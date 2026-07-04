@@ -74,7 +74,7 @@ npm run start
 
 Ele serve a pasta `dist` gerada por `npm run build` e usa automaticamente a porta definida em `PORT`.
 
-O arquivo `railpack.json` fixa o install em `npm ci --include=dev`, roda `npm run build` e inicia com `npm run start`.
+O deploy usa a deteccao Node padrao do Railpack: instala com `npm ci`, roda `npm run build` e inicia com `npm run start`.
 
 ## Plano mobile com Capacitor
 
