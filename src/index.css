@@ -1,10 +1,12 @@
+@import "@/styles/tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color: #0f172a;
-  background: #f8fafc;
+  color: var(--color-text);
+  background: var(--color-cream);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,8 +21,9 @@ body {
   min-height: 100%;
   margin: 0;
   background:
-    linear-gradient(180deg, rgba(254, 242, 242, 0.74) 0%, rgba(248, 250, 252, 0.92) 34%),
-    #f8fafc;
+    radial-gradient(circle at top left, rgba(255, 232, 199, 0.72), transparent 34rem),
+    linear-gradient(180deg, #fff8ef 0%, #fffdf9 42%, #fff8ef 100%);
+  color: var(--color-text);
 }
 
 button,
@@ -32,6 +35,26 @@ textarea {
 
 img {
   max-width: 100%;
+}
+
+::selection {
+  background: var(--color-brand-soft);
+  color: var(--color-brand-dark);
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    min-width: 320px;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgba(230, 67, 50, 0.34);
+    outline-offset: 3px;
+  }
 }
 
 @media (display-mode: standalone) {
