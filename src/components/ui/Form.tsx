@@ -23,7 +23,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={cn(
-        "min-h-12 rounded-bakeryLg border border-bakery-border bg-white px-3 text-base font-semibold text-bakery-ink outline-none transition placeholder:text-bakery-muted/70 focus:border-bakery-brand focus:ring-4 focus:ring-bakery-soft",
+        "min-h-12 w-full min-w-0 rounded-bakeryLg border border-bakery-border bg-white px-3 text-base font-semibold text-bakery-ink outline-none transition placeholder:text-bakery-muted/70 focus:border-bakery-brand focus:ring-4 focus:ring-bakery-soft",
         className
       )}
       {...props}
@@ -35,7 +35,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return (
     <textarea
       className={cn(
-        "min-h-24 rounded-bakeryLg border border-bakery-border bg-white px-3 py-2 text-base font-semibold text-bakery-ink outline-none transition placeholder:text-bakery-muted/70 focus:border-bakery-brand focus:ring-4 focus:ring-bakery-soft",
+        "min-h-24 w-full min-w-0 rounded-bakeryLg border border-bakery-border bg-white px-3 py-2 text-base font-semibold text-bakery-ink outline-none transition placeholder:text-bakery-muted/70 focus:border-bakery-brand focus:ring-4 focus:ring-bakery-soft",
         className
       )}
       {...props}
@@ -47,7 +47,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cn(
-        "min-h-12 rounded-bakeryLg border border-bakery-border bg-white px-3 text-base font-semibold text-bakery-ink outline-none transition focus:border-bakery-brand focus:ring-4 focus:ring-bakery-soft",
+        "min-h-12 w-full min-w-0 rounded-bakeryLg border border-bakery-border bg-white px-3 text-base font-semibold text-bakery-ink outline-none transition focus:border-bakery-brand focus:ring-4 focus:ring-bakery-soft",
         className
       )}
       {...props}
