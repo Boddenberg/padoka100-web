@@ -89,12 +89,12 @@ export function SalesModePage() {
   const error = currentDayQuery.error || productsQuery.error;
 
   return (
-    <div className="mx-auto grid w-full min-w-0 max-w-[var(--sales-max-width)] gap-5 px-4 py-5 sm:px-6 lg:py-8">
-      <header className="grid min-w-0 gap-2">
-        <p className="text-base font-bold text-bakery-brand">{getGreeting()}</p>
-        <h1 className="text-3xl font-black leading-tight text-bakery-ink sm:text-4xl">Venda de hoje</h1>
-        <p className="text-base font-semibold leading-relaxed text-bakery-muted">
-          Escolha os produtos, confira o carrinho e registre a venda em poucos toques.
+    <div className="mx-auto grid w-full min-w-0 max-w-[var(--sales-max-width)] gap-3 px-3.5 py-3 sm:px-6 lg:gap-5 lg:py-7">
+      <header className="grid min-w-0 gap-1">
+        <p className="text-sm font-bold text-bakery-brand">{getGreeting()}</p>
+        <h1 className="text-2xl font-black leading-tight text-bakery-ink sm:text-3xl">Venda de hoje</h1>
+        <p className="text-sm font-medium leading-relaxed text-bakery-muted">
+          Toque nos produtos e registre a venda.
         </p>
       </header>
 
@@ -118,8 +118,8 @@ export function SalesModePage() {
       ) : null}
 
       {currentDay ? (
-        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <div className="grid min-w-0 gap-5">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="grid min-w-0 gap-4">
             <CardDiaAtual dia={currentDay} resumo={resumoQuery.data} />
 
             {confirmation ? (
@@ -130,14 +130,14 @@ export function SalesModePage() {
             ) : null}
 
             {products.length ? (
-              <section className="grid gap-3">
+              <section className="grid gap-2">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <h2 className="text-2xl font-black text-bakery-ink">Produtos</h2>
-                    <p className="text-sm font-semibold text-bakery-muted">Toque em um card para adicionar.</p>
+                    <h2 className="text-xl font-black text-bakery-ink">Produtos</h2>
+                    <p className="text-xs font-medium text-bakery-muted">Toque em um card para adicionar.</p>
                   </div>
                 </div>
-                <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3">
+                <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:grid-cols-3">
                   {products.map((produto) => (
                     <CardProduto key={produto.id} produto={produto} quantidade={cart[produto.id] || 0} onAdd={addProduct} />
                   ))}
