@@ -9,15 +9,15 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ tone = "neutral", children }: StatusBadgeProps) {
   const styles = {
-    neutral: "bg-slate-100 text-slate-700",
-    good: "bg-teal-50 text-teal-700",
-    warn: "bg-amber-50 text-amber-700",
-    danger: "bg-rose-50 text-rose-700"
+    neutral: "bg-bakery-cream text-bakery-muted",
+    good: "bg-bakery-successSoft text-bakery-success",
+    warn: "bg-bakery-warningSoft text-bakery-warning",
+    danger: "bg-bakery-dangerSoft text-bakery-danger"
   };
   const Icon = tone === "good" ? CheckCircle2 : tone === "danger" ? CircleAlert : CircleDot;
 
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold", styles[tone])}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold", styles[tone])}>
       <Icon className="h-3.5 w-3.5" />
       {children}
     </span>

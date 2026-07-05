@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, Loader2, PackageOpen } from "lucide-react";
+import { AlertTriangle, Loader2, PackageOpen, Wheat } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
 export function LoadingState({ label = "Carregando" }: { label?: string }) {
   return (
-    <Card className="flex min-h-36 items-center justify-center gap-3 p-6 text-slate-600">
-      <Loader2 className="h-5 w-5 animate-spin" />
+    <Card className="flex min-h-36 items-center justify-center gap-3 p-6 text-bakery-muted">
+      <Loader2 className="h-5 w-5 animate-spin text-bakery-brand" />
       <span className="font-semibold">{label}</span>
     </Card>
   );
@@ -14,11 +14,13 @@ export function LoadingState({ label = "Carregando" }: { label?: string }) {
 
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
-    <Card className="grid justify-items-center gap-3 p-6 text-center">
-      <PackageOpen className="h-9 w-9 text-slate-400" />
+    <Card className="grid justify-items-center gap-4 p-7 text-center">
+      <div className="grid h-14 w-14 place-items-center rounded-full bg-bakery-soft text-bakery-brand">
+        <PackageOpen className="h-7 w-7" />
+      </div>
       <div>
-        <h3 className="text-lg font-bold text-slate-950">{title}</h3>
-        {description ? <p className="mt-1 text-sm font-medium text-slate-500">{description}</p> : null}
+        <h3 className="text-xl font-black text-bakery-ink">{title}</h3>
+        {description ? <p className="mt-2 text-base font-medium leading-relaxed text-bakery-muted">{description}</p> : null}
       </div>
       {action}
     </Card>
@@ -27,7 +29,7 @@ export function EmptyState({ title, description, action }: { title: string; desc
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <Card className="grid gap-3 border-rose-200 bg-rose-50 p-4 text-rose-900">
+    <Card className="grid gap-3 border-bakery-danger/20 bg-bakery-dangerSoft p-4 text-bakery-danger">
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
         <p className="font-semibold">{message}</p>
@@ -38,5 +40,16 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
         </Button>
       ) : null}
     </Card>
+  );
+}
+
+export function FriendlyHint({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 rounded-bakeryLg bg-bakery-cream p-4 text-base font-semibold text-bakery-muted">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-bakery-brand shadow-soft">
+        <Wheat className="h-5 w-5" />
+      </div>
+      <p>{children}</p>
+    </div>
   );
 }
