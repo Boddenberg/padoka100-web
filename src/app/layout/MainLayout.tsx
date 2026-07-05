@@ -17,13 +17,13 @@ import { cn } from "@/lib/utils/cn";
 const navItems = [
   { to: "/", label: "Venda", icon: ShoppingBag, end: true },
   { to: "/abrir-dia", label: "Abrir", icon: CalendarPlus },
-  { to: "/produtos", label: "Produtos", icon: Package },
+  { to: "/produtos", label: "Produtos", mobileLabel: "Produto", icon: Package },
   { to: "/locais", label: "Locais", icon: MapPin },
   { to: "/vendas", label: "Vendas", icon: ClipboardList },
-  { to: "/relatorios", label: "Relatorios", icon: BarChart3 },
-  { to: "/historico", label: "Historico", icon: History },
+  { to: "/relatorios", label: "Relatorios", mobileLabel: "Resumo", icon: BarChart3 },
+  { to: "/historico", label: "Historico", mobileLabel: "Histor.", icon: History },
   { to: "/ia", label: "IA", icon: Bot },
-  { to: "/configuracao", label: "Config", icon: Settings }
+  { to: "/configuracao", label: "Config", mobileLabel: "Ajustes", icon: Settings }
 ];
 
 export function MainLayout() {
