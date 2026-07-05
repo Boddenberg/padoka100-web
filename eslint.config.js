@@ -43,7 +43,9 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2022,
       globals: {
+        Headers: "readonly",
         URL: "readonly",
+        fetch: "readonly",
         console: "readonly",
         process: "readonly"
       }

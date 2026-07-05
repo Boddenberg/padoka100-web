@@ -28,6 +28,7 @@ Copie `.env.example` para `.env` se quiser sobrescrever os padroes:
 ```bash
 VITE_API_LOCAL_URL=http://localhost:8000
 VITE_API_PROD_URL=https://padoka100-production.up.railway.app
+VITE_API_PROD_PROXY=true
 VITE_DEFAULT_API_ENV=production
 ```
 
@@ -75,6 +76,13 @@ npm run start
 Ele serve a pasta `dist` gerada por `npm run build` e usa automaticamente a porta definida em `PORT`.
 
 O deploy usa a deteccao Node padrao do Railpack: instala com `npm ci`, roda `npm run build` e inicia com `npm run start`.
+
+Quando `VITE_API_PROD_PROXY=true`, o frontend chama o backend de producao por rotas same-origin:
+
+- `GET /health`
+- `/api/v1/*`
+
+No desenvolvimento local, o Vite encaminha essas rotas para `VITE_API_PROD_URL`. Em producao, `scripts/serve.mjs` faz o mesmo proxy. Isso evita problemas de CORS e mantem o frontend chamando o backend Railway pelo proprio dominio do frontend.
 
 ## Plano mobile com Capacitor
 

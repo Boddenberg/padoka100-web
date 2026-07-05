@@ -11,7 +11,7 @@ import { Page } from "@/components/ui/Page";
 import { ErrorState } from "@/components/ui/StateBlocks";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api } from "@/lib/api/client";
-import { getBaseUrl, runtimeApiConfig, useApiSettings } from "@/lib/config/apiSettings";
+import { getBackendTargetUrl, getBaseUrl, runtimeApiConfig, useApiSettings } from "@/lib/config/apiSettings";
 import type { ApiEnvironment, HealthStatus } from "@/types/api";
 
 const settingsSchema = z.object({
@@ -99,6 +99,9 @@ export function SettingsPage() {
                 <div className="grid gap-1 text-xs text-slate-500">
                   <span>Local: {runtimeApiConfig.localUrl}</span>
                   <span>Railway: {runtimeApiConfig.productionUrl}</span>
+                  {selectedEnvironment === "production" && runtimeApiConfig.useProductionProxy ? (
+                    <span>Proxy frontend: /health e /api/v1 encaminham para {getBackendTargetUrl("production")}</span>
+                  ) : null}
                 </div>
               </div>
 

@@ -2,6 +2,8 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+const productionBackendUrl = "https://padoka100-production.up.railway.app";
+
 export default defineConfig({
   plugins: [
     react(),
@@ -50,6 +52,20 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": "/src"
+    }
+  },
+  server: {
+    proxy: {
+      "/api/v1": {
+        target: productionBackendUrl,
+        changeOrigin: true,
+        secure: true
+      },
+      "/health": {
+        target: productionBackendUrl,
+        changeOrigin: true,
+        secure: true
+      }
     }
   }
 });

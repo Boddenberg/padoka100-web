@@ -12,6 +12,7 @@ export interface ApiSettings {
 export interface RuntimeApiConfig {
   localUrl: string;
   productionUrl: string;
+  useProductionProxy: boolean;
   defaultEnvironment: ApiEnvironment;
   envApiKey: string;
 }
@@ -21,6 +22,7 @@ export const runtimeApiConfig: RuntimeApiConfig = {
   productionUrl: stripTrailingSlash(
     import.meta.env.VITE_API_PROD_URL || "https://padoka100-production.up.railway.app"
   ),
+  useProductionProxy: import.meta.env.VITE_API_PROD_PROXY !== "false",
   defaultEnvironment: import.meta.env.VITE_DEFAULT_API_ENV === "local" ? "local" : "production",
   envApiKey: import.meta.env.VITE_API_KEY || ""
 };
@@ -66,6 +68,13 @@ export function saveApiSettings(settings: ApiSettings) {
 }
 
 export function getBaseUrl(environment = getApiSettings().environment) {
+  if (environment === "local") return runtimeApiConfig.localUrl;
+  if (!runtimeApiConfig.useProductionProxy) return runtimeApiConfig.productionUrl;
+
+  return typeof window === "undefined" ? "" : window.location.origin;
+}
+
+export function getBackendTargetUrl(environment = getApiSettings().environment) {
   return environment === "local" ? runtimeApiConfig.localUrl : runtimeApiConfig.productionUrl;
 }
 
