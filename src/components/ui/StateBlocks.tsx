@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 
 export function LoadingState({ label = "Carregando" }: { label?: string }) {
   return (
-    <Card className="flex min-h-36 items-center justify-center gap-3 p-6 text-bakery-muted">
+    <Card className="flex min-h-28 items-center justify-center gap-3 p-5 text-bakery-muted">
       <Loader2 className="h-5 w-5 animate-spin text-bakery-brand" />
       <span className="font-semibold">{label}</span>
     </Card>
@@ -14,13 +14,13 @@ export function LoadingState({ label = "Carregando" }: { label?: string }) {
 
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
-    <Card className="grid justify-items-center gap-4 p-7 text-center">
-      <div className="grid h-14 w-14 place-items-center rounded-full bg-bakery-soft text-bakery-brand">
-        <PackageOpen className="h-7 w-7" />
+    <Card className="grid justify-items-center gap-3 p-5 text-center">
+      <div className="grid h-12 w-12 place-items-center rounded-full bg-bakery-soft text-bakery-brand">
+        <PackageOpen className="h-6 w-6" />
       </div>
       <div>
-        <h3 className="text-xl font-black text-bakery-ink">{title}</h3>
-        {description ? <p className="mt-2 text-base font-medium leading-relaxed text-bakery-muted">{description}</p> : null}
+        <h3 className="text-lg font-black text-bakery-ink">{title}</h3>
+        {description ? <p className="mt-1 text-sm font-medium leading-relaxed text-bakery-muted">{description}</p> : null}
       </div>
       {action}
     </Card>
