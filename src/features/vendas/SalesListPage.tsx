@@ -77,11 +77,11 @@ export function SalesListPage() {
               <CardContent className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <ReceiptText className="h-5 w-5 text-red-600" />
-                    <h2 className="text-lg font-black text-slate-950">{formatCurrency(saleTotal(sale))}</h2>
+                    <ReceiptText className="h-5 w-5 text-bakery-brand" />
+                    <h2 className="text-xl font-black text-bakery-ink">{formatCurrency(saleTotal(sale))}</h2>
                     <StatusBadge tone={sale.situacao === "cancelada" ? "danger" : "good"}>{sale.situacao}</StatusBadge>
                   </div>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                  <p className="mt-1 text-sm font-semibold text-bakery-muted">
                     {formatDateTime(sale.ocorrido_em)} - {sale.itens?.length || 0} item(ns) - {sale.tipo_entrada}
                   </p>
                 </div>
@@ -112,14 +112,14 @@ export function SalesListPage() {
           <div className="grid gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <StatusBadge tone={selectedSale.situacao === "cancelada" ? "danger" : "good"}>{selectedSale.situacao}</StatusBadge>
-              <strong className="text-2xl text-slate-950">{formatCurrency(saleTotal(selectedSale))}</strong>
+              <strong className="text-2xl text-bakery-ink">{formatCurrency(saleTotal(selectedSale))}</strong>
             </div>
             <div className="grid gap-2">
               {(selectedSale.itens || []).map((item) => (
-                <div key={item.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg bg-slate-50 p-3">
+                <div key={item.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-bakeryLg bg-bakery-cream p-3">
                   <div>
-                    <p className="font-black text-slate-950">{item.nome_produto_no_momento}</p>
-                    <p className="text-sm font-semibold text-slate-500">
+                    <p className="font-black text-bakery-ink">{item.nome_produto_no_momento}</p>
+                    <p className="text-sm font-semibold text-bakery-muted">
                       {item.quantidade} x {formatCurrency(item.preco_venda_unitario_no_momento)}
                     </p>
                   </div>
@@ -128,7 +128,7 @@ export function SalesListPage() {
               ))}
             </div>
             {selectedSale.motivo_cancelamento ? (
-              <div className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-800">
+              <div className="rounded-bakeryLg bg-bakery-dangerSoft p-3 text-sm font-semibold text-bakery-danger">
                 {selectedSale.motivo_cancelamento}
               </div>
             ) : null}

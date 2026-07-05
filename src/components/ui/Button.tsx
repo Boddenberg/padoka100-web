@@ -29,7 +29,7 @@ export function Button({ className, variant = "primary", size = "md", icon, chil
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-bakeryLg font-bold transition active:scale-[0.98] focus:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none disabled:ring-slate-200",
+        "inline-flex items-center justify-center gap-2 rounded-bakeryLg font-bold transition active:scale-[0.98] focus:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:bg-bakery-creamStrong disabled:text-bakery-muted disabled:shadow-none disabled:ring-bakery-border",
         variants[variant],
         sizes[size],
         className

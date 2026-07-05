@@ -36,7 +36,7 @@ export function ReportsPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <SummaryCard
           title="Dia atual"
-          icon={<BarChart3 className="h-5 w-5 text-red-600" />}
+          icon={<BarChart3 className="h-5 w-5 text-bakery-brand" />}
           loading={currentDayQuery.isLoading || daySummaryQuery.isLoading}
           error={currentDayQuery.error || daySummaryQuery.error}
           summary={daySummaryQuery.data}
@@ -45,8 +45,8 @@ export function ReportsPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-red-600" />
-              <h2 className="text-lg font-bold text-slate-950">Periodo</h2>
+              <CalendarDays className="h-5 w-5 text-bakery-brand" />
+              <h2 className="text-xl font-black text-bakery-ink">Periodo</h2>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -86,7 +86,7 @@ function SummaryCard({
       <CardHeader>
         <div className="flex items-center gap-2">
           {icon}
-          <h2 className="text-lg font-bold text-slate-950">{title}</h2>
+          <h2 className="text-xl font-black text-bakery-ink">{title}</h2>
         </div>
       </CardHeader>
       <CardContent>
@@ -103,22 +103,22 @@ function DaySummary({ summary }: { summary: ResumoDoDia }) {
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-slate-500">{formatDate(summary.data_venda)}</p>
-          <h3 className="text-xl font-black text-slate-950">{summary.nome_local || "Sem local"}</h3>
+          <p className="text-sm font-bold text-bakery-muted">{formatDate(summary.data_venda)}</p>
+          <h3 className="text-xl font-black text-bakery-ink">{summary.nome_local || "Sem local"}</h3>
         </div>
         <StatusBadge tone={summary.situacao === "aberto" ? "good" : "warn"}>{summary.situacao}</StatusBadge>
       </div>
       <Metrics summary={summary} />
       <div className="grid gap-2">
         {(summary.produtos || []).map((produto) => (
-          <div key={produto.produto_id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg bg-slate-50 p-3">
+          <div key={produto.produto_id} className="grid grid-cols-[1fr_auto] gap-3 rounded-bakeryLg bg-bakery-cream p-3">
             <div>
-              <p className="font-black text-slate-950">{produto.nome_produto}</p>
-              <p className="text-sm font-semibold text-slate-500">
+              <p className="font-black text-bakery-ink">{produto.nome_produto}</p>
+              <p className="text-sm font-semibold text-bakery-muted">
                 {produto.quantidade_vendida || 0}/{produto.quantidade_produzida || 0} vendidos
               </p>
             </div>
-            <strong className="text-teal-700">{formatCurrency(produto.faturamento_bruto)}</strong>
+            <strong className="text-bakery-success">{formatCurrency(produto.faturamento_bruto)}</strong>
           </div>
         ))}
       </div>
@@ -132,10 +132,10 @@ function PeriodSummary({ summary }: { summary: ResumoDoPeriodo }) {
       <Metrics summary={summary} />
       <div className="grid gap-2">
         {(summary.dias || []).map((day) => (
-          <div key={day.dia_de_venda_id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg bg-slate-50 p-3">
+          <div key={day.dia_de_venda_id} className="grid grid-cols-[1fr_auto] gap-3 rounded-bakeryLg bg-bakery-cream p-3">
             <div>
-              <p className="font-black text-slate-950">{formatDate(day.data_venda)}</p>
-              <p className="text-sm font-semibold text-slate-500">{day.nome_local || "Sem local"}</p>
+              <p className="font-black text-bakery-ink">{formatDate(day.data_venda)}</p>
+              <p className="text-sm font-semibold text-bakery-muted">{day.nome_local || "Sem local"}</p>
             </div>
             <strong>{formatCurrency(day.faturamento_bruto)}</strong>
           </div>
@@ -158,9 +158,9 @@ function Metrics({ summary }: { summary: ResumoDoDia | ResumoDoPeriodo }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {metrics.map(([label, value]) => (
-        <div key={label} className="rounded-lg bg-slate-50 p-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
+        <div key={label} className="rounded-bakeryLg bg-bakery-cream p-3">
+          <p className="text-sm font-bold text-bakery-muted">{label}</p>
+          <p className="mt-1 text-xl font-black text-bakery-ink">{value}</p>
         </div>
       ))}
     </div>

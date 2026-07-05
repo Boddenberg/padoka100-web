@@ -92,14 +92,14 @@ export function HistoryPage() {
             <Card key={event.id}>
               <CardContent className="grid gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-lg font-black text-slate-950">{event.titulo}</h2>
+                  <h2 className="text-xl font-black text-bakery-ink">{event.titulo}</h2>
                   <StatusBadge tone="neutral">{event.tipo_evento}</StatusBadge>
                 </div>
-                <p className="text-sm font-semibold text-slate-500">
+                <p className="text-sm font-semibold text-bakery-muted">
                   {event.tipo_entidade} - {formatDateTime(event.criado_em)}
                 </p>
                 {Object.keys(event.detalhes || {}).length ? (
-                  <pre className="max-h-40 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-100">
+                  <pre className="max-h-40 overflow-auto rounded-bakeryLg bg-bakery-ink p-3 text-xs text-white">
                     {JSON.stringify(event.detalhes, null, 2)}
                   </pre>
                 ) : null}

@@ -71,7 +71,7 @@ export function LocationsPage() {
       <div className="grid gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-bold text-slate-950">Novo local</h2>
+            <h2 className="text-xl font-black text-bakery-ink">Novo local</h2>
           </CardHeader>
           <CardContent>
             <LocalForm
@@ -94,11 +94,11 @@ export function LocationsPage() {
                 <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <MapPin className="h-5 w-5 text-red-600" />
-                      <h2 className="text-lg font-black text-slate-950">{local.nome}</h2>
+                      <MapPin className="h-5 w-5 text-bakery-brand" />
+                      <h2 className="text-xl font-black text-bakery-ink">{local.nome}</h2>
                       <StatusBadge tone={local.situacao === "ativo" ? "good" : "warn"}>{local.situacao}</StatusBadge>
                     </div>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">{local.endereco_texto || "Sem endereco"}</p>
+                    <p className="mt-1 text-sm font-semibold text-bakery-muted">{local.endereco_texto || "Sem endereco"}</p>
                   </div>
                   <Button type="button" variant="secondary" onClick={() => openEdit(local)} icon={<Edit3 className="h-4 w-4" />}>
                     Editar

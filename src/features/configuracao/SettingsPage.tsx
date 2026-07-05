@@ -65,42 +65,42 @@ export function SettingsPage() {
   }
 
   return (
-    <Page title="Configuracao" eyebrow="Ambiente">
+    <Page title="Ajustes" eyebrow="Conexao">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-bold text-slate-950">Conexao com backend</h2>
+            <h2 className="text-xl font-black text-bakery-ink">Conexao do app</h2>
           </CardHeader>
           <CardContent>
             <form className="grid gap-4" onSubmit={form.handleSubmit(persist)}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Ambiente">
                   <Select {...form.register("environment")}>
-                    <option value="production">Railway Production</option>
+                    <option value="production">Producao</option>
                     <option value="local">Local</option>
                   </Select>
                 </Field>
 
-                <Field label="API key" hint="Salva apenas neste navegador. VITE_API_KEY e util so para dev.">
+                <Field label="Chave de acesso" hint="Fica salva apenas neste navegador.">
                   <Input
                     type="password"
                     autoComplete="off"
-                    placeholder="Cole a chave configurada no Railway"
+                    placeholder="Cole a chave de acesso"
                     {...form.register("apiKey")}
                   />
                 </Field>
               </div>
 
-              <div className="grid gap-2 rounded-lg bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+              <div className="grid gap-2 rounded-bakeryLg bg-bakery-cream p-3 text-sm font-semibold text-bakery-muted">
                 <div className="flex items-center gap-2">
-                  <Server className="h-4 w-4 text-red-600" />
+                  <Server className="h-4 w-4 text-bakery-brand" />
                   <span className="truncate">{getBaseUrl(selectedEnvironment)}</span>
                 </div>
-                <div className="grid gap-1 text-xs text-slate-500">
+                <div className="grid gap-1 text-sm text-bakery-muted">
                   <span>Local: {runtimeApiConfig.localUrl}</span>
-                  <span>Railway: {runtimeApiConfig.productionUrl}</span>
+                  <span>Producao: {runtimeApiConfig.productionUrl}</span>
                   {selectedEnvironment === "production" && runtimeApiConfig.useProductionProxy ? (
-                    <span>Proxy frontend: /health e /api/v1 encaminham para {getBackendTargetUrl("production")}</span>
+                    <span>O frontend encaminha /health e /api/v1 para {getBackendTargetUrl("production")}</span>
                   ) : null}
                 </div>
               </div>
@@ -116,12 +116,12 @@ export function SettingsPage() {
                   onClick={form.handleSubmit(testConnection)}
                   icon={<Wifi className="h-4 w-4" />}
                 >
-                  {testing ? "Testando" : "Testar /health"}
+                  {testing ? "Testando" : "Testar conexao"}
                 </Button>
               </div>
 
               {saved ? (
-                <div className="rounded-lg bg-teal-50 p-3 text-sm font-bold text-teal-700">
+                <div className="rounded-bakeryLg bg-bakery-successSoft p-3 text-sm font-bold text-bakery-success">
                   Configuracao salva.
                 </div>
               ) : null}
@@ -131,7 +131,7 @@ export function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-bold text-slate-950">Status</h2>
+            <h2 className="text-xl font-black text-bakery-ink">Status</h2>
           </CardHeader>
           <CardContent className="grid gap-3">
             <StatusBadge tone={selectedApiKey.trim() ? "good" : "warn"}>
@@ -140,15 +140,15 @@ export function SettingsPage() {
 
             {health ? (
               <div className="grid gap-3">
-                <StatusRow label="API" ok={health.status === "ok"} value={String(health.status || "sem status")} />
+                <StatusRow label="Servidor" ok={health.status === "ok"} value={String(health.status || "sem status")} />
                 <StatusRow label="Supabase" ok={Boolean(health.supabase_configured)} />
                 <StatusRow label="OpenAI texto" ok={Boolean(health.openai_text_configured)} />
                 <StatusRow label="OpenAI audio" ok={Boolean(health.openai_audio_configured)} />
                 <StatusRow label="API key backend" ok={Boolean(health.api_key_configured)} />
               </div>
             ) : (
-              <div className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm font-semibold text-slate-600">
-                <ShieldCheck className="h-6 w-6 text-slate-400" />
+              <div className="grid gap-3 rounded-bakeryLg bg-bakery-cream p-4 text-sm font-semibold text-bakery-muted">
+                <ShieldCheck className="h-6 w-6 text-bakery-brand" />
                 Teste a conexao para ver o status do backend.
               </div>
             )}
@@ -163,8 +163,8 @@ export function SettingsPage() {
 
 function StatusRow({ label, ok, value }: { label: string; ok: boolean; value?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-3">
-      <span className="font-semibold text-slate-700">{label}</span>
+    <div className="flex items-center justify-between gap-3 rounded-bakeryLg border border-bakery-border p-3">
+      <span className="font-semibold text-bakery-muted">{label}</span>
       <StatusBadge tone={ok ? "good" : "warn"}>{value || (ok ? "Configurado" : "Pendente")}</StatusBadge>
     </div>
   );

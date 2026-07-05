@@ -20,6 +20,7 @@ html {
 body {
   min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top left, rgba(255, 232, 199, 0.72), transparent 34rem),
     linear-gradient(180deg, #fff8ef 0%, #fffdf9 42%, #fff8ef 100%);
@@ -49,6 +50,7 @@ img {
 
   body {
     min-width: 320px;
+    overflow-x: hidden;
   }
 
   :focus-visible {

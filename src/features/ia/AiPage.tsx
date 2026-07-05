@@ -98,8 +98,8 @@ export function AiPage() {
         <Card>
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <Bot className="h-6 w-6 text-red-600" />
-              <h2 className="text-lg font-bold text-slate-950">Interpretar venda</h2>
+              <Bot className="h-6 w-6 text-bakery-brand" />
+              <h2 className="text-xl font-black text-bakery-ink">Interpretar venda</h2>
             </div>
             <StatusBadge tone={currentDayQuery.data ? "good" : "warn"}>
               {currentDayQuery.data ? "Dia aberto" : "Sem dia"}
@@ -150,30 +150,30 @@ export function AiPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-bold text-slate-950">Confirmacao</h2>
+            <h2 className="text-xl font-black text-bakery-ink">Confirmacao</h2>
           </CardHeader>
           <CardContent className="grid gap-4">
             {result ? (
               <>
-                <div className="rounded-lg bg-slate-50 p-4">
-                  <p className="text-sm font-bold text-slate-500">Resposta</p>
-                  <p className="mt-1 font-semibold text-slate-800">{result.mensagem_assistente}</p>
+                <div className="rounded-bakeryLg bg-bakery-cream p-4">
+                  <p className="text-sm font-bold text-bakery-muted">Resposta</p>
+                  <p className="mt-1 font-semibold text-bakery-ink">{result.mensagem_assistente}</p>
                 </div>
                 <div className="grid gap-2">
                   {(result.itens || []).map((item) => (
-                    <div key={`${item.produto_id}-${item.nome_produto}`} className="rounded-lg border border-slate-200 p-3">
+                    <div key={`${item.produto_id}-${item.nome_produto}`} className="rounded-bakeryLg border border-bakery-border p-3">
                       <div className="flex items-center justify-between gap-3">
-                        <strong className="text-slate-950">{item.nome_produto}</strong>
+                        <strong className="text-bakery-ink">{item.nome_produto}</strong>
                         <StatusBadge tone={item.confianca >= 0.75 ? "good" : "warn"}>
                           {Math.round(item.confianca * 100)}%
                         </StatusBadge>
                       </div>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">Quantidade: {item.quantidade}</p>
+                      <p className="mt-1 text-sm font-semibold text-bakery-muted">Quantidade: {item.quantidade}</p>
                     </div>
                   ))}
                 </div>
                 {result.itens_nao_identificados?.length ? (
-                  <div className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+                  <div className="rounded-bakeryLg bg-bakery-warningSoft p-3 text-sm font-semibold text-bakery-warning">
                     Nao identificado: {result.itens_nao_identificados.join(", ")}
                   </div>
                 ) : null}
@@ -187,7 +187,7 @@ export function AiPage() {
                   {confirmSale.isPending ? "Confirmando" : "Confirmar venda"}
                 </Button>
                 {confirmSale.data ? (
-                  <div className="rounded-lg bg-teal-50 p-3 text-sm font-black text-teal-800">
+                  <div className="rounded-bakeryLg bg-bakery-successSoft p-3 text-sm font-black text-bakery-success">
                     Venda criada: {formatCurrency((confirmSale.data.venda.itens || []).reduce((sum, item) => sum + Number(item.valor_total_venda || 0), 0))}
                   </div>
                 ) : null}

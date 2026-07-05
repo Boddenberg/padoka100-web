@@ -12,7 +12,7 @@ export interface BottomNavItem {
 export function BottomNavigation({ items }: { items: BottomNavItem[] }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-bakery-border/80 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.45rem)] pt-2 shadow-nav backdrop-blur-xl lg:hidden">
-      <div className="mx-auto flex max-w-[var(--sales-max-width)] gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mx-auto flex w-full max-w-[var(--sales-max-width)] gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => (
           <MobileNavLink key={item.to} {...item} />
         ))}

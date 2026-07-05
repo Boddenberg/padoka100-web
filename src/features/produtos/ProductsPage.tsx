@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit3, ImagePlus, Save, Tag } from "lucide-react";
+import { Edit3, ImagePlus, Save, Tag, Wheat } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Field, Input, Select, Textarea } from "@/components/ui/Form";
@@ -9,7 +9,7 @@ import { Page } from "@/components/ui/Page";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateBlocks";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api, createProductMediaForm } from "@/lib/api/client";
-import { cleanPayload, formatCurrency, formatDate, productInitials, todayInputValue } from "@/lib/utils/format";
+import { cleanPayload, formatCurrency, formatDate, todayInputValue } from "@/lib/utils/format";
 import { resolveMediaUrl } from "@/lib/utils/media";
 import type { Produto } from "@/types/api";
 
@@ -116,11 +116,11 @@ export function ProductsPage() {
   }
 
   return (
-    <Page title="Produtos" eyebrow="Catalogo">
+    <Page title="Produtos" eyebrow="Cardapio">
       <div className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-bold text-slate-950">Novo produto</h2>
+            <h2 className="text-xl font-black text-bakery-ink">Novo produto</h2>
           </CardHeader>
           <CardContent>
             <ProductForm
@@ -158,8 +158,8 @@ export function ProductsPage() {
             includeStatus
           />
 
-          <section className="grid gap-3 border-t border-slate-100 pt-4">
-            <h3 className="text-lg font-bold text-slate-950">Nova versao de preco</h3>
+          <section className="grid gap-3 border-t border-bakery-border pt-4">
+            <h3 className="text-xl font-black text-bakery-ink">Nova versao de preco</h3>
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Venda">
                 <Input
@@ -202,8 +202,8 @@ export function ProductsPage() {
             {createPrice.error instanceof Error ? <ErrorState message={createPrice.error.message} /> : null}
           </section>
 
-          <section className="grid gap-3 border-t border-slate-100 pt-4">
-            <h3 className="text-lg font-bold text-slate-950">Foto do produto</h3>
+          <section className="grid gap-3 border-t border-bakery-border pt-4">
+            <h3 className="text-xl font-black text-bakery-ink">Foto do produto</h3>
             <Input
               type="file"
               accept="image/*"
@@ -222,18 +222,18 @@ export function ProductsPage() {
             {uploadMedia.error instanceof Error ? <ErrorState message={uploadMedia.error.message} /> : null}
           </section>
 
-          <section className="grid gap-3 border-t border-slate-100 pt-4">
-            <h3 className="text-lg font-bold text-slate-950">Historico de precos</h3>
+          <section className="grid gap-3 border-t border-bakery-border pt-4">
+            <h3 className="text-xl font-black text-bakery-ink">Historico de precos</h3>
             {pricesQuery.isLoading ? <LoadingState label="Carregando precos" /> : null}
             {pricesQuery.data?.length ? (
               <div className="grid gap-2">
                 {pricesQuery.data.map((price) => (
-                  <div key={price.id} className="grid gap-1 rounded-lg bg-slate-50 p-3">
+                  <div key={price.id} className="grid gap-1 rounded-bakeryLg bg-bakery-cream p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-black text-slate-950">{formatCurrency(price.preco_venda)}</span>
-                      <span className="text-sm font-bold text-slate-500">{formatDate(price.vigente_desde)}</span>
+                      <span className="font-black text-bakery-ink">{formatCurrency(price.preco_venda)}</span>
+                      <span className="text-sm font-bold text-bakery-muted">{formatDate(price.vigente_desde)}</span>
                     </div>
-                    <p className="text-sm font-semibold text-slate-500">Custo {formatCurrency(price.preco_custo)}</p>
+                    <p className="text-sm font-semibold text-bakery-muted">Custo {formatCurrency(price.preco_custo)}</p>
                   </div>
                 ))}
               </div>
@@ -256,19 +256,20 @@ function ProductRow({ produto, onEdit }: { produto: Produto; onEdit: (produto: P
       <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           {image ? (
-            <img src={image} alt="" className="h-16 w-16 rounded-lg object-cover" loading="lazy" />
+            <img src={image} alt="" className="h-20 w-20 rounded-bakeryLg object-cover" loading="lazy" />
           ) : (
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg text-xl font-black text-white" style={{ backgroundColor: buttonColor }}>
-              {productInitials(produto.nome)}
+            <div className="grid h-20 w-20 shrink-0 place-items-center rounded-bakeryLg bg-gradient-to-br from-bakery-creamStrong to-white text-bakery-brand shadow-inner">
+              <Wheat className="h-9 w-9" />
             </div>
           )}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-black text-slate-950">{produto.nome}</h2>
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: buttonColor }} aria-hidden="true" />
+              <h2 className="text-xl font-black text-bakery-ink">{produto.nome}</h2>
               <StatusBadge tone={produto.situacao === "ativo" ? "good" : "warn"}>{produto.situacao}</StatusBadge>
             </div>
-            <p className="text-sm font-semibold text-slate-500">{produto.descricao || produto.descricao_visual || "Sem descricao"}</p>
-            <p className="mt-1 text-lg font-black text-teal-700">{formatCurrency(produto.preco_atual?.preco_venda)}</p>
+            <p className="text-sm font-semibold text-bakery-muted">{produto.descricao || produto.descricao_visual || "Sem descricao"}</p>
+            <p className="mt-1 text-xl font-black text-bakery-brand">{formatCurrency(produto.preco_atual?.preco_venda)}</p>
           </div>
         </div>
         <Button type="button" variant="secondary" onClick={() => onEdit(produto)} icon={<Edit3 className="h-4 w-4" />}>

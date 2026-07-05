@@ -118,10 +118,10 @@ export function OpenDayPage() {
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-950">
+                <h2 className="text-xl font-black text-bakery-ink">
                   {currentDay ? `Dia ${formatDate(currentDay.data_venda)}` : "Novo dia de venda"}
                 </h2>
-                <p className="text-sm font-semibold text-slate-500">
+                <p className="text-sm font-semibold text-bakery-muted">
                   {currentDay?.nome_local_no_momento || "Selecione o local e a producao inicial."}
                 </p>
               </div>
@@ -180,14 +180,14 @@ export function OpenDayPage() {
 
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-bold text-slate-950">Fechamento</h2>
+              <h2 className="text-xl font-black text-bakery-ink">Fechamento</h2>
             </CardHeader>
             <CardContent className="grid gap-4">
               {currentDay ? (
                 <>
-                  <div className="rounded-lg bg-slate-50 p-4">
-                    <p className="text-sm font-bold text-slate-500">Aberto em</p>
-                    <p className="text-lg font-black text-slate-950">{formatDate(currentDay.data_venda)}</p>
+                  <div className="rounded-bakeryLg bg-bakery-cream p-4">
+                    <p className="text-sm font-bold text-bakery-muted">Aberto em</p>
+                    <p className="text-xl font-black text-bakery-ink">{formatDate(currentDay.data_venda)}</p>
                   </div>
                   <Field label="Observacoes finais">
                     <Textarea value={closeNotes} onChange={(event) => setCloseNotes(event.target.value)} />
@@ -232,11 +232,11 @@ function ProductionEditor({
       {products.map((produto) => (
         <label
           key={produto.id}
-          className="grid grid-cols-[1fr_7rem] items-center gap-3 rounded-lg border border-slate-200 bg-white p-3"
+          className="grid grid-cols-[1fr_7rem] items-center gap-3 rounded-bakeryLg border border-bakery-border bg-white p-3 shadow-soft"
         >
           <div className="min-w-0">
-            <p className="truncate font-black text-slate-950">{produto.nome}</p>
-            <p className="text-sm font-semibold text-slate-500">{produto.preco_atual ? "Produto ativo" : "Sem preco atual"}</p>
+            <p className="truncate font-black text-bakery-ink">{produto.nome}</p>
+            <p className="text-sm font-semibold text-bakery-muted">{produto.preco_atual ? "Produto ativo" : "Sem preco atual"}</p>
           </div>
           <Input
             type="number"
