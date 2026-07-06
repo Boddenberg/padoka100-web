@@ -9,7 +9,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["padoka-mark.svg"],
+      includeAssets: [
+        "logo.png",
+        "padoka-mark.svg",
+        "icons/padoka-icon-192.png",
+        "icons/padoka-icon-512.png",
+        "icons/padoka-icon-maskable-512.png"
+      ],
       manifest: {
         name: "Padoka 100",
         short_name: "Padoka 100",
@@ -23,10 +29,22 @@ export default defineConfig({
         lang: "pt-BR",
         icons: [
           {
-            src: "/padoka-mark.svg",
-            sizes: "any",
-            type: "image/svg+xml",
-            purpose: "any maskable"
+            src: "/icons/padoka-icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any"
+          },
+          {
+            src: "/icons/padoka-icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any"
+          },
+          {
+            src: "/icons/padoka-icon-maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable"
           }
         ]
       },
