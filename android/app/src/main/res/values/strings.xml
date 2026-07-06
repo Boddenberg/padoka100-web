@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Padoka 100%</string>
-    <string name="title_activity_main">Padoka 100%</string>
-    <string name="package_name">com.boddenberg.padoka100</string>
-    <string name="custom_url_scheme">com.boddenberg.padoka100</string>
-</resources>

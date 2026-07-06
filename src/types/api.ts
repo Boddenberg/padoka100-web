@@ -220,10 +220,10 @@ export interface CriarDiaDeVendaRequest {
 
 export interface RegistrarVendaRequest {
   dia_de_venda_id: UUID;
-  itens: Array<{
+  itens: {
     produto_id: UUID;
     quantidade: number;
-  }>;
+  }[];
   tipo_entrada?: "manual" | "audio" | "ia";
   interacao_ia_id?: UUID | null;
   texto_original?: string | null;

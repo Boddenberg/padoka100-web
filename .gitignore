@@ -1,4 +1,6 @@
 node_modules
+.expo
+.expo/
 dist
 dist-ssr
 tsconfig.tsbuildinfo

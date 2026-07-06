@@ -5,11 +5,48 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "padoka100",
-    "platforms": ["android", "web"],
-    "android": {
-      "package": "com.boddenberg.padoka100"
+    "userInterfaceStyle": "light",
+    "runtimeVersion": {
+      "policy": "appVersion"
     },
+    "updates": {
+      "url": "https://u.expo.dev/ed7d0538-750b-4f69-87c3-ebba96be1538"
+    },
+    "icon": "./Logo.png",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.boddenberg.padoka100",
+      "infoPlist": {
+        "NSCameraUsageDescription": "A Padoka 100 usa a camera para fotografar produtos.",
+        "NSMicrophoneUsageDescription": "A Padoka 100 usa o microfone para registrar vendas por voz.",
+        "NSPhotoLibraryUsageDescription": "A Padoka 100 usa suas fotos para anexar imagens aos produtos."
+      }
+    },
+    "android": {
+      "package": "com.boddenberg.padoka100",
+      "permissions": ["CAMERA", "RECORD_AUDIO"]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir que a Padoka 100 acesse fotos de produtos.",
+          "cameraPermission": "Permitir que a Padoka 100 fotografe produtos."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Permitir que a Padoka 100 grave vendas por voz."
+        }
+      ],
+      "expo-secure-store"
+    ],
     "extra": {
+      "apiProdUrl": "https://padoka100-production.up.railway.app",
+      "apiLocalUrl": "http://localhost:8000",
       "eas": {
         "projectId": "ed7d0538-750b-4f69-87c3-ebba96be1538"
       }
