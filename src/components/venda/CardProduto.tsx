@@ -1,4 +1,5 @@
 import { Plus, Wheat } from "lucide-react";
+import { ProductImage } from "@/components/ui/ProductImage";
 import { Stepper } from "@/components/ui/Stepper";
 import { cn } from "@/lib/utils/cn";
 import { formatCurrency, productInitials } from "@/lib/utils/format";
@@ -32,16 +33,18 @@ export function CardProduto({ produto, quantidade, availableQuantity, stockReady
       )}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-bakery-creamStrong">
-        {image ? (
-          <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" />
-        ) : (
-          <div className="grid h-full place-items-center gap-1.5">
-            <div className="grid h-12 w-12 place-items-center rounded-full bg-white text-bakery-muted shadow-soft">
-              <Wheat className="h-6 w-6" />
+        <ProductImage
+          src={image}
+          className="h-full w-full object-cover"
+          fallback={
+            <div className="grid h-full place-items-center gap-1.5">
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-white text-bakery-muted shadow-soft">
+                <Wheat className="h-6 w-6" />
+              </div>
+              <span className="text-sm font-bold text-bakery-muted">{productInitials(produto.nome)}</span>
             </div>
-            <span className="text-sm font-bold text-bakery-muted">{productInitials(produto.nome)}</span>
-          </div>
-        )}
+          }
+        />
         {selected ? (
           <span className="absolute right-2.5 top-2.5 grid h-8 min-w-8 place-items-center rounded-full bg-bakery-brand px-2 text-base font-extrabold tabular-nums text-white shadow-button">
             {quantidade}

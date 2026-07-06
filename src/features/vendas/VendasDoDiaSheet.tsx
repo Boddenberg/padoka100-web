@@ -74,8 +74,8 @@ function SheetContent({ view, onViewChange }: { view: SheetView; onViewChange: (
   }
 
   return (
-    <div className="grid gap-4">
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <Select value={effectiveSelectedDayId} onChange={(event) => setSelectedDayId(event.target.value)}>
           {(daysQuery.data || []).map((day) => (
             <option key={day.id} value={day.id}>
@@ -83,7 +83,9 @@ function SheetContent({ view, onViewChange }: { view: SheetView; onViewChange: (
             </option>
           ))}
         </Select>
-        <StatusBadge tone="good">{formatCurrency(total)}</StatusBadge>
+        <span className="justify-self-start sm:justify-self-end">
+          <StatusBadge tone="good">{formatCurrency(total)}</StatusBadge>
+        </span>
       </div>
 
       {daysQuery.isLoading || salesQuery.isLoading ? <LoadingState label="Carregando vendas" /> : null}
@@ -91,7 +93,7 @@ function SheetContent({ view, onViewChange }: { view: SheetView; onViewChange: (
       {salesQuery.error instanceof Error ? <ErrorState message={salesQuery.error.message} /> : null}
 
       {salesQuery.data?.length ? (
-        <div className="grid divide-y divide-bakery-border/70">
+        <div className="divide-y divide-bakery-border/70">
           {salesQuery.data.map((sale) => (
             <div key={sale.id} className="flex items-center gap-3 py-3">
               <button
@@ -135,7 +137,7 @@ function SheetContent({ view, onViewChange }: { view: SheetView; onViewChange: (
 
 function SaleDetail({ sale }: { sale: Venda }) {
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <StatusBadge tone={sale.situacao === "cancelada" ? "danger" : "good"}>{sale.situacao}</StatusBadge>
         <strong className="text-2xl font-extrabold tracking-tight tabular-nums text-bakery-ink">

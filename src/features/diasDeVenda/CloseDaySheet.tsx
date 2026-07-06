@@ -31,7 +31,7 @@ export function CloseDaySheet({ open, onClose, dia }: CloseDaySheetProps) {
 
   return (
     <Modal title="Fechar o dia" open={open} onClose={onClose}>
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="rounded-bakeryLg bg-bakery-creamStrong/60 p-4">
           <p className="text-sm font-semibold text-bakery-muted">Dia de venda</p>
           <p className="text-xl font-extrabold text-bakery-ink">

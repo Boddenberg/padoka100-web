@@ -141,9 +141,9 @@ function AiSaleContent({
   );
 
   return (
-    <div className="grid gap-5">
+    <div className="grid grid-cols-1 gap-5">
       <form
-        className="grid gap-4"
+        className="grid grid-cols-1 gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           interpretText.mutate();

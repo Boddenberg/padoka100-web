@@ -1,4 +1,5 @@
 import { ShoppingBag, Trash2, Wheat } from "lucide-react";
+import { ProductImage } from "@/components/ui/ProductImage";
 import { Modal } from "@/components/ui/Modal";
 import { Stepper } from "@/components/ui/Stepper";
 import { ErrorState } from "@/components/ui/StateBlocks";
@@ -68,8 +69,8 @@ export function SacolaSheet({
       }
     >
       {hasItems ? (
-        <div className="grid gap-4">
-          <div className="grid divide-y divide-bakery-border/70">
+        <div className="grid grid-cols-1 gap-4">
+          <div className="divide-y divide-bakery-border/70">
             {cartItems.map((item) => {
               const image = resolveMediaUrl(item.produto.url_imagem_principal);
               const remainingQuantity = Math.max(0, item.availableQuantity - item.quantidade);
@@ -78,11 +79,11 @@ export function SacolaSheet({
               return (
                 <div key={item.produto.id} className="flex items-center gap-3 py-3">
                   <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-bakery-creamStrong">
-                    {image ? (
-                      <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" />
-                    ) : (
-                      <Wheat className="h-6 w-6 text-bakery-muted" />
-                    )}
+                    <ProductImage
+                      src={image}
+                      className="h-full w-full object-cover"
+                      fallback={<Wheat className="h-6 w-6 text-bakery-muted" />}
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-base font-bold text-bakery-ink">{item.produto.nome}</p>

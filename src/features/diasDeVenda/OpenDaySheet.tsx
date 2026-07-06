@@ -85,8 +85,8 @@ function OpenDayContent({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <form className="grid gap-4" onSubmit={form.handleSubmit((values) => createDay.mutate(values))}>
-      <div className="grid gap-4 sm:grid-cols-3">
+    <form className="grid grid-cols-1 gap-4" onSubmit={form.handleSubmit((values) => createDay.mutate(values))}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Data" error={form.formState.errors.data_venda?.message}>
           <Input type="date" {...form.register("data_venda")} />
         </Field>

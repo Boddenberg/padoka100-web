@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Field, Input, Select, Textarea } from "@/components/ui/Form";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateBlocks";
+import { ProductImage } from "@/components/ui/ProductImage";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api, createProductMediaForm } from "@/lib/api/client";
 import { cleanPayload, formatCurrency, formatDate, todayInputValue } from "@/lib/utils/format";
@@ -266,13 +267,9 @@ function ProductRow({ produto, onEdit }: { produto: Produto; onEdit: (produto: P
     <Card>
       <CardContent className="flex h-full flex-col gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          {image ? (
-            <img src={image} alt="" className="h-24 w-24 shrink-0 rounded-bakeryLg object-cover" loading="lazy" />
-          ) : (
-            <div className="grid h-24 w-24 shrink-0 place-items-center rounded-bakeryLg bg-gradient-to-br from-bakery-creamStrong to-white text-bakery-brand shadow-inner">
-              <Wheat className="h-9 w-9" />
-            </div>
-          )}
+          <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-bakeryLg bg-bakery-creamStrong/60 text-bakery-muted">
+            <ProductImage src={image} className="h-24 w-24 object-cover" fallback={<Wheat className="h-9 w-9" />} />
+          </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ backgroundColor: buttonColor }} aria-hidden="true" />
