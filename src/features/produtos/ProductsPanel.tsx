@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Field, Input, Select, Textarea } from "@/components/ui/Form";
 import { Modal } from "@/components/ui/Modal";
-import { Page } from "@/components/ui/Page";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateBlocks";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api, createProductMediaForm } from "@/lib/api/client";
@@ -39,7 +38,7 @@ const emptyProductDraft: ProductDraft = {
   situacao: "ativo"
 };
 
-export function ProductsPage() {
+export function ProductsPanel() {
   const queryClient = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<ProductDraft>(emptyProductDraft);
@@ -121,15 +120,7 @@ export function ProductsPage() {
   }
 
   return (
-    <Page
-      title="Produtos"
-      eyebrow="Cardapio"
-      action={
-        <Button type="button" onClick={() => setCreating(true)} icon={<Plus className="h-4 w-4" />}>
-          Novo produto
-        </Button>
-      }
-    >
+    <div className="grid gap-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <NewProductCard onClick={() => setCreating(true)} />
         {productsQuery.isLoading ? <LoadingState label="Carregando produtos" /> : null}
@@ -230,7 +221,7 @@ export function ProductsPage() {
             {pricesQuery.data?.length ? (
               <div className="grid gap-2">
                 {pricesQuery.data.map((price) => (
-                  <div key={price.id} className="grid gap-1 rounded-bakeryLg bg-bakery-cream p-3">
+                  <div key={price.id} className="grid gap-1 rounded-bakeryLg bg-bakery-creamStrong/60 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-black text-bakery-ink">{formatCurrency(price.preco_venda)}</span>
                       <span className="text-sm font-bold text-bakery-muted">{formatDate(price.vigente_desde)}</span>
@@ -245,7 +236,7 @@ export function ProductsPage() {
           </section>
         </div>
       </Modal>
-    </Page>
+    </div>
   );
 }
 
@@ -254,14 +245,14 @@ function NewProductCard({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="grid min-h-48 place-items-center rounded-bakeryLg border-2 border-dashed border-bakery-brand/35 bg-white/80 p-5 text-center transition hover:border-bakery-brand hover:bg-bakery-soft focus:outline-none focus-visible:ring-4 focus-visible:ring-bakery-soft"
+      className="grid min-h-48 place-items-center rounded-bakeryXl border-2 border-dashed border-bakery-border bg-white/60 p-5 text-center transition hover:border-bakery-ink focus:outline-none focus-visible:ring-4 focus-visible:ring-bakery-ink/10"
     >
       <span className="grid gap-3">
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-bakery-brand text-white shadow-button">
           <Plus className="h-7 w-7" />
         </span>
-        <span className="text-lg font-black text-bakery-ink">Cadastrar produto</span>
-        <span className="text-sm font-bold text-bakery-muted">Adicionar um novo item ao cardapio</span>
+        <span className="text-lg font-extrabold text-bakery-ink">Cadastrar produto</span>
+        <span className="text-sm font-semibold text-bakery-muted">Adicionar um novo item ao cardápio</span>
       </span>
     </button>
   );
@@ -289,7 +280,7 @@ function ProductRow({ produto, onEdit }: { produto: Produto; onEdit: (produto: P
               <StatusBadge tone={produto.situacao === "ativo" ? "good" : "warn"}>{produto.situacao}</StatusBadge>
             </div>
             <p className="text-sm font-semibold text-bakery-muted">{produto.descricao || produto.descricao_visual || "Sem descricao"}</p>
-            <p className="mt-1 text-xl font-black text-bakery-brand">{formatCurrency(produto.preco_atual?.preco_venda)}</p>
+            <p className="mt-1 text-xl font-extrabold tracking-tight tabular-nums text-bakery-ink">{formatCurrency(produto.preco_atual?.preco_venda)}</p>
           </div>
         </div>
         <Button type="button" variant="secondary" className="mt-auto w-full" onClick={() => onEdit(produto)} icon={<Edit3 className="h-4 w-4" />}>

@@ -4,14 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3, CalendarDays } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Field, Input } from "@/components/ui/Form";
-import { Page } from "@/components/ui/Page";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateBlocks";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api } from "@/lib/api/client";
 import { formatCurrency, formatDate, todayInputValue } from "@/lib/utils/format";
 import type { ResumoDoDia, ResumoDoPeriodo } from "@/types/api";
 
-export function ReportsPage() {
+export function ReportsPanel() {
   const today = todayInputValue();
   const [dataInicio, setDataInicio] = useState(today);
   const [dataFim, setDataFim] = useState(today);
@@ -32,8 +31,7 @@ export function ReportsPage() {
   });
 
   return (
-    <Page title="Relatorios" eyebrow="Resumo">
-      <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid gap-4 xl:grid-cols-2">
         <SummaryCard
           title="Dia atual"
           icon={<BarChart3 className="h-5 w-5 text-bakery-brand" />}
@@ -63,8 +61,7 @@ export function ReportsPage() {
             {periodQuery.data ? <PeriodSummary summary={periodQuery.data} /> : null}
           </CardContent>
         </Card>
-      </div>
-    </Page>
+    </div>
   );
 }
 
@@ -111,7 +108,7 @@ function DaySummary({ summary }: { summary: ResumoDoDia }) {
       <Metrics summary={summary} />
       <div className="grid gap-2">
         {(summary.produtos || []).map((produto) => (
-          <div key={produto.produto_id} className="grid grid-cols-[1fr_auto] gap-3 rounded-bakeryLg bg-bakery-cream p-3">
+          <div key={produto.produto_id} className="grid grid-cols-[1fr_auto] gap-3 rounded-bakeryLg bg-bakery-creamStrong/60 p-3">
             <div>
               <p className="font-black text-bakery-ink">{produto.nome_produto}</p>
               <p className="text-sm font-semibold text-bakery-muted">
@@ -132,7 +129,7 @@ function PeriodSummary({ summary }: { summary: ResumoDoPeriodo }) {
       <Metrics summary={summary} />
       <div className="grid gap-2">
         {(summary.dias || []).map((day) => (
-          <div key={day.dia_de_venda_id} className="grid grid-cols-[1fr_auto] gap-3 rounded-bakeryLg bg-bakery-cream p-3">
+          <div key={day.dia_de_venda_id} className="grid grid-cols-[1fr_auto] gap-3 rounded-bakeryLg bg-bakery-creamStrong/60 p-3">
             <div>
               <p className="font-black text-bakery-ink">{formatDate(day.data_venda)}</p>
               <p className="text-sm font-semibold text-bakery-muted">{day.nome_local || "Sem local"}</p>
@@ -158,9 +155,9 @@ function Metrics({ summary }: { summary: ResumoDoDia | ResumoDoPeriodo }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {metrics.map(([label, value]) => (
-        <div key={label} className="rounded-bakeryLg bg-bakery-cream p-3">
+        <div key={label} className="rounded-bakeryLg bg-bakery-creamStrong/60 p-3">
           <p className="text-sm font-bold text-bakery-muted">{label}</p>
-          <p className="mt-1 text-xl font-black text-bakery-ink">{value}</p>
+          <p className="mt-1 text-xl font-extrabold tracking-tight tabular-nums text-bakery-ink">{value}</p>
         </div>
       ))}
     </div>
