@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, DoorClosed, Save } from "lucide-react";
+import { CalendarCheck, DoorClosed, Minus, Plus, Save } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -227,31 +227,59 @@ function ProductionEditor({
     return <EmptyState title="Sem produtos ativos" description="Cadastre produtos antes de definir producao." />;
   }
 
+  function setProductQuantity(produtoId: string, value: number) {
+    onChange({
+      ...quantities,
+      [produtoId]: Math.max(0, Math.trunc(value || 0))
+    });
+  }
+
   return (
     <div className="grid gap-3">
-      {products.map((produto) => (
-        <label
-          key={produto.id}
-          className="grid grid-cols-[1fr_7rem] items-center gap-3 rounded-bakeryLg border border-bakery-border bg-white p-3 shadow-soft"
-        >
-          <div className="min-w-0">
-            <p className="truncate font-black text-bakery-ink">{produto.nome}</p>
-            <p className="text-sm font-semibold text-bakery-muted">{produto.preco_atual ? "Produto ativo" : "Sem preco atual"}</p>
+      {products.map((produto) => {
+        const quantity = quantities[produto.id] ?? 0;
+
+        return (
+          <div
+            key={produto.id}
+            className="grid gap-3 rounded-bakeryLg border border-bakery-border bg-white p-3 shadow-soft sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+          >
+            <div className="min-w-0">
+              <p className="truncate font-black text-bakery-ink">{produto.nome}</p>
+              <p className="text-sm font-semibold text-bakery-muted">{produto.preco_atual ? "Produto ativo" : "Sem preco atual"}</p>
+            </div>
+            <div className="grid grid-cols-[3rem_minmax(4rem,5rem)_3rem] items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                disabled={quantity <= 0}
+                onClick={() => setProductQuantity(produto.id, quantity - 1)}
+                aria-label={`Diminuir quantidade produzida de ${produto.nome}`}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Input
+                type="number"
+                min={0}
+                value={quantity}
+                onChange={(event) => setProductQuantity(produto.id, Number(event.target.value || 0))}
+                aria-label={`Quantidade produzida de ${produto.nome}`}
+                className="text-center"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                onClick={() => setProductQuantity(produto.id, quantity + 1)}
+                aria-label={`Aumentar quantidade produzida de ${produto.nome}`}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <Input
-            type="number"
-            min={0}
-            value={quantities[produto.id] ?? 0}
-            onChange={(event) =>
-              onChange({
-                ...quantities,
-                [produto.id]: Number(event.target.value || 0)
-              })
-            }
-            aria-label={`Quantidade produzida de ${produto.nome}`}
-          />
-        </label>
-      ))}
+        );
+      })}
     </div>
   );
 }
