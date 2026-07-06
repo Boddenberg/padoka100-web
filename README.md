@@ -73,3 +73,21 @@ eas build -p ios --profile production
 ```
 
 Para iOS, e necessario Apple Developer Account. Para envio as lojas, use `eas submit`.
+
+### Primeiro build: rode no terminal, em modo interativo
+
+O primeiro build de cada plataforma **precisa ser executado do seu terminal** (`eas build -p ios ...` / `eas build -p android ...`), porque o EAS pergunta interativamente se pode gerar as credenciais (certificado de distribuicao da Apple, keystore do Android) e as salva nos servidores do Expo.
+
+Builds disparados de forma nao-interativa (dashboard do EAS, integracao com GitHub, CI) falham com `Distribution Certificate is not validated for non-interactive builds` enquanto as credenciais nao existirem. Depois do primeiro build interativo, os proximos podem ser disparados de qualquer lugar.
+
+Passo a passo para o iOS:
+
+```bash
+npm install -g eas-cli
+eas login
+eas build -p ios --profile production   # responda "yes" para gerar as credenciais
+```
+
+Sera pedido o login da sua conta Apple Developer (assinatura de USD 99/ano obrigatoria para builds de iOS).
+
+> Para testar no **Expo Go** nao precisa de build nenhum: `npm run start` e escanear o QR code ja basta.

@@ -18,6 +18,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.boddenberg.padoka100",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "A Padoka 100 usa a camera para fotografar produtos.",
         "NSMicrophoneUsageDescription": "A Padoka 100 usa o microfone para registrar vendas por voz.",
         "NSPhotoLibraryUsageDescription": "A Padoka 100 usa suas fotos para anexar imagens aos produtos."
