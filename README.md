@@ -84,18 +84,35 @@ Quando `VITE_API_PROD_PROXY=true`, o frontend chama o backend de producao por ro
 
 No desenvolvimento local, o Vite encaminha essas rotas para `VITE_API_PROD_URL`. Em producao, `scripts/serve.mjs` faz o mesmo proxy. Isso evita problemas de CORS e mantem o frontend chamando o backend Railway pelo proprio dominio do frontend.
 
-## Plano mobile com Capacitor
+## Android com Capacitor + EAS
 
-Depois que a web app estiver estavel:
+Este projeto e uma app Vite/Web empacotada para Android com Capacitor. No build mobile, a app aponta direto para o backend de producao Railway e desliga o proxy same-origin:
+
+- `VITE_DEFAULT_API_ENV=production`
+- `VITE_API_PROD_URL=https://padoka100-production.up.railway.app`
+- `VITE_API_PROD_PROXY=false`
+
+Para atualizar os arquivos Android depois de mudar o frontend:
 
 ```bash
-npm i @capacitor/core @capacitor/cli
-npx cap init "Padoka 100" "br.com.padoka100.app" --web-dir=dist
-npm i @capacitor/android @capacitor/ios
-npm run build
-npx cap add android
-npx cap sync android
-npx cap open android
+npm run cap:sync:android
 ```
+
+Para gerar um APK instalavel pelo EAS:
+
+```bash
+eas build -p android --profile preview
+```
+
+O perfil `preview` gera APK para instalacao direta. O script `eas-build-post-install` roda `npm run cap:sync:android` no build remoto antes de compilar.
+
+Para compilar localmente, instale Android Studio e configure `ANDROID_HOME`; depois use:
+
+```bash
+cd android
+./gradlew assembleDebug
+```
+
+No Windows/PowerShell, use `.\gradlew.bat assembleDebug` dentro da pasta `android`.
 
 Para iOS, e necessario macOS com Xcode.
