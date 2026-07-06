@@ -15,9 +15,9 @@ Padoka100 should feel like a simple daily-use sales app for a bakery business, n
 ## Core surfaces
 
 - `AppHeader` keeps the brand visible and sends settings to an icon action.
-- `BottomNavigation` stays comfortable on mobile and scrolls when there are many destinations.
-- `SalesModePage` is the primary experience: day card, product cards, cart, and a clear sale button.
-- `CardDiaAtual`, `CardProduto`, and `CardCarrinho` are the reference components for the selling flow.
+- `BottomNavigation` shows a few big fixed tabs on mobile; extra destinations live under a "Mais" sheet instead of a side-scrolling row.
+- `SalesModePage` is the primary experience: a day hero, big product cards with quantity steppers, a floating cart bar, and a clear sale button.
+- `CardDiaAtual`, `CardProduto`, `BarraCarrinho`, and `SacolaSheet` are the reference components for the selling flow.
 
 ## Avoid
 

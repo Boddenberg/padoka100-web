@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
-import type { ComponentType, Ref } from "react";
+import { useState } from "react";
+import type { ComponentType } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils/cn";
 
 export interface BottomNavItem {
@@ -11,29 +13,72 @@ export interface BottomNavItem {
   end?: boolean;
 }
 
-export function BottomNavigation({ items }: { items: BottomNavItem[] }) {
-  const location = useLocation();
-  const activeRef = useRef<HTMLAnchorElement | null>(null);
+interface BottomNavigationProps {
+  primary: BottomNavItem[];
+  secondary: BottomNavItem[];
+}
 
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }, [location.pathname]);
+export function BottomNavigation({ primary, secondary }: BottomNavigationProps) {
+  const location = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive = secondary.some((item) => isItemActive(item, location.pathname));
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-bakery-border/80 bg-white/[0.97] px-0 pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1.5 shadow-nav backdrop-blur-xl lg:hidden">
-      <div className="relative mx-auto w-full max-w-[22.25rem] overflow-hidden">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-white to-white/0" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-white to-white/0" />
+    <>
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-bakery-border/80 bg-white/[0.97] pb-[max(env(safe-area-inset-bottom),0.35rem)] pt-1.5 shadow-nav backdrop-blur-xl lg:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-4 gap-1 px-2">
+          {primary.map((item) => (
+            <MobileNavLink key={item.to} {...item} active={isItemActive(item, location.pathname)} />
+          ))}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className={cn(
+              "grid min-h-[3.5rem] place-items-center gap-1 rounded-bakeryMd px-1 py-1.5 text-xs font-bold transition active:scale-95",
+              moreActive ? "text-bakery-brand" : "text-bakery-muted"
+            )}
+            aria-label="Ver mais opções"
+          >
+            <span className={cn("grid h-8 w-14 place-items-center rounded-full transition", moreActive ? "bg-bakery-soft" : "")}>
+              <MoreHorizontal className="h-6 w-6" />
+            </span>
+            <span>Mais</span>
+          </button>
+        </div>
+      </nav>
 
-        <div className="flex snap-x snap-mandatory gap-1 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {items.map((item) => {
+      <Modal title="Mais opções" open={moreOpen} onClose={() => setMoreOpen(false)}>
+        <div className="grid gap-2">
+          {secondary.map((item) => {
             const active = isItemActive(item, location.pathname);
-
-            return <MobileNavLink key={item.to} {...item} active={active} activeRef={active ? activeRef : undefined} />;
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={() => setMoreOpen(false)}
+                className={cn(
+                  "flex min-h-[3.75rem] items-center gap-3.5 rounded-bakeryLg px-3 text-lg font-bold transition active:scale-[0.99]",
+                  active ? "bg-bakery-soft text-bakery-brand" : "bg-bakery-cream text-bakery-ink"
+                )}
+              >
+                <span
+                  className={cn(
+                    "grid h-12 w-12 shrink-0 place-items-center rounded-full",
+                    active ? "bg-white text-bakery-brand" : "bg-white text-bakery-muted"
+                  )}
+                >
+                  <Icon className="h-6 w-6" />
+                </span>
+                <span className="flex-1">{item.label}</span>
+                <ChevronRight className="h-5 w-5 text-bakery-muted" />
+              </NavLink>
+            );
           })}
         </div>
-      </div>
-    </nav>
+      </Modal>
+    </>
   );
 }
 
@@ -42,27 +87,20 @@ function isItemActive(item: BottomNavItem, pathname: string) {
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
-function MobileNavLink({
-  to,
-  label,
-  mobileLabel,
-  icon: Icon,
-  end,
-  active,
-  activeRef
-}: BottomNavItem & { active: boolean; activeRef?: Ref<HTMLAnchorElement> }) {
+function MobileNavLink({ to, label, mobileLabel, icon: Icon, end, active }: BottomNavItem & { active: boolean }) {
   return (
     <NavLink
       to={to}
       end={end}
-      ref={activeRef}
       className={cn(
-        "grid min-h-[3.25rem] min-w-[4.25rem] snap-start place-items-center gap-0.5 rounded-bakeryMd px-2 py-1 text-[0.68rem] font-bold transition active:scale-95",
-        active ? "bg-bakery-soft text-bakery-brand shadow-soft" : "text-bakery-muted hover:bg-bakery-cream"
+        "grid min-h-[3.5rem] place-items-center gap-1 rounded-bakeryMd px-1 py-1.5 text-xs font-bold transition active:scale-95",
+        active ? "text-bakery-brand" : "text-bakery-muted"
       )}
     >
-      <Icon className="h-[18px] w-[18px]" />
-      <span className="max-w-full whitespace-nowrap">{mobileLabel || label}</span>
+      <span className={cn("grid h-8 w-14 place-items-center rounded-full transition", active ? "bg-bakery-soft" : "")}>
+        <Icon className="h-6 w-6" />
+      </span>
+      <span className="max-w-full truncate">{mobileLabel || label}</span>
     </NavLink>
   );
 }

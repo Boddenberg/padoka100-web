@@ -33,7 +33,8 @@ export default {
         soft: "var(--shadow-card)",
         warm: "var(--shadow-card-hover)",
         button: "var(--shadow-button)",
-        nav: "var(--shadow-bottom-nav)"
+        nav: "var(--shadow-bottom-nav)",
+        floating: "var(--shadow-floating)"
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"]
