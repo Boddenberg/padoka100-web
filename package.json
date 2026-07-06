@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:mobile": "node scripts/build-mobile.mjs",
-    "cap:sync:android": "node scripts/patch-capacitor-android-java.mjs && npm run build:mobile && npx cap sync android",
+    "cap:sync:android": "node scripts/patch-capacitor-android-java.mjs && npm run build:mobile && npx cap sync android && node scripts/patch-capacitor-android-java.mjs",
     "eas-build-post-install": "npm run cap:sync:android",
     "start": "node scripts/serve.mjs",
     "preview": "vite preview",
