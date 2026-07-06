@@ -335,21 +335,12 @@ function ProductForm({
       <Field label="Descricao">
         <Textarea value={value.descricao} onChange={(event) => onChange({ ...value, descricao: event.target.value })} />
       </Field>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
-        <Field label="Imagem URL">
-          <Input
-            value={value.url_imagem_principal}
-            onChange={(event) => onChange({ ...value, url_imagem_principal: event.target.value })}
-          />
-        </Field>
-        <Field label="Ordem">
-          <Input
-            type="number"
-            value={value.ordem_exibicao}
-            onChange={(event) => onChange({ ...value, ordem_exibicao: event.target.value })}
-          />
-        </Field>
-      </div>
+      <Field label="Imagem URL">
+        <Input
+          value={value.url_imagem_principal}
+          onChange={(event) => onChange({ ...value, url_imagem_principal: event.target.value })}
+        />
+      </Field>
       {includePhotoCapture ? (
         <Field label="Foto do produto" hint="Escolha uma imagem ou tire uma foto pelo celular.">
           <Input
