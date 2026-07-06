@@ -21,9 +21,7 @@ body {
   min-height: 100%;
   margin: 0;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(255, 232, 199, 0.72), transparent 34rem),
-    linear-gradient(180deg, #fff8ef 0%, #fffdf9 42%, #fff8ef 100%);
+  background: var(--color-cream);
   color: var(--color-text);
 }
 
@@ -54,7 +52,7 @@ img {
   }
 
   :focus-visible {
-    outline: 3px solid rgba(230, 67, 50, 0.34);
+    outline: 3px solid rgba(226, 59, 46, 0.35);
     outline-offset: 3px;
   }
 }
@@ -62,6 +60,5 @@ img {
 @media (display-mode: standalone) {
   body {
     padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
   }
 }

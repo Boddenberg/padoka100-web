@@ -15,11 +15,11 @@ export function LoadingState({ label = "Carregando" }: { label?: string }) {
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
     <Card className="grid justify-items-center gap-3 p-5 text-center">
-      <div className="grid h-12 w-12 place-items-center rounded-full bg-bakery-soft text-bakery-brand">
+      <div className="grid h-12 w-12 place-items-center rounded-full bg-bakery-creamStrong text-bakery-ink">
         <PackageOpen className="h-6 w-6" />
       </div>
       <div>
-        <h3 className="text-lg font-black text-bakery-ink">{title}</h3>
+        <h3 className="text-lg font-extrabold text-bakery-ink">{title}</h3>
         {description ? <p className="mt-1 text-sm font-medium leading-relaxed text-bakery-muted">{description}</p> : null}
       </div>
       {action}
@@ -45,7 +45,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 
 export function FriendlyHint({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 rounded-bakeryLg bg-bakery-cream p-4 text-base font-semibold text-bakery-muted">
+    <div className="flex items-center gap-3 rounded-bakeryLg bg-bakery-creamStrong/60 p-4 text-base font-semibold text-bakery-muted">
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-bakery-brand shadow-soft">
         <Wheat className="h-5 w-5" />
       </div>

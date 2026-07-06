@@ -4,18 +4,17 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Field, Input, Select } from "@/components/ui/Form";
-import { Page } from "@/components/ui/Page";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateBlocks";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api } from "@/lib/api/client";
 import { formatDate, formatDateTime } from "@/lib/utils/format";
 
-export function HistoryPage() {
+export function HistoryPanel() {
   const [filters, setFilters] = useState({ dia_de_venda_id: "", tipo_entidade: "", entidade_id: "", limite: 100 });
   const [applied, setApplied] = useState(filters);
 
   const daysQuery = useQuery({
-    queryKey: ["dias", "lista-historico"],
+    queryKey: ["dias", "lista"],
     queryFn: () => api.dias.list()
   });
   const timelineQuery = useQuery({
@@ -30,7 +29,7 @@ export function HistoryPage() {
   });
 
   return (
-    <Page title="Historico" eyebrow="Linha do tempo">
+    <div className="grid gap-4">
       <Card>
         <CardContent>
           <form
@@ -110,6 +109,6 @@ export function HistoryPage() {
       ) : !timelineQuery.isLoading ? (
         <EmptyState title="Nenhum evento encontrado" />
       ) : null}
-    </Page>
+    </div>
   );
 }

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Field, Input, Select, Textarea } from "@/components/ui/Form";
 import { Modal } from "@/components/ui/Modal";
-import { Page } from "@/components/ui/Page";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateBlocks";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api } from "@/lib/api/client";
@@ -28,7 +27,7 @@ const emptyDraft: LocalDraft = {
   situacao: "ativo"
 };
 
-export function LocationsPage() {
+export function LocationsPanel() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<LocalDraft>(emptyDraft);
   const [editing, setEditing] = useState<LocalVenda | null>(null);
@@ -67,7 +66,7 @@ export function LocationsPage() {
   }
 
   return (
-    <Page title="Locais" eyebrow="Pontos de venda">
+    <div className="grid gap-4">
       <div className="grid gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <Card>
           <CardHeader>
@@ -123,7 +122,7 @@ export function LocationsPage() {
           includeStatus
         />
       </Modal>
-    </Page>
+    </div>
   );
 }
 

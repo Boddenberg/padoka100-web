@@ -20,8 +20,8 @@ export default defineConfig({
         name: "Padoka 100",
         short_name: "Padoka 100",
         description: "Controle mobile-first de producao e vendas.",
-        theme_color: "#e64332",
-        background_color: "#fff8ef",
+        theme_color: "#f6f6f4",
+        background_color: "#f6f6f4",
         display: "standalone",
         orientation: "portrait",
         start_url: "/",
@@ -49,6 +49,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
