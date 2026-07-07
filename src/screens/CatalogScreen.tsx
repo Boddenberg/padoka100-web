@@ -1,13 +1,48 @@
 import * as ImagePicker from "expo-image-picker";
 import { Camera, ChevronRight, Images, MapPin } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Badge, Button, Card, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
-import { api, createProductMediaForm, type NativeFile } from "@/lib/api";
+import { Badge, Button, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
+import { api, createMediaForm, type NativeFile } from "@/lib/api";
 import { cleanPayload, formatCurrency, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
-import type { Produto } from "@/types/api";
+import type { LocalVenda, Produto } from "@/types/api";
+
+// Abre câmera ou galeria e devolve o arquivo escolhido (ou null se cancelou).
+async function pickImage(source: "camera" | "gallery", prefix: string): Promise<NativeFile | null> {
+  let result: ImagePicker.ImagePickerResult;
+  if (source === "camera") {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) throw new Error("Permissão de câmera negada.");
+    result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true, aspect: [4, 3] });
+  } else {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) throw new Error("Permissão de fotos negada.");
+    result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true, aspect: [4, 3] });
+  }
+
+  if (result.canceled) return null;
+  const asset = result.assets[0];
+  return {
+    uri: asset.uri,
+    name: asset.fileName || `${prefix}-${Date.now()}.jpg`,
+    type: asset.mimeType || "image/jpeg"
+  };
+}
+
+// Alert.alert com botões não funciona no navegador; lá usamos o confirm nativo.
+function confirmDestructive(title: string, message: string, confirmLabel: string, onConfirm: () => void) {
+  if (Platform.OS === "web") {
+    const webConfirm = (globalThis as { confirm?: (text: string) => boolean }).confirm;
+    if (!webConfirm || webConfirm(`${title}\n\n${message}`)) onConfirm();
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: "Voltar", style: "cancel" },
+    { text: confirmLabel, style: "destructive", onPress: onConfirm }
+  ]);
+}
 
 type ProductDraft = {
   nome: string;
@@ -26,12 +61,37 @@ const emptyProduct: ProductDraft = {
 };
 
 export function CatalogScreen() {
-  const [sheet, setSheet] = useState<"product" | "location" | "edit" | null>(null);
+  const [sheet, setSheet] = useState<"product" | "location" | "edit" | "edit-location" | null>(null);
   const [editing, setEditing] = useState<Produto | null>(null);
+  const [editingLocal, setEditingLocal] = useState<LocalVenda | null>(null);
   const productsQuery = useQuery({ queryKey: ["produtos", "todos"], queryFn: () => api.produtos.list(false) });
   const locationsQuery = useQuery({ queryKey: ["locais", "todos"], queryFn: () => api.locais.list(false) });
   // Sempre a versão mais fresca do produto em edição (após salvar/foto).
   const editingProduct = productsQuery.data?.find((produto) => produto.id === editing?.id) || editing;
+  const editingLocation = locationsQuery.data?.find((local) => local.id === editingLocal?.id) || editingLocal;
+  const activeProducts = productsQuery.data?.filter((produto) => produto.situacao === "ativo") || [];
+  const inactiveProducts = productsQuery.data?.filter((produto) => produto.situacao !== "ativo") || [];
+
+  const openProduct = (produto: Produto) => {
+    setEditing(produto);
+    setSheet("edit");
+  };
+
+  const productRow = (produto: Produto) => (
+    <Pressable
+      key={produto.id}
+      onPress={() => openProduct(produto)}
+      style={({ pressed }) => [styles.productRow, shadows.soft, pressed && styles.pressed]}
+    >
+      <ProductPhoto url={produto.url_imagem_principal} name={produto.nome} size={62} rounded={radius.lg} />
+      <View style={styles.productInfo}>
+        <Text style={styles.productTitle}>{produto.nome}</Text>
+        <Text style={styles.productPrice}>{formatCurrency(produto.preco_atual?.preco_venda)}</Text>
+        <Badge text={produto.situacao} tone={produto.situacao === "ativo" ? "good" : "warn"} />
+      </View>
+      <ChevronRight size={20} color={colors.muted} />
+    </Pressable>
+  );
 
   return (
     <>
@@ -48,46 +108,56 @@ export function CatalogScreen() {
         <SectionTitle text="Produtos" />
         {productsQuery.isLoading ? <StateText text="Carregando produtos..." /> : null}
         {productsQuery.error instanceof Error ? <StateText tone="error" text={productsQuery.error.message} /> : null}
-        {productsQuery.data?.map((produto) => (
+        {activeProducts.map(productRow)}
+
+        <SectionTitle text="Locais" />
+        {locationsQuery.error instanceof Error ? <StateText tone="error" text={locationsQuery.error.message} /> : null}
+        {locationsQuery.data?.map((local) => (
           <Pressable
-            key={produto.id}
+            key={local.id}
             onPress={() => {
-              setEditing(produto);
-              setSheet("edit");
+              setEditingLocal(local);
+              setSheet("edit-location");
             }}
             style={({ pressed }) => [styles.productRow, shadows.soft, pressed && styles.pressed]}
           >
-            <ProductPhoto url={produto.url_imagem_principal} name={produto.nome} size={62} rounded={radius.lg} />
+            <LocationPhoto url={local.url_imagem_principal} size={62} />
             <View style={styles.productInfo}>
-              <Text style={styles.productTitle}>{produto.nome}</Text>
-              <Text style={styles.productPrice}>{formatCurrency(produto.preco_atual?.preco_venda)}</Text>
-              <Badge text={produto.situacao} tone={produto.situacao === "ativo" ? "good" : "warn"} />
+              <Text style={styles.productTitle}>{local.nome}</Text>
+              {local.endereco_texto ? <Text style={styles.locationAddress}>{local.endereco_texto}</Text> : null}
+              <Badge text={local.situacao} tone={local.situacao === "ativo" ? "good" : "warn"} />
             </View>
             <ChevronRight size={20} color={colors.muted} />
           </Pressable>
         ))}
 
-        <SectionTitle text="Locais" />
-        {locationsQuery.data?.map((local) => (
-          <Card key={local.id}>
-            <View style={styles.locationRow}>
-              <View style={styles.locationIcon}>
-                <MapPin size={20} color={colors.brandDeep} />
-              </View>
-              <View style={styles.productInfo}>
-                <Text style={styles.productTitle}>{local.nome}</Text>
-                <Badge text={local.situacao} tone={local.situacao === "ativo" ? "good" : "warn"} />
-              </View>
-            </View>
-          </Card>
-        ))}
+        {inactiveProducts.length > 0 ? (
+          <>
+            <SectionTitle text="Produtos inativos" />
+            <StateText text="Excluídos do catálogo. Toque para reativar." />
+            {inactiveProducts.map(productRow)}
+          </>
+        ) : null}
       </Page>
 
       <ProductSheet visible={sheet === "product"} onClose={() => setSheet(null)} />
       <LocationSheet visible={sheet === "location"} onClose={() => setSheet(null)} />
       <EditProductSheet visible={sheet === "edit"} onClose={() => setSheet(null)} product={editingProduct} />
+      <EditLocationSheet visible={sheet === "edit-location"} onClose={() => setSheet(null)} location={editingLocation} />
     </>
   );
+}
+
+// Foto do local com fallback de mapinha quando não há imagem.
+function LocationPhoto({ url, size }: { url?: string | null; size: number }) {
+  if (!url) {
+    return (
+      <View style={[styles.locationIcon, { height: size, width: size }]}>
+        <MapPin size={22} color={colors.brandDeep} />
+      </View>
+    );
+  }
+  return <ProductPhoto url={url} name="Local" size={size} rounded={radius.lg} />;
 }
 
 function ProductSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -185,26 +255,10 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
 
   const uploadMedia = useMutation({
     mutationFn: async (source: "camera" | "gallery") => {
-      let result: ImagePicker.ImagePickerResult;
-      if (source === "camera") {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) throw new Error("Permissão de câmera negada.");
-        result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true, aspect: [4, 3] });
-      } else {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) throw new Error("Permissão de fotos negada.");
-        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true, aspect: [4, 3] });
-      }
+      const file = await pickImage(source, "produto");
+      if (!file) return null;
 
-      if (result.canceled) return null;
-      const asset = result.assets[0];
-      const file: NativeFile = {
-        uri: asset.uri,
-        name: asset.fileName || `produto-${Date.now()}.jpg`,
-        type: asset.mimeType || "image/jpeg"
-      };
-
-      const media = await api.produtos.uploadMedia(product.id, createProductMediaForm(file));
+      const media = await api.produtos.uploadMedia(product.id, createMediaForm(file));
 
       // Garante a troca: grava a URL nova no produto pelo endpoint de atualização.
       const mediaUrl = media?.url_publica || media?.caminho_arquivo || null;
@@ -219,6 +273,15 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
     }
   });
 
+  // "Excluir" preserva o histórico de vendas: o produto vira inativo e sai do catálogo.
+  const removeProduct = useMutation({
+    mutationFn: () => api.produtos.update(product.id, { situacao: "inativo" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+      onClose();
+    }
+  });
+
   return (
     <>
       <View style={styles.editHeader}>
@@ -229,24 +292,7 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
         </View>
       </View>
 
-      <View style={styles.photoActions}>
-        <Pressable
-          onPress={() => uploadMedia.mutate("camera")}
-          disabled={uploadMedia.isPending}
-          style={({ pressed }) => [styles.photoAction, pressed && styles.pressed]}
-        >
-          <Camera size={20} color={colors.brandDeep} />
-          <Text style={styles.photoActionText}>Fotografar</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => uploadMedia.mutate("gallery")}
-          disabled={uploadMedia.isPending}
-          style={({ pressed }) => [styles.photoAction, pressed && styles.pressed]}
-        >
-          <Images size={20} color={colors.brandDeep} />
-          <Text style={styles.photoActionText}>Galeria</Text>
-        </Pressable>
-      </View>
+      <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
       {uploadMedia.isPending ? <StateText text="Enviando foto..." /> : null}
       {uploadMedia.isSuccess && uploadMedia.data ? <StateText tone="success" text="Foto atualizada!" /> : null}
       {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
@@ -297,26 +343,105 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
           onPress={() => createPrice.mutate()}
         />
       </View>
+
+      <View style={styles.dangerSection}>
+        {removeProduct.error instanceof Error ? <StateText tone="error" text={removeProduct.error.message} /> : null}
+        <Button
+          title={removeProduct.isPending ? "Excluindo..." : "Excluir produto"}
+          tone="danger"
+          disabled={removeProduct.isPending}
+          onPress={() =>
+            confirmDestructive(
+              "Excluir produto",
+              `"${product.nome}" sai do catálogo e das vendas, mas o histórico é mantido. Dá para reativar depois na seção "Produtos inativos".`,
+              "Excluir",
+              () => removeProduct.mutate()
+            )
+          }
+        />
+      </View>
     </>
   );
+}
+
+function PhotoPickerButtons({ onPick, disabled }: { onPick: (source: "camera" | "gallery") => void; disabled?: boolean }) {
+  return (
+    <View style={styles.photoActions}>
+      <Pressable
+        onPress={() => onPick("camera")}
+        disabled={disabled}
+        style={({ pressed }) => [styles.photoAction, pressed && styles.pressed]}
+      >
+        <Camera size={20} color={colors.brandDeep} />
+        <Text style={styles.photoActionText}>Fotografar</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => onPick("gallery")}
+        disabled={disabled}
+        style={({ pressed }) => [styles.photoAction, pressed && styles.pressed]}
+      >
+        <Images size={20} color={colors.brandDeep} />
+        <Text style={styles.photoActionText}>Galeria</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// Envia a foto pelo endpoint de mídia e grava a URL no cadastro do local.
+async function uploadLocationPhoto(localId: string, file: NativeFile) {
+  const media = await api.locais.uploadMedia(localId, createMediaForm(file));
+  const mediaUrl = media?.url_publica || media?.caminho_arquivo || null;
+  if (mediaUrl) {
+    await api.locais.update(localId, { url_imagem_principal: mediaUrl });
+  }
+  return mediaUrl;
 }
 
 function LocationSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
+  // Foto escolhida antes de criar: sobe logo depois que o local ganha id.
+  const [photo, setPhoto] = useState<NativeFile | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  const choosePhoto = async (source: "camera" | "gallery") => {
+    try {
+      setPhotoError(null);
+      const file = await pickImage(source, "local");
+      if (file) setPhoto(file);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : "Não foi possível escolher a foto.");
+    }
+  };
+
   const createLocation = useMutation({
-    mutationFn: () =>
-      api.locais.create(
+    mutationFn: async () => {
+      const created = await api.locais.create(
         cleanPayload({
           nome: name,
+          endereco_texto: address,
           descricao: description,
           situacao: "ativo"
         })
-      ),
+      );
+
+      if (photo) {
+        // O local já existe; se a foto falhar, dá para reenviar depois na edição.
+        try {
+          await uploadLocationPhoto(created.id, photo);
+        } catch {
+          setPhotoError("O local foi criado, mas a foto falhou. Toque no local para tentar de novo.");
+        }
+      }
+      return created;
+    },
     onSuccess: () => {
       setName("");
+      setAddress("");
       setDescription("");
+      setPhoto(null);
       onClose();
       queryClient.invalidateQueries({ queryKey: ["locais"] });
     }
@@ -324,8 +449,20 @@ function LocationSheet({ visible, onClose }: { visible: boolean; onClose: () => 
 
   return (
     <Sheet visible={visible} title="Novo local" subtitle="Feira, evento, ponto fixo..." onClose={onClose}>
+      <View style={styles.editHeader}>
+        <LocationPhoto url={photo?.uri} size={96} />
+        <View style={styles.editHeaderInfo}>
+          <Text style={styles.photoHint}>{photo ? "Foto escolhida!" : "Foto do local (opcional)"}</Text>
+        </View>
+      </View>
+      <PhotoPickerButtons onPick={choosePhoto} disabled={createLocation.isPending} />
+      {photoError ? <StateText tone="error" text={photoError} /> : null}
+
       <Field label="Nome">
         <Input value={name} onChangeText={setName} />
+      </Field>
+      <Field label="Endereço">
+        <Input value={address} onChangeText={setAddress} />
       </Field>
       <Field label="Descrição">
         <Input value={description} onChangeText={setDescription} />
@@ -337,6 +474,101 @@ function LocationSheet({ visible, onClose }: { visible: boolean; onClose: () => 
         onPress={() => createLocation.mutate()}
       />
     </Sheet>
+  );
+}
+
+function EditLocationSheet({ visible, onClose, location }: { visible: boolean; onClose: () => void; location: LocalVenda | null }) {
+  return (
+    <Sheet visible={visible} title={location?.nome || "Local"} subtitle="Dados e foto do local" onClose={onClose}>
+      {visible && location ? <EditLocationForm onClose={onClose} location={location} /> : null}
+    </Sheet>
+  );
+}
+
+function EditLocationForm({ onClose, location }: { onClose: () => void; location: LocalVenda }) {
+  const queryClient = useQueryClient();
+  const [nome, setNome] = useState(location.nome);
+  const [endereco, setEndereco] = useState(location.endereco_texto || "");
+  const [descricao, setDescricao] = useState(location.descricao || "");
+  const [situacao, setSituacao] = useState(location.situacao || "ativo");
+  // Foto recém-enviada: mostra na hora, sem esperar a lista recarregar.
+  const [photoUrl, setPhotoUrl] = useState(location.url_imagem_principal);
+
+  const updateLocation = useMutation({
+    mutationFn: () =>
+      api.locais.update(
+        location.id,
+        cleanPayload({
+          nome,
+          endereco_texto: endereco,
+          descricao,
+          situacao
+        })
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["locais"] });
+      onClose();
+    }
+  });
+
+  const uploadMedia = useMutation({
+    mutationFn: async (source: "camera" | "gallery") => {
+      const file = await pickImage(source, "local");
+      if (!file) return null;
+      return uploadLocationPhoto(location.id, file);
+    },
+    onSuccess: (mediaUrl) => {
+      if (mediaUrl) setPhotoUrl(mediaUrl);
+      queryClient.invalidateQueries({ queryKey: ["locais"] });
+    }
+  });
+
+  return (
+    <>
+      <View style={styles.editHeader}>
+        <LocationPhoto url={photoUrl} size={96} />
+        <View style={styles.editHeaderInfo}>
+          <Badge text={situacao} tone={situacao === "ativo" ? "good" : "warn"} />
+        </View>
+      </View>
+
+      <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
+      {uploadMedia.isPending ? <StateText text="Enviando foto..." /> : null}
+      {uploadMedia.isSuccess && uploadMedia.data ? <StateText tone="success" text="Foto atualizada!" /> : null}
+      {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
+
+      <Field label="Nome">
+        <Input value={nome} onChangeText={setNome} />
+      </Field>
+      <Field label="Endereço">
+        <Input value={endereco} onChangeText={setEndereco} />
+      </Field>
+      <Field label="Descrição">
+        <Input value={descricao} onChangeText={setDescricao} />
+      </Field>
+      <Field label="Situação">
+        <View style={styles.statusRow}>
+          <Pressable
+            onPress={() => setSituacao("ativo")}
+            style={[styles.statusChip, situacao === "ativo" && styles.statusChipActive]}
+          >
+            <Text style={[styles.statusChipText, situacao === "ativo" && styles.statusChipTextActive]}>Ativo</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSituacao("inativo")}
+            style={[styles.statusChip, situacao === "inativo" && styles.statusChipActive]}
+          >
+            <Text style={[styles.statusChipText, situacao === "inativo" && styles.statusChipTextActive]}>Inativo</Text>
+          </Pressable>
+        </View>
+      </Field>
+      {updateLocation.error instanceof Error ? <StateText tone="error" text={updateLocation.error.message} /> : null}
+      <Button
+        title={updateLocation.isPending ? "Salvando..." : "Salvar alterações"}
+        disabled={!nome.trim() || updateLocation.isPending}
+        onPress={() => updateLocation.mutate()}
+      />
+    </>
   );
 }
 
@@ -396,10 +628,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     letterSpacing: -0.3
   },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12
+  locationAddress: {
+    color: colors.muted,
+    fontSize: 13,
+    fontFamily: fonts.body
   },
   locationIcon: {
     height: 44,
@@ -480,5 +712,17 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 17,
     fontFamily: fonts.display
+  },
+  dangerSection: {
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 14,
+    marginTop: 4
+  },
+  photoHint: {
+    color: colors.muted,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
   }
 });

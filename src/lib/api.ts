@@ -114,7 +114,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return payload as T;
 }
 
-export function createProductMediaForm(file: NativeFile, options?: { descricao?: string; textoAlternativo?: string }) {
+export function createMediaForm(file: NativeFile, options?: { descricao?: string; textoAlternativo?: string }) {
   const form = new FormData();
   form.append("file", file as unknown as Blob);
   if (options?.descricao) form.append("descricao", options.descricao);
@@ -150,7 +150,9 @@ export const api = {
       apiRequest<LocalVenda[]>("/api/v1/locais", { query: { somente_ativos: somenteAtivos } }),
     create: (body: Record<string, unknown>) => apiRequest<LocalVenda>("/api/v1/locais", { method: "POST", body }),
     update: (localId: UUID, body: Record<string, unknown>) =>
-      apiRequest<LocalVenda>(`/api/v1/locais/${localId}`, { method: "PATCH", body })
+      apiRequest<LocalVenda>(`/api/v1/locais/${localId}`, { method: "PATCH", body }),
+    uploadMedia: (localId: UUID, formData: FormData) =>
+      apiRequest<Midia>(`/api/v1/midia/local/${localId}`, { method: "POST", formData })
   },
   dias: {
     list: (query?: { data_inicio?: string; data_fim?: string; situacao?: string }) =>
