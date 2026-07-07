@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button, Card, Field, Input, Page, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { apiUrls, getBaseUrl, readApiSettings, saveApiSettings, type ApiSettings } from "@/lib/settings";
-import { colors, radius } from "@/lib/theme";
+import { colors, fonts, radius, shadows } from "@/lib/theme";
 import type { ApiEnvironment } from "@/types/api";
 
 export function SettingsScreen() {
@@ -57,7 +57,12 @@ export function SettingsScreen() {
 
       <Card>
         <Text style={styles.sectionTitle}>Teste de conexão</Text>
-        <Button title={health.isPending ? "Testando..." : "Testar /health"} tone="dark" disabled={health.isPending} onPress={() => health.mutate()} />
+        <Button
+          title={health.isPending ? "Testando..." : "Testar conexão"}
+          tone="soft"
+          disabled={health.isPending}
+          onPress={() => health.mutate()}
+        />
         {health.data ? <StateText tone="success" text={`Conectado: ${health.data.status || "ok"}`} /> : null}
         {health.error instanceof Error ? <StateText tone="error" text={health.error.message} /> : null}
       </Card>
@@ -83,39 +88,41 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.ink,
     fontSize: 18,
-    fontWeight: "900"
+    fontFamily: fonts.display
   },
   segment: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     borderRadius: radius.pill,
-    backgroundColor: colors.surfaceStrong,
-    padding: 4
+    backgroundColor: colors.surfaceWarm,
+    padding: 5
   },
   segmentButton: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
-    paddingVertical: 10
+    paddingVertical: 11
   },
   segmentButtonActive: {
-    backgroundColor: colors.ink
+    backgroundColor: colors.brand,
+    ...shadows.brand
   },
   segmentLabel: {
     color: colors.muted,
-    fontWeight: "900"
+    fontFamily: fonts.bodyBold
   },
   segmentLabelActive: {
     color: "#fff"
   },
   muted: {
     color: colors.muted,
-    fontWeight: "700"
+    fontSize: 13,
+    fontFamily: fonts.body
   },
   hint: {
     color: colors.warning,
     fontSize: 13,
-    fontWeight: "700"
+    fontFamily: fonts.body
   }
 });

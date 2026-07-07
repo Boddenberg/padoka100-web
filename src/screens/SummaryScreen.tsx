@@ -1,10 +1,11 @@
+import { CalendarDays, TrendingUp } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Field, Input, Page, StateText } from "@/components/ui";
+import { Badge, Button, Card, Field, Input, Page, SectionTitle, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, todayInputValue } from "@/lib/format";
-import { colors } from "@/lib/theme";
+import { colors, fonts, radius } from "@/lib/theme";
 
 export function SummaryScreen() {
   const today = todayInputValue();
@@ -24,15 +25,19 @@ export function SummaryScreen() {
   const days = useMemo(() => totals?.dias || [], [totals]);
 
   return (
-    <Page title="Resumo" subtitle="Faturamento, sobras e histórico recente.">
+    <Page title="Resumo" subtitle="Faturamento, restantes e histórico recente.">
       <Card>
         <View style={styles.filters}>
-          <Field label="Início">
-            <Input value={start} onChangeText={setStart} placeholder="AAAA-MM-DD" />
-          </Field>
-          <Field label="Fim">
-            <Input value={end} onChangeText={setEnd} placeholder="AAAA-MM-DD" />
-          </Field>
+          <View style={styles.filterField}>
+            <Field label="Início">
+              <Input value={start} onChangeText={setStart} placeholder="AAAA-MM-DD" />
+            </Field>
+          </View>
+          <View style={styles.filterField}>
+            <Field label="Fim">
+              <Input value={end} onChangeText={setEnd} placeholder="AAAA-MM-DD" />
+            </Field>
+          </View>
         </View>
         <Button title="Atualizar" onPress={() => periodQuery.refetch()} />
       </Card>
@@ -42,54 +47,174 @@ export function SummaryScreen() {
 
       {totals ? (
         <Card>
+          <View style={styles.revenueHeader}>
+            <TrendingUp size={20} color={colors.brandDeep} />
+            <Text style={styles.revenueLabel}>Faturamento do período</Text>
+          </View>
           <Text style={styles.total}>{formatCurrency(totals.faturamento_bruto)}</Text>
-          <Text style={styles.muted}>Lucro estimado: {formatCurrency(totals.lucro_estimado)}</Text>
-          <Text style={styles.muted}>Vendido: {totals.total_vendido ?? 0} · Sobra: {totals.total_sobra ?? 0}</Text>
+          <View style={styles.metricsGrid}>
+            <Metric label="Lucro" value={formatCurrency(totals.lucro_estimado)} highlight />
+            <Metric label="Vendido" value={String(totals.total_vendido ?? 0)} />
+            <Metric label="Restante" value={String(totals.total_sobra ?? 0)} />
+          </View>
         </Card>
       ) : null}
 
       {days.map((day) => (
         <Card key={day.dia_de_venda_id}>
-          <Text style={styles.title}>{formatDate(day.data_venda)}</Text>
-          <Text style={styles.muted}>{day.nome_local || "Sem local"} · {day.situacao}</Text>
-          <Text style={styles.muted}>{formatCurrency(day.faturamento_bruto)} · lucro {formatCurrency(day.lucro_estimado)}</Text>
+          <View style={styles.dayHeader}>
+            <View style={styles.dayIcon}>
+              <CalendarDays size={18} color={colors.brandDeep} />
+            </View>
+            <View style={styles.dayInfo}>
+              <Text style={styles.dayTitle}>{formatDate(day.data_venda)}</Text>
+              <Text style={styles.muted}>{day.nome_local || "Sem local"}</Text>
+            </View>
+            <Badge text={day.situacao} tone={day.situacao === "aberto" ? "good" : "neutral"} />
+          </View>
+          <View style={styles.dayNumbers}>
+            <Text style={styles.dayRevenue}>{formatCurrency(day.faturamento_bruto)}</Text>
+            <Text style={styles.muted}>lucro {formatCurrency(day.lucro_estimado)}</Text>
+          </View>
         </Card>
       ))}
 
-      <Text style={styles.sectionTitle}>Histórico</Text>
+      <SectionTitle text="Histórico" />
       {historyQuery.isLoading ? <StateText text="Carregando histórico..." /> : null}
       {historyQuery.error instanceof Error ? <StateText tone="error" text={historyQuery.error.message} /> : null}
       {historyQuery.data?.map((event) => (
-        <Card key={event.id}>
-          <Text style={styles.title}>{event.titulo}</Text>
-          <Text style={styles.muted}>{event.tipo_evento} · {formatDate(event.criado_em)}</Text>
-        </Card>
+        <View key={event.id} style={styles.eventRow}>
+          <View style={styles.eventDot} />
+          <View style={styles.eventInfo}>
+            <Text style={styles.eventTitle}>{event.titulo}</Text>
+            <Text style={styles.muted}>
+              {event.tipo_evento} · {formatDate(event.criado_em)}
+            </Text>
+          </View>
+        </View>
       ))}
     </Page>
   );
 }
 
+function Metric({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <View style={[styles.metric, highlight && styles.metricHighlight]}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={[styles.metricValue, highlight && { color: colors.success }]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   filters: {
+    flexDirection: "row",
     gap: 10
+  },
+  filterField: {
+    flex: 1
+  },
+  revenueHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  revenueLabel: {
+    color: colors.muted,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
   },
   total: {
     color: colors.ink,
-    fontSize: 30,
-    fontWeight: "900"
+    fontSize: 36,
+    fontFamily: fonts.display,
+    letterSpacing: -1
   },
-  title: {
+  metricsGrid: {
+    flexDirection: "row",
+    gap: 8
+  },
+  metric: {
+    flex: 1,
+    gap: 2,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceWarm,
+    padding: 12
+  },
+  metricHighlight: {
+    backgroundColor: colors.successSoft
+  },
+  metricLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontFamily: fonts.bodyBold
+  },
+  metricValue: {
     color: colors.ink,
     fontSize: 17,
-    fontWeight: "900"
+    fontFamily: fonts.display,
+    letterSpacing: -0.3
+  },
+  dayHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  dayIcon: {
+    height: 40,
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.brandSoft
+  },
+  dayInfo: {
+    flex: 1
+  },
+  dayTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontFamily: fonts.display
+  },
+  dayNumbers: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 10
+  },
+  dayRevenue: {
+    color: colors.ink,
+    fontSize: 22,
+    fontFamily: fonts.display,
+    letterSpacing: -0.4
   },
   muted: {
     color: colors.muted,
-    fontWeight: "700"
+    fontSize: 13,
+    fontFamily: fonts.body
   },
-  sectionTitle: {
+  eventRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 4
+  },
+  eventDot: {
+    marginTop: 6,
+    height: 10,
+    width: 10,
+    borderRadius: 5,
+    backgroundColor: colors.brand
+  },
+  eventInfo: {
+    flex: 1,
+    gap: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: 12
+  },
+  eventTitle: {
     color: colors.ink,
-    fontSize: 20,
-    fontWeight: "900"
+    fontSize: 15,
+    fontFamily: fonts.bodyBold
   }
 });

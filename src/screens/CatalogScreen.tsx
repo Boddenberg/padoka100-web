@@ -1,12 +1,12 @@
 import * as ImagePicker from "expo-image-picker";
-import { MapPin, PackagePlus } from "lucide-react-native";
+import { Camera, ChevronRight, Images, MapPin } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Field, Input, Page, Sheet, StateText } from "@/components/ui";
+import { Badge, Button, Card, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { api, createProductMediaForm, type NativeFile } from "@/lib/api";
 import { cleanPayload, formatCurrency, todayInputValue } from "@/lib/format";
-import { colors } from "@/lib/theme";
+import { colors, fonts, radius, shadows } from "@/lib/theme";
 import type { Produto } from "@/types/api";
 
 type ProductDraft = {
@@ -20,7 +20,7 @@ type ProductDraft = {
 const emptyProduct: ProductDraft = {
   nome: "",
   descricao: "",
-  cor_botao: "#ef4444",
+  cor_botao: "#ff7a1a",
   preco_venda: "",
   preco_custo: "0"
 };
@@ -35,11 +35,15 @@ export function CatalogScreen() {
     <>
       <Page title="Catálogo" subtitle="Produtos, preços, fotos e locais de venda.">
         <View style={styles.actions}>
-          <Button title="Novo produto" onPress={() => setSheet("product")} />
-          <Button title="Novo local" tone="dark" onPress={() => setSheet("location")} />
+          <View style={styles.actionButton}>
+            <Button title="Novo produto" onPress={() => setSheet("product")} />
+          </View>
+          <View style={styles.actionButton}>
+            <Button title="Novo local" tone="soft" onPress={() => setSheet("location")} />
+          </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Produtos</Text>
+        <SectionTitle text="Produtos" />
         {productsQuery.isLoading ? <StateText text="Carregando produtos..." /> : null}
         {productsQuery.error instanceof Error ? <StateText tone="error" text={productsQuery.error.message} /> : null}
         {productsQuery.data?.map((produto) => (
@@ -49,29 +53,28 @@ export function CatalogScreen() {
               setEditing(produto);
               setSheet("edit");
             }}
+            style={({ pressed }) => [styles.productRow, shadows.soft, pressed && styles.pressed]}
           >
-            <Card>
-              <View style={styles.itemHeader}>
-                <PackagePlus color={colors.brand} />
-                <View style={styles.itemText}>
-                  <Text style={styles.itemTitle}>{produto.nome}</Text>
-                  <Text style={styles.muted}>
-                    {formatCurrency(produto.preco_atual?.preco_venda)} · {produto.situacao}
-                  </Text>
-                </View>
-              </View>
-            </Card>
+            <ProductPhoto url={produto.url_imagem_principal} name={produto.nome} size={62} rounded={radius.lg} />
+            <View style={styles.productInfo}>
+              <Text style={styles.productTitle}>{produto.nome}</Text>
+              <Text style={styles.productPrice}>{formatCurrency(produto.preco_atual?.preco_venda)}</Text>
+              <Badge text={produto.situacao} tone={produto.situacao === "ativo" ? "good" : "warn"} />
+            </View>
+            <ChevronRight size={20} color={colors.muted} />
           </Pressable>
         ))}
 
-        <Text style={styles.sectionTitle}>Locais</Text>
+        <SectionTitle text="Locais" />
         {locationsQuery.data?.map((local) => (
           <Card key={local.id}>
-            <View style={styles.itemHeader}>
-              <MapPin color={colors.brand} />
-              <View style={styles.itemText}>
-                <Text style={styles.itemTitle}>{local.nome}</Text>
-                <Text style={styles.muted}>{local.situacao}</Text>
+            <View style={styles.locationRow}>
+              <View style={styles.locationIcon}>
+                <MapPin size={20} color={colors.brandDeep} />
+              </View>
+              <View style={styles.productInfo}>
+                <Text style={styles.productTitle}>{local.nome}</Text>
+                <Badge text={local.situacao} tone={local.situacao === "ativo" ? "good" : "warn"} />
               </View>
             </View>
           </Card>
@@ -117,10 +120,14 @@ function ProductSheet({ visible, onClose }: { visible: boolean; onClose: () => v
   });
 
   return (
-    <Sheet visible={visible} title="Novo produto" onClose={onClose}>
+    <Sheet visible={visible} title="Novo produto" subtitle="Depois adicione a foto na edição." onClose={onClose}>
       <ProductFields draft={draft} setDraft={setDraft} />
       {createProduct.error instanceof Error ? <StateText tone="error" text={createProduct.error.message} /> : null}
-      <Button title={createProduct.isPending ? "Criando..." : "Criar produto"} disabled={!draft.nome || createProduct.isPending} onPress={() => createProduct.mutate()} />
+      <Button
+        title={createProduct.isPending ? "Criando..." : "Criar produto"}
+        disabled={!draft.nome || createProduct.isPending}
+        onPress={() => createProduct.mutate()}
+      />
     </Sheet>
   );
 }
@@ -145,12 +152,21 @@ function EditProductSheet({ visible, onClose, product }: { visible: boolean; onC
     }
   });
   const uploadMedia = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (source: "camera" | "gallery") => {
       if (!product) throw new Error("Produto não selecionado.");
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) throw new Error("Permissão de câmera negada.");
-      const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-      if (result.canceled) throw new Error("Captura cancelada.");
+
+      let result: ImagePicker.ImagePickerResult;
+      if (source === "camera") {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) throw new Error("Permissão de câmera negada.");
+        result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) throw new Error("Permissão de fotos negada.");
+        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
+      }
+
+      if (result.canceled) throw new Error("Seleção cancelada.");
       const asset = result.assets[0];
       const file: NativeFile = {
         uri: asset.uri,
@@ -163,11 +179,36 @@ function EditProductSheet({ visible, onClose, product }: { visible: boolean; onC
   });
 
   return (
-    <Sheet visible={visible} title={product?.nome || "Produto"} onClose={onClose}>
-      <Card>
-        <Text style={styles.itemTitle}>{formatCurrency(product?.preco_atual?.preco_venda)}</Text>
-        <Text style={styles.muted}>Situação: {product?.situacao}</Text>
-      </Card>
+    <Sheet visible={visible} title={product?.nome || "Produto"} subtitle="Preço e foto do produto" onClose={onClose}>
+      <View style={styles.editHeader}>
+        <ProductPhoto url={product?.url_imagem_principal} name={product?.nome || ""} size={96} rounded={radius.xl} />
+        <View style={styles.editHeaderInfo}>
+          <Text style={styles.editPrice}>{formatCurrency(product?.preco_atual?.preco_venda)}</Text>
+          <Badge text={product?.situacao || ""} tone={product?.situacao === "ativo" ? "good" : "warn"} />
+        </View>
+      </View>
+
+      <View style={styles.photoActions}>
+        <Pressable
+          onPress={() => uploadMedia.mutate("camera")}
+          disabled={uploadMedia.isPending}
+          style={({ pressed }) => [styles.photoAction, pressed && styles.pressed]}
+        >
+          <Camera size={20} color={colors.brandDeep} />
+          <Text style={styles.photoActionText}>Fotografar</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => uploadMedia.mutate("gallery")}
+          disabled={uploadMedia.isPending}
+          style={({ pressed }) => [styles.photoAction, pressed && styles.pressed]}
+        >
+          <Images size={20} color={colors.brandDeep} />
+          <Text style={styles.photoActionText}>Galeria</Text>
+        </Pressable>
+      </View>
+      {uploadMedia.isPending ? <StateText text="Enviando foto..." /> : null}
+      {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
+
       <Field label="Novo preço de venda">
         <Input value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
       </Field>
@@ -175,9 +216,7 @@ function EditProductSheet({ visible, onClose, product }: { visible: boolean; onC
         <Input value={cost} onChangeText={setCost} keyboardType="decimal-pad" />
       </Field>
       {createPrice.error instanceof Error ? <StateText tone="error" text={createPrice.error.message} /> : null}
-      <Button title={createPrice.isPending ? "Salvando..." : "Criar preço"} disabled={createPrice.isPending} onPress={() => createPrice.mutate()} />
-      <Button title={uploadMedia.isPending ? "Enviando..." : "Fotografar produto"} tone="dark" disabled={uploadMedia.isPending} onPress={() => uploadMedia.mutate()} />
-      {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
+      <Button title={createPrice.isPending ? "Salvando..." : "Salvar preço"} disabled={createPrice.isPending} onPress={() => createPrice.mutate()} />
     </Sheet>
   );
 }
@@ -204,7 +243,7 @@ function LocationSheet({ visible, onClose }: { visible: boolean; onClose: () => 
   });
 
   return (
-    <Sheet visible={visible} title="Novo local" onClose={onClose}>
+    <Sheet visible={visible} title="Novo local" subtitle="Feira, evento, ponto fixo..." onClose={onClose}>
       <Field label="Nome">
         <Input value={name} onChangeText={setName} />
       </Field>
@@ -212,18 +251,16 @@ function LocationSheet({ visible, onClose }: { visible: boolean; onClose: () => 
         <Input value={description} onChangeText={setDescription} />
       </Field>
       {createLocation.error instanceof Error ? <StateText tone="error" text={createLocation.error.message} /> : null}
-      <Button title={createLocation.isPending ? "Criando..." : "Criar local"} disabled={!name || createLocation.isPending} onPress={() => createLocation.mutate()} />
+      <Button
+        title={createLocation.isPending ? "Criando..." : "Criar local"}
+        disabled={!name || createLocation.isPending}
+        onPress={() => createLocation.mutate()}
+      />
     </Sheet>
   );
 }
 
-function ProductFields({
-  draft,
-  setDraft
-}: {
-  draft: ProductDraft;
-  setDraft: (draft: ProductDraft) => void;
-}) {
+function ProductFields({ draft, setDraft }: { draft: ProductDraft; setDraft: (draft: ProductDraft) => void }) {
   return (
     <>
       <Field label="Nome">
@@ -243,31 +280,88 @@ function ProductFields({
 }
 
 const styles = StyleSheet.create({
+  pressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.92
+  },
   actions: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 10
   },
-  sectionTitle: {
-    color: colors.ink,
-    fontSize: 20,
-    fontWeight: "900"
+  actionButton: {
+    flex: 1
   },
-  itemHeader: {
+  productRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    padding: 12
+  },
+  productInfo: {
+    flex: 1,
+    gap: 4
+  },
+  productTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontFamily: fonts.bodyBold
+  },
+  productPrice: {
+    color: colors.ink,
+    fontSize: 18,
+    fontFamily: fonts.display,
+    letterSpacing: -0.3
+  },
+  locationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12
   },
-  itemText: {
-    flex: 1
+  locationIcon: {
+    height: 44,
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.brandSoft
   },
-  itemTitle: {
+  editHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14
+  },
+  editHeaderInfo: {
+    gap: 6
+  },
+  editPrice: {
     color: colors.ink,
-    fontSize: 17,
-    fontWeight: "900"
+    fontSize: 26,
+    fontFamily: fonts.display,
+    letterSpacing: -0.5
   },
-  muted: {
-    color: colors.muted,
-    fontWeight: "700"
+  photoActions: {
+    flexDirection: "row",
+    gap: 10
+  },
+  photoAction: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 50,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.brandSoft,
+    backgroundColor: colors.surfaceGlow
+  },
+  photoActionText: {
+    color: colors.brandDeep,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
   }
 });
