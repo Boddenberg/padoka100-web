@@ -187,10 +187,19 @@ export interface RespostaInterpretarVenda {
   acao: string;
   precisa_confirmacao?: boolean;
   mensagem_assistente: string;
+  mensagem_confirmacao?: string | null;
   itens?: ItemVendaInterpretado[];
   itens_nao_identificados?: string[];
   dados_confirmacao: Record<string, unknown>;
   modelo_usado: string;
+}
+
+export interface RespostaConfirmarComando {
+  interacao_ia_id: UUID;
+  acao: string;
+  sucesso?: boolean;
+  mensagem_assistente?: string | null;
+  resultado?: Record<string, unknown>;
 }
 
 export interface RespostaTranscreverAudio {

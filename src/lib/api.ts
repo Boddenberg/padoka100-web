@@ -9,7 +9,7 @@ import type {
   Midia,
   Produto,
   RegistrarVendaRequest,
-  RespostaConfirmarVenda,
+  RespostaConfirmarComando,
   RespostaInterpretarVenda,
   RespostaTranscreverAudio,
   ResumoDoDia,
@@ -185,11 +185,13 @@ export const api = {
       apiRequest<EventoLinhaDoTempo[]>("/api/v1/historico/linha-do-tempo", { query: { limite: 100, ...query } })
   },
   ia: {
-    interpretSale: (body: { texto: string; dia_de_venda_id?: UUID | null; permitir_fallback?: boolean }) =>
-      apiRequest<RespostaInterpretarVenda>("/api/v1/ia/interpretar-comando-de-venda", { method: "POST", body }),
+    // Endpoints genéricos: interpretam qualquer comando (venda, abrir dia com
+    // produção etc.), não só vendas.
+    interpretCommand: (body: { texto: string; dia_de_venda_id?: UUID | null; permitir_fallback?: boolean }) =>
+      apiRequest<RespostaInterpretarVenda>("/api/v1/ia/interpretar-comando", { method: "POST", body }),
     transcribeAudio: (formData: FormData) =>
-      apiRequest<RespostaTranscreverAudio>("/api/v1/ia/transcrever-audio-de-venda", { method: "POST", formData }),
-    confirmSale: (interacaoId: UUID) =>
-      apiRequest<RespostaConfirmarVenda>(`/api/v1/ia/interacoes/${interacaoId}/confirmar-venda`, { method: "POST" })
+      apiRequest<RespostaTranscreverAudio>("/api/v1/ia/transcrever-audio", { method: "POST", formData }),
+    confirmCommand: (interacaoId: UUID) =>
+      apiRequest<RespostaConfirmarComando>(`/api/v1/ia/interacoes/${interacaoId}/confirmar`, { method: "POST" })
   }
 };

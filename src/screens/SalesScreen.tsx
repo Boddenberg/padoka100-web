@@ -175,20 +175,27 @@ export function SalesScreen() {
           </LinearGradient>
         ) : null}
 
+        {!loading ? (
+          <AgentBanner
+            hint={
+              currentDay
+                ? "“Busca, venda, o que precisar: fala ou escreve!”"
+                : "“Posso abrir o dia com a produção: fala ou escreve!”"
+            }
+            search={search}
+            onSearchChange={setSearch}
+            onSpeak={() => openAgent({ record: true })}
+            onAsk={() => {
+              if (search.trim()) {
+                openAgent({ text: search.trim() });
+                setSearch("");
+              }
+            }}
+          />
+        ) : null}
+
         {currentDay ? (
           <>
-            <AgentBanner
-              search={search}
-              onSearchChange={setSearch}
-              onSpeak={() => openAgent({ record: true })}
-              onAsk={() => {
-                if (search.trim()) {
-                  openAgent({ text: search.trim() });
-                  setSearch("");
-                }
-              }}
-            />
-
             {filteredProducts.length ? (
               <FlatList
                 data={filteredProducts}
@@ -319,11 +326,13 @@ function HeroChip({ label, onPress }: { label: string; onPress: () => void }) {
 // Card do agente com a entrada embutida: a pessoa escolhe entre
 // falar (mic) ou escrever (caixa de texto) sem sair do card.
 function AgentBanner({
+  hint,
   search,
   onSearchChange,
   onSpeak,
   onAsk
 }: {
+  hint: string;
   search: string;
   onSearchChange: (value: string) => void;
   onSpeak: () => void;
@@ -336,7 +345,7 @@ function AgentBanner({
         <View style={styles.agentBannerText}>
           <AgentTag />
           <Text style={styles.agentName}>{AGENT_NAME}</Text>
-          <Text style={styles.agentHint}>“Busca, venda, o que precisar: fala ou escreve!”</Text>
+          <Text style={styles.agentHint}>{hint}</Text>
         </View>
       </View>
 
@@ -691,7 +700,7 @@ function AgentConversation({
   const recorderState = useAudioRecorderState(recorder);
 
   const interpret = useMutation({
-    mutationFn: (command: string) => api.ia.interpretSale({ texto: command, dia_de_venda_id: day?.id, permitir_fallback: true }),
+    mutationFn: (command: string) => api.ia.interpretCommand({ texto: command, dia_de_venda_id: day?.id, permitir_fallback: true }),
     onSuccess: setResult
   });
   const upload = useMutation({
@@ -702,9 +711,9 @@ function AgentConversation({
     }
   });
   const confirm = useMutation({
-    mutationFn: () => api.ia.confirmSale(result!.interacao_ia_id),
-    onSuccess: () => {
-      onMessage(`${AGENT_NAME} registrou a venda!`);
+    mutationFn: () => api.ia.confirmCommand(result!.interacao_ia_id),
+    onSuccess: (response) => {
+      onMessage(response.mensagem_assistente || `${AGENT_NAME} resolveu pra você!`);
       onClose();
       invalidateDay(queryClient);
     }
@@ -753,12 +762,14 @@ function AgentConversation({
       <View style={styles.agentBubble}>
         <Text style={styles.agentBubbleText}>
           {recorderState.isRecording
-            ? "Tô ouvindo... fala a venda!"
+            ? "Tô ouvindo... pode falar!"
             : busy
               ? "Pensando aqui..."
               : result
                 ? result.mensagem_assistente
-                : "Me fala o que vendeu — por voz ou por texto — que eu monto a sacola e registro."}
+                : day
+                  ? "Me fala o que vendeu — por voz ou por texto — que eu monto a sacola e registro."
+                  : "O dia ainda não foi aberto. Me fala a produção de hoje que eu abro pra você!"}
         </Text>
       </View>
 
@@ -771,9 +782,13 @@ function AgentConversation({
         >
           <Mic size={30} color="#fff" />
           <Text style={styles.recordText}>
-            {recorderState.isRecording ? "Gravando... toque para parar" : upload.isPending ? "Enviando áudio..." : "Toque e fala a venda"}
+            {recorderState.isRecording ? "Gravando... toque para parar" : upload.isPending ? "Enviando áudio..." : "Toque e fala"}
           </Text>
-          {!recorderState.isRecording ? <Text style={styles.recordHint}>Ex: “vende 2 pães de queijo e 1 café”</Text> : null}
+          {!recorderState.isRecording ? (
+            <Text style={styles.recordHint}>
+              {day ? "Ex: “vende 2 pães de queijo e 1 café”" : "Ex: “abre o dia com 20 pães de queijo”"}
+            </Text>
+          ) : null}
         </LinearGradient>
       </Pressable>
 
@@ -787,7 +802,7 @@ function AgentConversation({
         <Input
           value={text}
           onChangeText={setText}
-          placeholder="Ex: vende 2 pães de queijo"
+          placeholder={day ? "Ex: vende 2 pães de queijo" : "Ex: abre o dia com 20 pães"}
           style={styles.commandInput}
           returnKeyType="send"
           onSubmitEditing={() => text.trim() && interpret.mutate(text.trim())}
@@ -828,8 +843,9 @@ function AgentConversation({
           {result.itens_nao_identificados?.length ? (
             <StateText tone="error" text={`Não identifiquei: ${result.itens_nao_identificados.join(", ")}`} />
           ) : null}
+          {result.mensagem_confirmacao ? <StateText text={result.mensagem_confirmacao} /> : null}
           <Button
-            title={confirm.isPending ? "Confirmando..." : "Confirmar venda"}
+            title={confirm.isPending ? "Confirmando..." : "Confirmar"}
             tone="success"
             disabled={!result.interacao_ia_id || confirm.isPending}
             onPress={() => confirm.mutate()}
