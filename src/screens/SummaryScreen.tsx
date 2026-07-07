@@ -2,7 +2,8 @@ import { CalendarDays, TrendingUp } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Button, Card, Field, Input, Page, SectionTitle, StateText } from "@/components/ui";
+import { RangeCalendar } from "@/components/calendar";
+import { Badge, Card, Page, SectionTitle, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius } from "@/lib/theme";
@@ -20,6 +21,16 @@ export function SummaryScreen() {
     queryKey: ["historico", "timeline"],
     queryFn: () => api.historico.timeline({ limite: 40 })
   });
+  // Todos os dias de venda já registrados: viram os pontinhos do calendário.
+  const salesDaysQuery = useQuery({ queryKey: ["dias", "lista"], queryFn: () => api.dias.list() });
+
+  const markedDays = useMemo(() => {
+    const set = new Set<string>();
+    salesDaysQuery.data?.forEach((day) => {
+      if (day.data_venda) set.add(day.data_venda.slice(0, 10));
+    });
+    return set;
+  }, [salesDaysQuery.data]);
 
   const totals = periodQuery.data;
   const days = useMemo(() => totals?.dias || [], [totals]);
@@ -27,19 +38,19 @@ export function SummaryScreen() {
   return (
     <Page title="Resumo" subtitle="Faturamento, restantes e histórico recente.">
       <Card>
-        <View style={styles.filters}>
-          <View style={styles.filterField}>
-            <Field label="Início">
-              <Input value={start} onChangeText={setStart} placeholder="AAAA-MM-DD" />
-            </Field>
-          </View>
-          <View style={styles.filterField}>
-            <Field label="Fim">
-              <Input value={end} onChangeText={setEnd} placeholder="AAAA-MM-DD" />
-            </Field>
-          </View>
+        <View style={styles.rangeHeader}>
+          <Text style={styles.rangeLabel}>Período</Text>
+          <Badge text={start === end ? formatDate(start) : `${formatDate(start)} – ${formatDate(end)}`} tone="good" />
         </View>
-        <Button title="Atualizar" onPress={() => periodQuery.refetch()} />
+        <RangeCalendar
+          start={start}
+          end={end}
+          marked={markedDays}
+          onChange={(nextStart, nextEnd) => {
+            setStart(nextStart);
+            setEnd(nextEnd);
+          }}
+        />
       </Card>
 
       {periodQuery.isLoading ? <StateText text="Carregando resumo..." /> : null}
@@ -107,12 +118,16 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
 }
 
 const styles = StyleSheet.create({
-  filters: {
+  rangeHeader: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 10
   },
-  filterField: {
-    flex: 1
+  rangeLabel: {
+    color: colors.ink,
+    fontSize: 18,
+    fontFamily: fonts.display
   },
   revenueHeader: {
     flexDirection: "row",

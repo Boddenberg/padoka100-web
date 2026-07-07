@@ -287,7 +287,9 @@ function DayHero({
 function HeroChip({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.heroChip, pressed && styles.pressed]}>
-      <Text style={styles.heroChipText}>{label}</Text>
+      <Text style={styles.heroChipText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -934,20 +936,21 @@ const styles = StyleSheet.create({
   },
   heroActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
+    gap: 6
   },
   heroChip: {
+    flex: 1,
+    alignItems: "center",
     borderRadius: radius.pill,
     backgroundColor: "rgba(255,255,255,0.2)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 10
   },
   heroChipText: {
     color: "#fff",
-    fontSize: 13,
+    fontSize: 12.5,
     fontFamily: fonts.bodyBold
   },
   agentBanner: {
