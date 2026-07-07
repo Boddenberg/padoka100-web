@@ -30,6 +30,8 @@ export function CatalogScreen() {
   const [editing, setEditing] = useState<Produto | null>(null);
   const productsQuery = useQuery({ queryKey: ["produtos", "todos"], queryFn: () => api.produtos.list(false) });
   const locationsQuery = useQuery({ queryKey: ["locais", "todos"], queryFn: () => api.locais.list(false) });
+  // Sempre a versão mais fresca do produto em edição (após salvar/foto).
+  const editingProduct = productsQuery.data?.find((produto) => produto.id === editing?.id) || editing;
 
   return (
     <>
@@ -83,7 +85,7 @@ export function CatalogScreen() {
 
       <ProductSheet visible={sheet === "product"} onClose={() => setSheet(null)} />
       <LocationSheet visible={sheet === "location"} onClose={() => setSheet(null)} />
-      <EditProductSheet visible={sheet === "edit"} onClose={() => setSheet(null)} product={editing} />
+      <EditProductSheet visible={sheet === "edit"} onClose={() => setSheet(null)} product={editingProduct} />
     </>
   );
 }
@@ -133,58 +135,97 @@ function ProductSheet({ visible, onClose }: { visible: boolean; onClose: () => v
 }
 
 function EditProductSheet({ visible, onClose, product }: { visible: boolean; onClose: () => void; product: Produto | null }) {
+  return (
+    <Sheet visible={visible} title={product?.nome || "Produto"} subtitle="Dados, foto e preço" onClose={onClose}>
+      {visible && product ? <EditProductForm onClose={onClose} product={product} /> : null}
+    </Sheet>
+  );
+}
+
+function EditProductForm({ onClose, product }: { onClose: () => void; product: Produto }) {
   const queryClient = useQueryClient();
+  const [nome, setNome] = useState(product.nome);
+  const [descricao, setDescricao] = useState(product.descricao || "");
+  const [situacao, setSituacao] = useState(product.situacao || "ativo");
   const [price, setPrice] = useState("");
-  const [cost, setCost] = useState("0");
+  const [cost, setCost] = useState(product.preco_atual?.preco_custo || "0");
+  // Foto recém-enviada: mostra na hora, sem esperar a lista recarregar.
+  const [photoUrl, setPhotoUrl] = useState(product.url_imagem_principal);
+
+  // Dados cadastrais salvos pelo endpoint de atualização (PATCH), sem exigir preço.
+  const updateProduct = useMutation({
+    mutationFn: () =>
+      api.produtos.update(
+        product.id,
+        cleanPayload({
+          nome,
+          descricao,
+          situacao
+        })
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+      onClose();
+    }
+  });
+
   const createPrice = useMutation({
-    mutationFn: () => {
-      if (!product || !price) throw new Error("Informe o preço.");
-      return api.produtos.createPrice(product.id, {
+    mutationFn: () =>
+      api.produtos.createPrice(product.id, {
         preco_venda: Number(price),
         preco_custo: Number(cost || 0),
         vigente_desde: todayInputValue(),
         motivo: "Atualização pelo app"
-      });
-    },
+      }),
     onSuccess: () => {
       setPrice("");
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
     }
   });
+
   const uploadMedia = useMutation({
     mutationFn: async (source: "camera" | "gallery") => {
-      if (!product) throw new Error("Produto não selecionado.");
-
       let result: ImagePicker.ImagePickerResult;
       if (source === "camera") {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) throw new Error("Permissão de câmera negada.");
-        result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+        result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true, aspect: [4, 3] });
       } else {
         const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permission.granted) throw new Error("Permissão de fotos negada.");
-        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
+        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true, aspect: [4, 3] });
       }
 
-      if (result.canceled) throw new Error("Seleção cancelada.");
+      if (result.canceled) return null;
       const asset = result.assets[0];
       const file: NativeFile = {
         uri: asset.uri,
         name: asset.fileName || `produto-${Date.now()}.jpg`,
         type: asset.mimeType || "image/jpeg"
       };
-      return api.produtos.uploadMedia(product.id, createProductMediaForm(file));
+
+      const media = await api.produtos.uploadMedia(product.id, createProductMediaForm(file));
+
+      // Garante a troca: grava a URL nova no produto pelo endpoint de atualização.
+      const mediaUrl = media?.url_publica || media?.caminho_arquivo || null;
+      if (mediaUrl) {
+        await api.produtos.update(product.id, { url_imagem_principal: mediaUrl });
+      }
+      return mediaUrl;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["produtos"] })
+    onSuccess: (mediaUrl) => {
+      if (mediaUrl) setPhotoUrl(mediaUrl);
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+    }
   });
 
   return (
-    <Sheet visible={visible} title={product?.nome || "Produto"} subtitle="Preço e foto do produto" onClose={onClose}>
+    <>
       <View style={styles.editHeader}>
-        <ProductPhoto url={product?.url_imagem_principal} name={product?.nome || ""} size={96} rounded={radius.xl} />
+        <ProductPhoto url={photoUrl} name={product.nome} size={96} rounded={radius.xl} />
         <View style={styles.editHeaderInfo}>
-          <Text style={styles.editPrice}>{formatCurrency(product?.preco_atual?.preco_venda)}</Text>
-          <Badge text={product?.situacao || ""} tone={product?.situacao === "ativo" ? "good" : "warn"} />
+          <Text style={styles.editPrice}>{formatCurrency(product.preco_atual?.preco_venda)}</Text>
+          <Badge text={situacao} tone={situacao === "ativo" ? "good" : "warn"} />
         </View>
       </View>
 
@@ -207,17 +248,56 @@ function EditProductSheet({ visible, onClose, product }: { visible: boolean; onC
         </Pressable>
       </View>
       {uploadMedia.isPending ? <StateText text="Enviando foto..." /> : null}
+      {uploadMedia.isSuccess && uploadMedia.data ? <StateText tone="success" text="Foto atualizada!" /> : null}
       {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
 
-      <Field label="Novo preço de venda">
-        <Input value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
+      <Field label="Nome">
+        <Input value={nome} onChangeText={setNome} />
       </Field>
-      <Field label="Custo">
-        <Input value={cost} onChangeText={setCost} keyboardType="decimal-pad" />
+      <Field label="Descrição">
+        <Input value={descricao} onChangeText={setDescricao} />
       </Field>
-      {createPrice.error instanceof Error ? <StateText tone="error" text={createPrice.error.message} /> : null}
-      <Button title={createPrice.isPending ? "Salvando..." : "Salvar preço"} disabled={createPrice.isPending} onPress={() => createPrice.mutate()} />
-    </Sheet>
+      <Field label="Situação">
+        <View style={styles.statusRow}>
+          <Pressable
+            onPress={() => setSituacao("ativo")}
+            style={[styles.statusChip, situacao === "ativo" && styles.statusChipActive]}
+          >
+            <Text style={[styles.statusChipText, situacao === "ativo" && styles.statusChipTextActive]}>Ativo</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSituacao("inativo")}
+            style={[styles.statusChip, situacao === "inativo" && styles.statusChipActive]}
+          >
+            <Text style={[styles.statusChipText, situacao === "inativo" && styles.statusChipTextActive]}>Inativo</Text>
+          </Pressable>
+        </View>
+      </Field>
+      {updateProduct.error instanceof Error ? <StateText tone="error" text={updateProduct.error.message} /> : null}
+      <Button
+        title={updateProduct.isPending ? "Salvando..." : "Salvar alterações"}
+        disabled={!nome.trim() || updateProduct.isPending}
+        onPress={() => updateProduct.mutate()}
+      />
+
+      <View style={styles.priceSection}>
+        <Text style={styles.priceSectionTitle}>Novo preço (opcional)</Text>
+        <Field label="Preço de venda">
+          <Input value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="Deixe vazio para manter o atual" />
+        </Field>
+        <Field label="Custo">
+          <Input value={cost} onChangeText={setCost} keyboardType="decimal-pad" />
+        </Field>
+        {createPrice.error instanceof Error ? <StateText tone="error" text={createPrice.error.message} /> : null}
+        {createPrice.isSuccess ? <StateText tone="success" text="Preço atualizado!" /> : null}
+        <Button
+          title={createPrice.isPending ? "Salvando..." : "Criar novo preço"}
+          tone="soft"
+          disabled={!price.trim() || createPrice.isPending}
+          onPress={() => createPrice.mutate()}
+        />
+      </View>
+    </>
   );
 }
 
@@ -363,5 +443,42 @@ const styles = StyleSheet.create({
     color: colors.brandDeep,
     fontSize: 14,
     fontFamily: fonts.bodyBold
+  },
+  statusRow: {
+    flexDirection: "row",
+    gap: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceWarm,
+    padding: 5
+  },
+  statusChip: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    paddingVertical: 10
+  },
+  statusChipActive: {
+    backgroundColor: colors.brand,
+    ...shadows.brand
+  },
+  statusChipText: {
+    color: colors.muted,
+    fontFamily: fonts.bodyBold
+  },
+  statusChipTextActive: {
+    color: "#fff"
+  },
+  priceSection: {
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 14,
+    marginTop: 4
+  },
+  priceSectionTitle: {
+    color: colors.ink,
+    fontSize: 17,
+    fontFamily: fonts.display
   }
 });
