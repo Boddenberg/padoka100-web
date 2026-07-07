@@ -158,41 +158,17 @@ export function SalesScreen() {
 
         {currentDay ? (
           <>
-            <AgentBanner onSpeak={() => openAgent({ record: true })} onWrite={() => openAgent()} />
-
-            <View style={styles.searchRow}>
-              <View style={styles.searchBox}>
-                <Search size={18} color={colors.muted} />
-                <Input
-                  placeholder="Busque ou peça qualquer ação..."
-                  value={search}
-                  onChangeText={setSearch}
-                  style={styles.searchInput}
-                  returnKeyType="send"
-                  onSubmitEditing={() => {
-                    if (search.trim()) {
-                      openAgent({ text: search.trim() });
-                      setSearch("");
-                    }
-                  }}
-                />
-              </View>
-              <Pressable onPress={() => openAgent({ record: true })} style={({ pressed }) => pressed && styles.pressed}>
-                <LinearGradient colors={gradients.agent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.micButton, shadows.agent]}>
-                  <Mic color="#fff" />
-                </LinearGradient>
-              </Pressable>
-            </View>
-
-            {search.trim() ? (
-              <Pressable onPress={() => openAgent({ text: search.trim() })} style={({ pressed }) => [styles.askAgentChip, pressed && styles.pressed]}>
-                <Sparkles size={16} color={colors.agentDeep} />
-                <Text style={styles.askAgentText} numberOfLines={1}>
-                  Pedir pro {AGENT_NAME}: “{search.trim()}”
-                </Text>
-                <ChevronRight size={16} color={colors.agentDeep} />
-              </Pressable>
-            ) : null}
+            <AgentBanner
+              search={search}
+              onSearchChange={setSearch}
+              onSpeak={() => openAgent({ record: true })}
+              onAsk={() => {
+                if (search.trim()) {
+                  openAgent({ text: search.trim() });
+                  setSearch("");
+                }
+              }}
+            />
 
             {filteredProducts.length ? (
               <FlatList
@@ -292,12 +268,7 @@ function DayHero({
         <Text style={styles.heroMuted}>Vendas de hoje</Text>
         <Text style={styles.heroRevenue}>{formatCurrency(revenue)}</Text>
         <View style={styles.progressTrack}>
-          <LinearGradient
-            colors={gradients.brand}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.progressFill, { width: `${progress}%` }]}
-          />
+          <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
         <Text style={styles.heroMuted}>
           {sold ?? 0} de {produced ?? 0} itens vendidos · {progress}%
@@ -321,28 +292,59 @@ function HeroChip({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
-function AgentBanner({ onSpeak, onWrite }: { onSpeak: () => void; onWrite: () => void }) {
+// Card do agente com a entrada embutida: a pessoa escolhe entre
+// falar (mic) ou escrever (caixa de texto) sem sair do card.
+function AgentBanner({
+  search,
+  onSearchChange,
+  onSpeak,
+  onAsk
+}: {
+  search: string;
+  onSearchChange: (value: string) => void;
+  onSpeak: () => void;
+  onAsk: () => void;
+}) {
   return (
-    <Pressable onPress={onSpeak} style={({ pressed }) => pressed && styles.pressed}>
-      <View style={[styles.agentBanner, shadows.soft]}>
+    <View style={[styles.agentBanner, shadows.soft]}>
+      <View style={styles.agentBannerHeader}>
         <AgentAvatar size={52} />
         <View style={styles.agentBannerText}>
           <AgentTag />
           <Text style={styles.agentName}>{AGENT_NAME}</Text>
-          <Text style={styles.agentHint}>“Me fala a venda que eu registro pra você!”</Text>
-        </View>
-        <View style={styles.agentActions}>
-          <Pressable onPress={onSpeak} style={({ pressed }) => pressed && styles.pressed}>
-            <LinearGradient colors={gradients.agent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.agentActionButton}>
-              <Mic size={18} color="#fff" />
-            </LinearGradient>
-          </Pressable>
-          <Pressable onPress={onWrite} style={({ pressed }) => [styles.agentActionButtonSoft, pressed && styles.pressed]}>
-            <Send size={16} color={colors.agentDeep} />
-          </Pressable>
+          <Text style={styles.agentHint}>“Busca, venda, o que precisar: fala ou escreve!”</Text>
         </View>
       </View>
-    </Pressable>
+
+      <View style={styles.agentInputRow}>
+        <View style={styles.searchBox}>
+          <Search size={18} color={colors.muted} />
+          <Input
+            placeholder="Busque ou peça qualquer ação..."
+            value={search}
+            onChangeText={onSearchChange}
+            style={styles.searchInput}
+            returnKeyType="send"
+            onSubmitEditing={onAsk}
+          />
+        </View>
+        <Pressable onPress={onSpeak} style={({ pressed }) => pressed && styles.pressed}>
+          <LinearGradient colors={gradients.agent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.micButton, shadows.agent]}>
+            <Mic color="#fff" />
+          </LinearGradient>
+        </Pressable>
+      </View>
+
+      {search.trim() ? (
+        <Pressable onPress={onAsk} style={({ pressed }) => [styles.askAgentChip, pressed && styles.pressed]}>
+          <Sparkles size={16} color={colors.agentDeep} />
+          <Text style={styles.askAgentText} numberOfLines={1}>
+            Pedir pro {AGENT_NAME}: “{search.trim()}”
+          </Text>
+          <ChevronRight size={16} color={colors.agentDeep} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -880,7 +882,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 12,
     paddingVertical: 6
   },
@@ -895,7 +897,7 @@ const styles = StyleSheet.create({
     borderRadius: 4
   },
   heroGreeting: {
-    color: "rgba(255,255,255,0.6)",
+    color: "rgba(255,255,255,0.85)",
     fontSize: 14,
     fontFamily: fonts.body
   },
@@ -907,7 +909,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4
   },
   heroMuted: {
-    color: "rgba(255,255,255,0.62)",
+    color: "rgba(255,255,255,0.85)",
     fontSize: 13,
     fontFamily: fonts.body
   },
@@ -922,12 +924,13 @@ const styles = StyleSheet.create({
     height: 10,
     marginBottom: 6,
     borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.22)",
     overflow: "hidden"
   },
   progressFill: {
     height: "100%",
-    borderRadius: radius.pill
+    borderRadius: radius.pill,
+    backgroundColor: "#fff"
   },
   heroActions: {
     flexDirection: "row",
@@ -936,7 +939,7 @@ const styles = StyleSheet.create({
   },
   heroChip: {
     borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.2)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
     paddingHorizontal: 16,
@@ -948,14 +951,17 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold
   },
   agentBanner: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 12,
     borderRadius: radius.xl,
     borderWidth: 1.5,
     borderColor: colors.agentSoft,
     backgroundColor: colors.surface,
     padding: 14
+  },
+  agentBannerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
   },
   agentBannerText: {
     flex: 1,
@@ -971,25 +977,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontFamily: fonts.body
   },
-  agentActions: {
-    gap: 8
-  },
-  agentActionButton: {
-    height: 42,
-    width: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill
-  },
-  agentActionButtonSoft: {
-    height: 42,
-    width: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    backgroundColor: colors.agentSoft
-  },
-  searchRow: {
+  agentInputRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10

@@ -28,7 +28,8 @@ export const colors = {
 // Gradientes prontos para LinearGradient (sempre início → fim).
 export const gradients = {
   brand: ["#ff8a2a", "#f24d0f"] as const,
-  hero: ["#432a1c", "#2a1a10"] as const,
+  // Pôr do sol tech: laranja → framboesa → violeta.
+  hero: ["#ff8a2a", "#f0426b", "#8b5cf6"] as const,
   agent: ["#9d6bff", "#6d28d9"] as const,
   glow: ["#fff3e2", "#fbf5ec"] as const
 };
