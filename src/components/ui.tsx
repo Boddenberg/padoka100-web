@@ -3,7 +3,10 @@ import { Image } from "expo-image";
 import { Minus, Plus, X } from "lucide-react-native";
 import type { ReactNode } from "react";
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,12 +32,20 @@ export function Screen({ children }: { children: ReactNode }) {
 export function Page({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        </View>
-        {children}
+      <ScrollView
+        contentContainerStyle={styles.pageScroll}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Tocar em qualquer área vazia fecha o teclado. */}
+        <Pressable style={styles.page} onPress={Keyboard.dismiss} accessible={false}>
+          <View>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          </View>
+          {children}
+        </Pressable>
       </ScrollView>
     </Screen>
   );
@@ -114,7 +125,15 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export function Input(props: TextInputProps) {
-  return <TextInput placeholderTextColor={colors.muted} {...props} style={[styles.input, props.style]} />;
+  return (
+    <TextInput
+      placeholderTextColor={colors.muted}
+      // "OK/Concluído" no teclado fecha em vez de quebrar linha.
+      returnKeyType={props.multiline ? undefined : "done"}
+      {...props}
+      style={[styles.input, props.style]}
+    />
+  );
 }
 
 export function StateText({ text, tone = "muted" }: { text: string; tone?: "muted" | "error" | "success" }) {
@@ -240,8 +259,15 @@ export function Sheet({
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.scrim}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.scrim}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            // Primeiro toque fora fecha o teclado; o seguinte fecha o sheet.
+            if (Keyboard.isVisible()) Keyboard.dismiss();
+            else onClose();
+          }}
+        />
         <SafeAreaView style={styles.sheet} edges={["bottom"]}>
           <View style={styles.handle} />
           <View style={styles.sheetHeader}>
@@ -254,11 +280,18 @@ export function Sheet({
               <X size={20} color={colors.ink} />
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {children}
+          <ScrollView
+            contentContainerStyle={styles.sheetBodyScroll}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
+            <Pressable style={styles.sheetBody} onPress={Keyboard.dismiss} accessible={false}>
+              {children}
+            </Pressable>
           </ScrollView>
         </SafeAreaView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -268,7 +301,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg
   },
+  pageScroll: {
+    flexGrow: 1
+  },
   page: {
+    flexGrow: 1,
     gap: 16,
     padding: 16,
     paddingBottom: 132
@@ -448,7 +485,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceWarm
   },
+  sheetBodyScroll: {
+    flexGrow: 1
+  },
   sheetBody: {
+    flexGrow: 1,
     gap: 14,
     padding: 16,
     paddingTop: 6,

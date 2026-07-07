@@ -1,7 +1,7 @@
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ban, CalendarDays, CheckCircle2, ChevronRight, Mic, ReceiptText, Search, Send, Sparkles } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
@@ -95,8 +95,27 @@ export function SalesScreen() {
     }
   });
 
+  // A barra Registrar surge embaixo do dedo no primeiro "+": segura os
+  // toques dela por um instante para não registrar venda sem querer.
+  const [cartBarGuard, setCartBarGuard] = useState(false);
+  const guardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function armCartBarGuard() {
+    if (guardTimer.current) clearTimeout(guardTimer.current);
+    setCartBarGuard(true);
+    guardTimer.current = setTimeout(() => setCartBarGuard(false), 900);
+  }
+
+  useEffect(
+    () => () => {
+      if (guardTimer.current) clearTimeout(guardTimer.current);
+    },
+    []
+  );
+
   function addProduct(produto: Produto) {
     if (!produto.preco_atual || !stockReady) return;
+    if (itemCount === 0) armCartBarGuard();
     setCart((current) => {
       const currentQuantity = current[produto.id] || 0;
       const availableQuantity = availableByProduct[produto.id] || 0;
@@ -195,7 +214,10 @@ export function SalesScreen() {
       </Page>
 
       {itemCount ? (
-        <View style={[styles.cartBar, shadows.floating]}>
+        <View
+          pointerEvents={cartBarGuard ? "none" : "auto"}
+          style={[styles.cartBar, shadows.floating, cartBarGuard && styles.cartBarGuarded]}
+        >
           <View style={styles.cartInfo}>
             <View style={styles.cartCountBubble}>
               <Text style={styles.cartCountText}>{itemCount}</Text>
@@ -1114,6 +1136,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#2a1a10",
     padding: 10,
     paddingLeft: 18
+  },
+  cartBarGuarded: {
+    opacity: 0.7
   },
   cartInfo: {
     flexDirection: "row",
