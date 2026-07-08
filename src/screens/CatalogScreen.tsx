@@ -7,6 +7,7 @@ import { Badge, Button, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, S
 import { api, createMediaForm, type NativeFile } from "@/lib/api";
 import { cleanPayload, formatCurrency, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
+import { fixProductName } from "@/utils/text";
 import type { LocalVenda, Produto } from "@/types/api";
 
 // Abre câmera ou galeria e devolve o arquivo escolhido (ou null se cancelou).
@@ -106,7 +107,7 @@ export function CatalogScreen() {
     >
       <ProductPhoto url={produto.url_imagem_principal} name={produto.nome} size={62} rounded={radius.lg} />
       <View style={styles.productInfo}>
-        <Text style={styles.productTitle}>{produto.nome}</Text>
+        <Text style={styles.productTitle}>{fixProductName(produto.nome)}</Text>
         <Text style={styles.productPrice}>{formatCurrency(produto.preco_atual?.preco_venda)}</Text>
         <Badge text={produto.situacao} tone={produto.situacao === "ativo" ? "good" : "warn"} />
       </View>
@@ -218,7 +219,7 @@ function ProductSheet({ visible, onClose }: { visible: boolean; onClose: () => v
 
 function EditProductSheet({ visible, onClose, product }: { visible: boolean; onClose: () => void; product: Produto | null }) {
   return (
-    <Sheet visible={visible} title={product?.nome || "Produto"} subtitle="Dados, foto e preço" onClose={onClose}>
+    <Sheet visible={visible} title={product ? fixProductName(product.nome) : "Produto"} subtitle="Dados, foto e preço" onClose={onClose}>
       {visible && product ? <EditProductForm onClose={onClose} product={product} /> : null}
     </Sheet>
   );

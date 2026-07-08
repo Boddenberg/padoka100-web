@@ -8,6 +8,7 @@ import { Badge, Card, Page, SectionTitle, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius } from "@/lib/theme";
+import { humanizeEventDetail, humanizeEventTitle } from "@/utils/events";
 
 export function SummaryScreen() {
   const today = todayInputValue();
@@ -96,17 +97,18 @@ export function SummaryScreen() {
       <SectionTitle text="Histórico" />
       {historyQuery.isLoading ? <StateText text="Carregando histórico..." /> : null}
       {historyQuery.error instanceof Error ? <StateText tone="error" text={historyQuery.error.message} /> : null}
-      {historyQuery.data?.map((event) => (
-        <View key={event.id} style={styles.eventRow}>
-          <View style={styles.eventDot} />
-          <View style={styles.eventInfo}>
-            <Text style={styles.eventTitle}>{event.titulo}</Text>
-            <Text style={styles.muted}>
-              {event.tipo_evento} · {formatDate(event.criado_em)}
-            </Text>
+      {historyQuery.data?.map((event) => {
+        const detail = humanizeEventDetail(event);
+        return (
+          <View key={event.id} style={styles.eventRow}>
+            <View style={styles.eventDot} />
+            <View style={styles.eventInfo}>
+              <Text style={styles.eventTitle}>{humanizeEventTitle(event)}</Text>
+              <Text style={styles.muted}>{detail ? `${detail} · ${formatDate(event.criado_em)}` : formatDate(event.criado_em)}</Text>
+            </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </Page>
   );
 }

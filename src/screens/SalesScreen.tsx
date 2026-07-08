@@ -9,6 +9,8 @@ import { Badge, Button, Card, Field, Input, Page, ProductPhoto, Sheet, StateText
 import { api, createAudioForm, type NativeFile } from "@/lib/api";
 import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
+import { getGreeting } from "@/utils/greeting";
+import { fixProductName } from "@/utils/text";
 import type { DiaDeVenda, Produto, RespostaInterpretarVenda, Venda } from "@/types/api";
 
 type Cart = Record<string, number>;
@@ -409,7 +411,7 @@ function ProductTile({
       </View>
       <View style={styles.productBody}>
         <Text style={styles.productName} numberOfLines={2}>
-          {product.nome}
+          {fixProductName(product.nome)}
         </Text>
         <Text style={styles.price}>{formatCurrency(product.preco_atual?.preco_venda)}</Text>
         <Text style={styles.stock}>{available <= 0 ? "Esgotado" : `Restante: ${remaining}`}</Text>
@@ -437,7 +439,7 @@ function ProductionEditor({
           <View key={produto.id} style={styles.productionRow}>
             <ProductPhoto url={produto.url_imagem_principal} name={produto.nome} size={48} />
             <Text style={styles.productionName} numberOfLines={2}>
-              {produto.nome}
+              {fixProductName(produto.nome)}
             </Text>
             <Stepper
               value={quantity}
@@ -611,7 +613,7 @@ function SalesListSheet({ visible, onClose, day }: { visible: boolean; onClose: 
       {sales.map((sale) => {
         const cancelled = sale.situacao === "cancelada";
         const itemsLabel = (sale.itens || [])
-          .map((item) => `${item.quantidade}x ${item.nome_produto_no_momento}`)
+          .map((item) => `${item.quantidade}x ${fixProductName(item.nome_produto_no_momento)}`)
           .join(" · ");
 
         return (
@@ -835,7 +837,7 @@ function AgentConversation({
           {result.itens?.map((item) => (
             <View key={`${item.produto_id}-${item.nome_produto}`} style={styles.resultRow}>
               <Text style={styles.resultItem}>
-                {item.quantidade}x {item.nome_produto}
+                {item.quantidade}x {fixProductName(item.nome_produto)}
               </Text>
               <Badge text={`${Math.round(item.confianca * 100)}%`} tone={item.confianca >= 0.75 ? "good" : "warn"} />
             </View>
@@ -866,13 +868,6 @@ function invalidateDay(queryClient: ReturnType<typeof useQueryClient>) {
 
 function normalize(value: string) {
   return value.normalize("NFD").replace(DIACRITICS, "").toLowerCase();
-}
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Bom dia!";
-  if (hour < 18) return "Boa tarde!";
-  return "Boa noite!";
 }
 
 function saleTotal(sale: Venda) {
