@@ -3,10 +3,13 @@ import type {
   AlterarEmailRequest,
   AlterarSenhaRequest,
   AnaliseIARequest,
-  CorrigirDiaRequest,
+  CorrigirDiaFechadoRequest,
   CriarDiaDeVendaRequest,
   CriarItemProducaoRequest,
   DiaDeVenda,
+  IniciarHojeRequest,
+  ProdutoDaVenda,
+  RespostaIniciarHoje,
   EventoLinhaDoTempo,
   HealthStatus,
   LocalVenda,
@@ -200,10 +203,13 @@ export const api = {
         method: "POST",
         body: { observacoes: observacoes || null }
       }),
-    // Correção retroativa de dia fechado. Contrato definido pelo app;
-    // o backend ainda precisa implementar este endpoint.
-    correct: (diaId: UUID, body: CorrigirDiaRequest) =>
-      apiRequest<ResumoDoDia>(`/api/v1/dias-de-venda/${diaId}/correcao`, { method: "PATCH", body })
+    // Início do dia com virada automática: idempotente; pode devolver
+    // acao "decidir_sobras" para o usuário escolher o que aproveitar.
+    startToday: (body: IniciarHojeRequest) =>
+      apiRequest<RespostaIniciarHoje>("/api/v1/dias-de-venda/iniciar-hoje", { method: "POST", body }),
+    // Correção retroativa de dia fechado, preservando o antes/depois.
+    corrections: (diaId: UUID, body: CorrigirDiaFechadoRequest) =>
+      apiRequest<Record<string, unknown>>(`/api/v1/dias-de-venda/${diaId}/correcoes`, { method: "POST", body })
   },
   vendas: {
     create: (body: RegistrarVendaRequest) => apiRequest<Venda>("/api/v1/vendas", { method: "POST", body }),
@@ -213,9 +219,12 @@ export const api = {
   },
   relatorios: {
     day: (diaId: UUID) => apiRequest<ResumoDoDia>(`/api/v1/relatorios/dias/${diaId}/resumo`),
-    period: (dataInicio: string, dataFim: string) =>
+    dayByDate: (date: string) => apiRequest<ResumoDoDia>(`/api/v1/relatorios/dias/por-data/${date}/resumo`),
+    // Produtos que participam do dia (esgotados continuam na lista).
+    dayProducts: (diaId: UUID) => apiRequest<ProdutoDaVenda[]>(`/api/v1/relatorios/dias/${diaId}/produtos-venda`),
+    period: (dataInicio: string, dataFim: string, produtoId?: UUID) =>
       apiRequest<ResumoDoPeriodo>("/api/v1/relatorios/periodo", {
-        query: { data_inicio: dataInicio, data_fim: dataFim }
+        query: { data_inicio: dataInicio, data_fim: dataFim, produto_id: produtoId }
       })
   },
   historico: {

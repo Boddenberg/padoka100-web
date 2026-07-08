@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { formatCurrency, formatDate, formatWholeCurrency, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
 import { addDays, describePeriod, diffDays, startOfMonth } from "@/utils/dates";
-import { humanizeEventDetail, humanizeEventTitle } from "@/utils/events";
+import { eventTimestamp, humanizeEventDetail, humanizeEventTitle } from "@/utils/events";
 
 // Ordem da tela (README): 1. Faturamento do período · 2. Período ·
 // 3. Gráfico · 4. Análise com IA · 5. Histórico.
@@ -179,7 +179,9 @@ export function SummaryScreen() {
               <View style={styles.eventDot} />
               <View style={styles.eventInfo}>
                 <Text style={styles.eventTitle}>{humanizeEventTitle(event)}</Text>
-                <Text style={styles.muted}>{detail ? `${detail} · ${formatDate(event.criado_em)}` : formatDate(event.criado_em)}</Text>
+                <Text style={styles.muted}>
+                  {detail ? `${detail} · ${formatDate(eventTimestamp(event))}` : formatDate(eventTimestamp(event))}
+                </Text>
               </View>
             </View>
           );

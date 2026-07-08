@@ -160,6 +160,10 @@ export interface EventoLinhaDoTempo {
   titulo: string;
   detalhes: Record<string, unknown>;
   criado_em: string;
+  // Campos novos da linha do tempo (os antigos seguem por compatibilidade).
+  tipo?: string;
+  dataHora?: string;
+  dados?: Record<string, unknown>;
 }
 
 export interface Midia {
@@ -272,16 +276,66 @@ export interface RespostaAnaliseIA {
   modelo_usado?: string;
 }
 
-// Correção retroativa de um dia fechado (backend ainda vai implementar).
-export interface CorrecaoItemRequest {
+// Correção retroativa de um dia fechado (POST /dias-de-venda/{id}/correcoes).
+export interface CorrecaoProducaoRequest {
   produto_id: UUID;
-  quantidade_produzida?: number | null;
-  quantidade_vendida?: number | null;
+  quantidade_produzida: number;
 }
 
-export interface CorrigirDiaRequest {
-  itens: CorrecaoItemRequest[];
+export interface CorrecaoItemVendaRequest {
+  item_venda_id: UUID;
+  quantidade: number;
+}
+
+export interface CorrecaoVendaAdicionadaRequest {
+  itens: { produto_id: UUID; quantidade: number }[];
+  observacoes?: string | null;
+}
+
+export interface CorrigirDiaFechadoRequest {
+  usuario_id: string;
   motivo?: string | null;
+  producoes?: CorrecaoProducaoRequest[];
+  itens_venda?: CorrecaoItemVendaRequest[];
+  vendas_adicionadas?: CorrecaoVendaAdicionadaRequest[];
+  vendas_canceladas?: { venda_id: UUID; motivo?: string | null }[];
+}
+
+// Início do dia com virada automática (POST /dias-de-venda/iniciar-hoje).
+export interface DecisaoSobraRequest {
+  produto_id: UUID;
+  quantidade_usada_hoje: number;
+  quantidade_nao_usada_hoje?: number;
+}
+
+export interface IniciarHojeRequest {
+  itens_producao?: CriarItemProducaoRequest[];
+  decisoes_sobra?: DecisaoSobraRequest[];
+}
+
+export interface SobraPendente {
+  produto_id: UUID;
+  nome_produto: string;
+  quantidade_sobra: number;
+  quantidade_sugerida_para_usar: number;
+}
+
+export interface RespostaDecidirSobras {
+  acao: "decidir_sobras";
+  mensagem: string;
+  data_venda: string;
+  sobras_pendentes: SobraPendente[];
+}
+
+export type RespostaIniciarHoje = DiaDeVenda | RespostaDecidirSobras;
+
+// Produtos que participam do dia (GET /relatorios/dias/{id}/produtos-venda).
+export interface ProdutoDaVenda {
+  produto_id: UUID;
+  nome_produto?: string;
+  esgotado?: boolean;
+  quantidade_disponivel?: number;
+  [key: string]: unknown;
 }
 
 export interface RegistrarVendaRequest {

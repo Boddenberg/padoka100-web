@@ -156,23 +156,20 @@ function ProductSheet({ visible, onClose }: { visible: boolean; onClose: () => v
   const [draft, setDraft] = useState<ProductDraft>(emptyProduct);
   const createProduct = useMutation({
     mutationFn: async () => {
-      const created = await api.produtos.create(
-        cleanPayload({
-          nome: draft.nome,
-          descricao: draft.descricao,
-          cor_botao: draft.cor_botao,
-          ordem_exibicao: 0,
-          situacao: "ativo",
-          preco_inicial: draft.preco_venda
-            ? {
-                preco_venda: Number(draft.preco_venda),
-                preco_custo: Number(draft.preco_custo || 0),
-                vigente_desde: todayInputValue(),
-                motivo: "Preço inicial"
-              }
-            : undefined
-        })
-      );
+      // Preço vai flat no cadastro (preco_venda/preco_custo/vigente_desde).
+      const payload: Record<string, unknown> = {
+        nome: draft.nome,
+        descricao: draft.descricao,
+        cor_botao: draft.cor_botao,
+        ordem_exibicao: 0,
+        situacao: "ativo"
+      };
+      if (draft.preco_venda) {
+        payload.preco_venda = Number(draft.preco_venda);
+        payload.preco_custo = Number(draft.preco_custo || 0);
+        payload.vigente_desde = todayInputValue();
+      }
+      const created = await api.produtos.create(cleanPayload(payload));
       return created;
     },
     onSuccess: () => {

@@ -7,7 +7,7 @@ import { Badge, Button, Money, ProductPhoto, SectionTitle, Sheet, StateText } fr
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { colors, fonts, radius } from "@/lib/theme";
-import { humanizeEventDetail, humanizeEventTitle } from "@/utils/events";
+import { eventTimestamp, humanizeEventDetail, humanizeEventTitle } from "@/utils/events";
 import { fixProductName } from "@/utils/text";
 
 // Resumo completo de um dia (aberto ou fechado): status, faturamento,
@@ -134,7 +134,7 @@ export function DaySummarySheet({
                 <View style={styles.eventInfo}>
                   <Text style={styles.eventTitle}>{humanizeEventTitle(event)}</Text>
                   <Text style={styles.eventDetail}>
-                    {detail ? `${detail} · ${formatTime(event.criado_em)}` : formatTime(event.criado_em)}
+                    {detail ? `${detail} · ${formatTime(eventTimestamp(event))}` : formatTime(eventTimestamp(event))}
                   </Text>
                 </View>
               </View>

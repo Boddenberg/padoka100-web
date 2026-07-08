@@ -39,18 +39,20 @@ function looksTechnical(value: string) {
 }
 
 export function humanizeEventTitle(event: EventoLinhaDoTempo) {
-  const normalized = normalizeTechnicalText(`${event.tipo_evento} ${event.titulo}`);
+  // O campo novo `tipo` (público, em caixa alta) tem prioridade; os antigos
+  // continuam valendo por compatibilidade.
+  const normalized = normalizeTechnicalText(`${event.tipo || ""} ${event.tipo_evento || ""} ${event.titulo || ""}`);
   const rule = RULES.find((candidate) => candidate.test(normalized));
   if (rule) return rule.label;
 
   // Sem regra conhecida: aproveita o título se ele já for humano.
   if (event.titulo && !looksTechnical(event.titulo)) return event.titulo;
-  return fixProductName(event.titulo || event.tipo_evento);
+  return fixProductName(event.titulo || event.tipo || event.tipo_evento);
 }
 
 // Detalhe curto do evento em linguagem humana (produto, quantidade etc).
 export function humanizeEventDetail(event: EventoLinhaDoTempo) {
-  const details = event.detalhes || {};
+  const details = { ...(event.detalhes || {}), ...(event.dados || {}) };
   const parts: string[] = [];
 
   const productName = details["nome_produto"] || details["produto"] || details["nome"];
@@ -60,4 +62,9 @@ export function humanizeEventDetail(event: EventoLinhaDoTempo) {
   if (typeof quantity === "number") parts.push(`${quantity} un.`);
 
   return parts.join(" · ") || null;
+}
+
+// Data/hora do evento: campo novo primeiro, antigo como reserva.
+export function eventTimestamp(event: EventoLinhaDoTempo) {
+  return event.dataHora || event.criado_em;
 }

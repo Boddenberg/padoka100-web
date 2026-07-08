@@ -3,11 +3,12 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Field, Input, ProductPhoto, StateText, Stepper } from "@/components/ui";
+import { useAuth } from "@/contexts/auth";
 import { api, ApiError } from "@/lib/api";
 import { formatCurrency, toNumber } from "@/lib/format";
 import { colors, fonts, radius } from "@/lib/theme";
 import { fixProductName } from "@/utils/text";
-import type { Produto, ResumoDoDia } from "@/types/api";
+import type { CorrecaoItemVendaRequest, CorrecaoProducaoRequest, Produto, ResumoDoDia } from "@/types/api";
 
 type Step = "warning" | "edit" | "confirm";
 
@@ -20,6 +21,7 @@ interface ItemState {
 // botões de mais/menos → resumo do que muda → salvar.
 export function EditDayFlow({ resumo, onCancel, onSaved }: { resumo: ResumoDoDia; onCancel: () => void; onSaved: () => void }) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>("warning");
   const [reason, setReason] = useState("");
   const [showAddList, setShowAddList] = useState(false);
@@ -40,6 +42,12 @@ export function EditDayFlow({ resumo, onCancel, onSaved }: { resumo: ResumoDoDia
 
   const productsQuery = useQuery({ queryKey: ["produtos", "ativos"], queryFn: () => api.produtos.list(true) });
   const allProducts = useMemo(() => productsQuery.data || [], [productsQuery.data]);
+
+  // Vendas do dia: necessárias para corrigir itens de venda existentes.
+  const salesQuery = useQuery({
+    queryKey: ["vendas", "dia", resumo.dia_de_venda_id],
+    queryFn: () => api.vendas.listByDay(resumo.dia_de_venda_id)
+  });
 
   // Preço unitário para estimar o faturamento: primeiro o praticado no dia,
   // depois o preço atual do catálogo.
@@ -95,19 +103,59 @@ export function EditDayFlow({ resumo, onCancel, onSaved }: { resumo: ResumoDoDia
   }, [changes, unitPrice, currentRevenue]);
 
   const save = useMutation({
-    mutationFn: () =>
-      api.dias.correct(resumo.dia_de_venda_id, {
+    mutationFn: async () => {
+      const sales = salesQuery.data ?? (await api.vendas.listByDay(resumo.dia_de_venda_id));
+
+      // Traduz o "antes → depois" da edição para o contrato de correções:
+      // produção corrigida, itens de venda reduzidos e venda retroativa
+      // para as quantidades que faltou lançar.
+      const producoes: CorrecaoProducaoRequest[] = [];
+      const itensVenda: CorrecaoItemVendaRequest[] = [];
+      const itensAdicionados: { produto_id: string; quantidade: number }[] = [];
+
+      for (const { row, before, after } of changes) {
+        if (before.produced !== after.produced) {
+          producoes.push({ produto_id: row.id, quantidade_produzida: after.produced });
+        }
+
+        const delta = after.sold - before.sold;
+        if (delta > 0) {
+          itensAdicionados.push({ produto_id: row.id, quantidade: delta });
+        } else if (delta < 0) {
+          // Reduz a partir das vendas mais recentes, preservando as antigas.
+          let toRemove = -delta;
+          const items = sales
+            .filter((sale) => sale.situacao !== "cancelada")
+            .flatMap((sale) => sale.itens || [])
+            .filter((item) => item.produto_id === row.id)
+            .sort((a, b) => (a.criado_em < b.criado_em ? 1 : -1));
+
+          for (const item of items) {
+            if (toRemove <= 0) break;
+            const reduceBy = Math.min(item.quantidade, toRemove);
+            itensVenda.push({ item_venda_id: item.id, quantidade: item.quantidade - reduceBy });
+            toRemove -= reduceBy;
+          }
+
+          if (toRemove > 0) {
+            throw new Error(`Não encontrei vendas suficientes de ${fixProductName(row.name)} para reduzir.`);
+          }
+        }
+      }
+
+      return api.dias.corrections(resumo.dia_de_venda_id, {
+        usuario_id: user?.usuario || "app",
         motivo: reason.trim() || null,
-        itens: changes.map(({ row, after }) => ({
-          produto_id: row.id,
-          quantidade_produzida: after.produced,
-          quantidade_vendida: after.sold
-        }))
-      }),
+        ...(producoes.length ? { producoes } : {}),
+        ...(itensVenda.length ? { itens_venda: itensVenda } : {}),
+        ...(itensAdicionados.length ? { vendas_adicionadas: [{ itens: itensAdicionados }] } : {})
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["relatorios"] });
       queryClient.invalidateQueries({ queryKey: ["dias"] });
       queryClient.invalidateQueries({ queryKey: ["historico"] });
+      queryClient.invalidateQueries({ queryKey: ["vendas"] });
       onSaved();
     }
   });
@@ -271,11 +319,9 @@ function ChangeLine({ label, from, to }: { label: string; from: string; to: stri
   );
 }
 
-// O endpoint de correção ainda não existe no backend: transforma o erro
-// técnico em recado honesto para o usuário.
 function correctionErrorMessage(error: unknown) {
   if (error instanceof ApiError && [404, 405, 501].includes(error.status)) {
-    return "O servidor ainda não aceita correção de dias fechados. Essa parte do sistema está em construção.";
+    return "O servidor não aceitou a correção. Confira se o app está apontando para o servidor certo no Perfil.";
   }
   return error instanceof Error ? error.message : "Não foi possível salvar as correções.";
 }

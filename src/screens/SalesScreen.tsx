@@ -21,11 +21,18 @@ import {
   Stepper
 } from "@/components/ui";
 import { api, createAudioForm, type NativeFile } from "@/lib/api";
-import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
+import { formatCurrency, formatDate, toNumber } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { getGreeting } from "@/utils/greeting";
 import { fixProductName } from "@/utils/text";
-import type { DiaDeVenda, Produto, RespostaInterpretarVenda, Venda } from "@/types/api";
+import type {
+  DecisaoSobraRequest,
+  DiaDeVenda,
+  Produto,
+  RespostaDecidirSobras,
+  RespostaInterpretarVenda,
+  Venda
+} from "@/types/api";
 
 type Cart = Record<string, number>;
 type ActiveSheet = "open-day" | "production" | "close-day" | "sales" | "ai" | null;
@@ -545,23 +552,84 @@ function OpenDaySheet({ visible, onClose, products }: { visible: boolean; onClos
 
 function OpenDayForm({ onClose, products }: { onClose: () => void; products: Produto[] }) {
   const queryClient = useQueryClient();
-  const [notes, setNotes] = useState("");
   const [quantities, setQuantities] = useState<Cart>({});
+  // Sobras do dia anterior aguardando a decisão do usuário.
+  const [pendingLeftovers, setPendingLeftovers] = useState<RespostaDecidirSobras | null>(null);
+  const [leftoverUse, setLeftoverUse] = useState<Cart>({});
 
-  const createDay = useMutation({
-    mutationFn: () =>
-      api.dias.create({
-        data_venda: todayInputValue(),
-        observacoes: notes || null,
+  const startDay = useMutation({
+    mutationFn: (decisoes?: DecisaoSobraRequest[]) =>
+      api.dias.startToday({
         itens_producao: products
           .map((produto) => ({ produto_id: produto.id, quantidade_produzida: Number(quantities[produto.id] || 0) }))
-          .filter((item) => item.quantidade_produzida > 0)
+          .filter((item) => item.quantidade_produzida > 0),
+        ...(decisoes ? { decisoes_sobra: decisoes } : {})
       }),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      if ("acao" in response) {
+        // Sobrou produto de ontem: o dia só abre depois da escolha.
+        setPendingLeftovers(response);
+        const initial: Cart = {};
+        response.sobras_pendentes.forEach((sobra) => {
+          initial[sobra.produto_id] = sobra.quantidade_sugerida_para_usar;
+        });
+        setLeftoverUse(initial);
+        return;
+      }
       onClose();
       invalidateDay(queryClient);
     }
   });
+
+  if (pendingLeftovers) {
+    return (
+      <>
+        <View style={styles.leftoverNotice}>
+          <Text style={styles.leftoverNoticeText}>{pendingLeftovers.mensagem}</Text>
+        </View>
+        {pendingLeftovers.sobras_pendentes.map((sobra) => {
+          const use = leftoverUse[sobra.produto_id] ?? 0;
+          return (
+            <View key={sobra.produto_id} style={styles.productionRow}>
+              <View style={styles.leftoverInfo}>
+                <Text style={styles.productionName} numberOfLines={2}>
+                  {fixProductName(sobra.nome_produto)}
+                </Text>
+                <Text style={styles.leftoverHint}>Sobraram {sobra.quantidade_sobra} · quantos usar hoje?</Text>
+              </View>
+              <Stepper
+                value={use}
+                onIncrement={() =>
+                  setLeftoverUse((current) => ({
+                    ...current,
+                    [sobra.produto_id]: Math.min(sobra.quantidade_sobra, use + 1)
+                  }))
+                }
+                onDecrement={() =>
+                  setLeftoverUse((current) => ({ ...current, [sobra.produto_id]: Math.max(0, use - 1) }))
+                }
+                canAdd={use < sobra.quantidade_sobra}
+              />
+            </View>
+          );
+        })}
+        {startDay.error instanceof Error ? <StateText tone="error" text={startDay.error.message} /> : null}
+        <Button
+          title={startDay.isPending ? "Abrindo..." : "Usar sobras e abrir o dia"}
+          disabled={startDay.isPending}
+          onPress={() =>
+            startDay.mutate(
+              pendingLeftovers.sobras_pendentes.map((sobra) => ({
+                produto_id: sobra.produto_id,
+                quantidade_usada_hoje: leftoverUse[sobra.produto_id] ?? 0
+              }))
+            )
+          }
+        />
+        <Button title="Voltar" tone="soft" onPress={() => setPendingLeftovers(null)} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -570,11 +638,8 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
         quantities={quantities}
         onChange={(produtoId, value) => setQuantities((current) => ({ ...current, [produtoId]: value }))}
       />
-      <Field label="Observações">
-        <Input value={notes} onChangeText={setNotes} placeholder="Opcional" />
-      </Field>
-      {createDay.error instanceof Error ? <StateText tone="error" text={createDay.error.message} /> : null}
-      <Button title={createDay.isPending ? "Abrindo..." : "Abrir dia"} disabled={createDay.isPending} onPress={() => createDay.mutate()} />
+      {startDay.error instanceof Error ? <StateText tone="error" text={startDay.error.message} /> : null}
+      <Button title={startDay.isPending ? "Abrindo..." : "Abrir dia"} disabled={startDay.isPending} onPress={() => startDay.mutate(undefined)} />
     </>
   );
 }
@@ -780,12 +845,17 @@ function AgentConversation({
   const queryClient = useQueryClient();
   const [text, setText] = useState(initialText);
   const [result, setResult] = useState<RespostaInterpretarVenda | null>(null);
+  // Recado quando a confirmação não pôde ser aplicada (sucesso: false).
+  const [confirmNotice, setConfirmNotice] = useState<string | null>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
 
   const interpret = useMutation({
     mutationFn: (command: string) => api.ia.interpretCommand({ texto: command, dia_de_venda_id: day?.id, permitir_fallback: true }),
-    onSuccess: setResult
+    onSuccess: (response) => {
+      setConfirmNotice(null);
+      setResult(response);
+    }
   });
   const upload = useMutation({
     mutationFn: (file: NativeFile) => api.ia.transcribeAudio(createAudioForm(file, day?.id)),
@@ -797,6 +867,15 @@ function AgentConversation({
   const confirm = useMutation({
     mutationFn: () => api.ia.confirmCommand(result!.interacao_ia_id),
     onSuccess: (response) => {
+      // A API pode responder sem erro HTTP mas sem conseguir aplicar:
+      // nesse caso o sheet fica aberto com o recado amigável.
+      if (response.sucesso === false) {
+        const detail =
+          response.mensagem_assistente ||
+          (typeof response.resultado?.mensagem === "string" ? response.resultado.mensagem : null);
+        setConfirmNotice(detail || "Não consegui aplicar o comando. Tente pedir de novo.");
+        return;
+      }
       onMessage(response.mensagem_assistente || `${AGENT_NAME} resolveu pra você!`);
       onClose();
       invalidateDay(queryClient);
@@ -934,6 +1013,7 @@ function AgentConversation({
             disabled={!result.interacao_ia_id || confirm.isPending}
             onPress={() => confirm.mutate()}
           />
+          {confirmNotice ? <StateText tone="error" text={confirmNotice} /> : null}
           {confirm.error instanceof Error ? <StateText tone="error" text={confirm.error.message} /> : null}
         </Card>
       ) : null}
@@ -1259,6 +1339,28 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
     fontFamily: fonts.bodyBold
+  },
+  leftoverNotice: {
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.warningSoft,
+    backgroundColor: colors.surfaceGlow,
+    padding: 14
+  },
+  leftoverNoticeText: {
+    color: colors.warning,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold,
+    lineHeight: 21
+  },
+  leftoverInfo: {
+    flex: 1,
+    gap: 2
+  },
+  leftoverHint: {
+    color: colors.muted,
+    fontSize: 12.5,
+    fontFamily: fonts.body
   },
   cartBar: {
     position: "absolute",
