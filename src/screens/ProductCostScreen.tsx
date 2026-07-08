@@ -2,8 +2,8 @@ import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, use
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Keyboard as KeyboardIcon, Mic, PartyPopper } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Animated, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AgentAvatar, AgentTag, AGENT_NAME } from "@/components/agent";
 import {
@@ -321,7 +321,10 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   const pendencias = guidedItems(session?.pendencias);
   const avisos = guidedItems(session?.avisos);
   const thinking = sendText.isPending || sendFile.isPending || patchDraft.isPending;
-  const entryCount = session?.entradas?.length || 0;
+  // Estado de envio por tipo: a foto mostra "Enviando" no botão de foto, não no
+  // microfone (era o que confundia).
+  const audioUploading = sendFile.isPending && sendFile.variables?.tipo === "audio";
+  const photoUploading = sendFile.isPending && sendFile.variables?.tipo === "imagem";
 
   const rendimentoOk = toNumber(rascunho.receita?.rendimento) > 0;
   const recipeReadyCount = ingredientes.filter(hasRecipeData).length;
@@ -344,10 +347,10 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     : confirmed
       ? `Custo confirmado e guardado em ${productName}! 🎉`
       : phase === "resultado"
-        ? "Tá fechando! Confere o custo aqui embaixo e, se estiver certo, é só confirmar."
+        ? "Confere o custo aqui embaixo. Se estiver certo, é só confirmar. ✅"
         : phase === "precos"
-          ? "Agora os preços 💰 Pra cada item, me diz quanto você comprou e quanto pagou. Pode mandar a foto da nota também."
-          : `Vamos começar pela receita de ${productName}! Me conta os ingredientes, quanto de cada um você usa e quantas unidades rende. Os preços ficam pra próxima etapa.`;
+          ? "Agora me diga quanto você comprou e pagou de cada item. 💰"
+          : "Me conta os ingredientes, quanto de cada um você usa e quantas unidades rende. Os preços ficam pra próxima etapa.";
 
   // --- Render. ----------------------------------------------------------------
   return (
@@ -394,7 +397,10 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
         ) : (
           <>
             <ProgressTrail step={step} />
-            <AgentBubble message={agentMessage} thinking={thinking && !sheet} />
+
+            {phase === "resultado" ? (
+              <AgentBubble message={agentMessage} thinking={thinking && !sheet} />
+            ) : null}
 
             {phase === "resultado" ? (
               <ResultPhase
@@ -413,26 +419,28 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
               />
             ) : (
               <>
-                {perguntas.map((pergunta) => (
-                  <QuestionCard key={pergunta} question={pergunta} onAnswer={() => setSheet({ kind: "texto", pergunta })} />
-                ))}
-                <NoticeStack items={pendencias} tone="danger" />
+                <PhaseHeader phase={phase} message={agentMessage} thinking={thinking && !sheet} />
 
-                <InputDock
+                {phase === "precos" && rascunho.receita ? (
+                  <RecipeRecap receita={rascunho.receita} onEdit={() => setSheet({ kind: "receita" })} />
+                ) : null}
+
+                <InputMethods
                   phase={phase}
                   recording={recorderState.isRecording}
                   busy={thinking}
-                  uploading={sendFile.isPending}
+                  audioUploading={audioUploading}
+                  photoUploading={photoUploading}
                   onMic={() => void toggleRecording()}
                   onWrite={() => setSheet({ kind: "texto", pergunta: null })}
                   onPhoto={choosePhoto}
                 />
                 {sendError ? <StateText tone="error" text={sendError} /> : null}
-                {entryCount > 0 ? (
-                  <Text style={styles.entryCount}>
-                    {entryCount === 1 ? "1 recado enviado" : `${entryCount} recados enviados`} para {AGENT_NAME}
-                  </Text>
-                ) : null}
+
+                {perguntas.map((pergunta) => (
+                  <QuestionCard key={pergunta} question={pergunta} onAnswer={() => setSheet({ kind: "texto", pergunta })} />
+                ))}
+                <NoticeStack items={pendencias} tone="danger" />
 
                 {phase === "receita" ? (
                   <RecipePhaseBody
@@ -446,7 +454,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                   />
                 ) : (
                   <PricePhaseBody
-                    rascunho={rascunho}
                     ingredientes={ingredientes}
                     custosAdicionais={custosAdicionais}
                     avisos={avisos}
@@ -456,7 +463,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                     onEditIngrediente={(index) => setSheet({ kind: "ingrediente-preco", index })}
                     onEditExtra={(index) => setSheet({ kind: "extra", index })}
                     onAddExtra={() => setSheet({ kind: "extra", index: null })}
-                    onEditReceita={() => setSheet({ kind: "receita" })}
                     onBack={() => goToPhase("receita")}
                     onSeeResult={() => goToPhase("resultado")}
                   />
@@ -605,8 +611,25 @@ function RecipePhaseBody({
 // Etapa 2 — Preços: quanto comprou e pagou de cada item + custos extras.
 // ---------------------------------------------------------------------------
 
+// Receita fixada no topo da etapa de preços: o usuário vê o que está precificando.
+function RecipeRecap({ receita, onEdit }: { receita: ReceitaRascunho; onEdit: () => void }) {
+  return (
+    <Pressable onPress={onEdit} style={({ pressed }) => [styles.recipeRecap, shadows.soft, pressed && styles.pressed]}>
+      <Text style={styles.recipeRecapEmoji}>🍞</Text>
+      <View style={styles.recipeRecapBody}>
+        <Text style={styles.recipeRecapText} numberOfLines={1}>
+          {receita.nome || "Receita"}
+        </Text>
+        <Text style={styles.recipeRecapSub}>
+          rende {receita.rendimento || "?"} {receita.unidade_rendimento || "un"}
+        </Text>
+      </View>
+      <Text style={styles.recipeRecapEdit}>editar</Text>
+    </Pressable>
+  );
+}
+
 function PricePhaseBody({
-  rascunho,
   ingredientes,
   custosAdicionais,
   avisos,
@@ -616,11 +639,9 @@ function PricePhaseBody({
   onEditIngrediente,
   onEditExtra,
   onAddExtra,
-  onEditReceita,
   onBack,
   onSeeResult
 }: {
-  rascunho: RascunhoCusteio;
   ingredientes: IngredienteRascunho[];
   custosAdicionais: CustoAdicionalRascunho[];
   avisos: string[];
@@ -630,23 +651,11 @@ function PricePhaseBody({
   onEditIngrediente: (index: number) => void;
   onEditExtra: (index: number) => void;
   onAddExtra: () => void;
-  onEditReceita: () => void;
   onBack: () => void;
   onSeeResult: () => void;
 }) {
-  const receita = rascunho.receita;
-
   return (
     <>
-      {receita ? (
-        <Pressable onPress={onEditReceita} style={({ pressed }) => [styles.recipeRecap, pressed && styles.pressed]}>
-          <Text style={styles.recipeRecapText}>
-            🍞 {receita.nome || "Receita"} · rende {receita.rendimento || "?"} {receita.unidade_rendimento || "un"}
-          </Text>
-          <Text style={styles.recipeRecapEdit}>editar receita</Text>
-        </Pressable>
-      ) : null}
-
       <SectionTitle text="Preço de cada item" />
       <Text style={styles.sectionHint}>Toque em cada ingrediente e diga quanto comprou e quanto pagou.</Text>
       {ingredientes.map((ingrediente, index) => (
@@ -812,14 +821,36 @@ function WelcomeStep({ number, emoji, title, text }: { number: string; emoji: st
 }
 
 // ---------------------------------------------------------------------------
-// Dock de entrada: falar (grande, pulsando ao gravar), escrever e foto.
+// Cabeçalho da etapa: deixa claríssimo em que passo o usuário está.
 // ---------------------------------------------------------------------------
 
-function InputDock({
+function PhaseHeader({ phase, message, thinking }: { phase: CusteioPhase; message: string; thinking: boolean }) {
+  const step = phase === "receita" ? 1 : phase === "precos" ? 2 : 3;
+  const title = phase === "receita" ? "A receita" : phase === "precos" ? "Os preços" : "Resultado";
+
+  return (
+    <View style={styles.phaseHeader}>
+      <View style={styles.phaseChip}>
+        <Text style={styles.phaseChipStep}>ETAPA {step} DE 3</Text>
+        <View style={styles.phaseChipDot} />
+        <Text style={styles.phaseChipTitle}>{title}</Text>
+      </View>
+      <AgentBubble message={message} thinking={thinking} />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Entrada: três formas com o mesmo peso — falar, escrever ou foto. Cada uma
+// mostra seu próprio "Enviando...", então a foto não aparece no microfone.
+// ---------------------------------------------------------------------------
+
+function InputMethods({
   phase,
   recording,
   busy,
-  uploading,
+  audioUploading,
+  photoUploading,
   onMic,
   onWrite,
   onPhoto
@@ -827,62 +858,99 @@ function InputDock({
   phase: CusteioPhase;
   recording: boolean;
   busy: boolean;
-  uploading: boolean;
+  audioUploading: boolean;
+  photoUploading: boolean;
   onMic: () => void;
   onWrite: () => void;
   onPhoto: () => void;
 }) {
-  const pulse = useRef(new Animated.Value(1)).current;
   const recipe = phase === "receita";
 
-  useEffect(() => {
-    if (!recording) {
-      pulse.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.04, duration: 520, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 520, useNativeDriver: true })
-      ])
+  // Gravando: banner vermelho ocupa o lugar dos botões, sem ambiguidade.
+  if (recording) {
+    return (
+      <Pressable onPress={onMic} style={({ pressed }) => [pressed && styles.pressed]}>
+        <LinearGradient
+          colors={["#ff5252", "#d81b43"] as const}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.recBanner, shadows.agent]}
+        >
+          <View style={styles.recPulse}>
+            <Mic size={22} color="#fff" />
+          </View>
+          <View style={styles.recBody}>
+            <Text style={styles.recTitle}>Gravando... toque para parar</Text>
+            <Text style={styles.recHint}>{recipe ? "Pode falar a receita" : "Pode falar os preços"}</Text>
+          </View>
+        </LinearGradient>
+      </Pressable>
     );
-    loop.start();
-    return () => loop.stop();
-  }, [recording, pulse]);
-
-  const idleText = recipe ? "Toque e fala a receita" : "Toque e fala os preços";
-  const hint = recipe
-    ? "Ex: “uso 800g de farinha, 3 ovos e 250ml de leite, rende 12”"
-    : "Ex: “o pacote de farinha de 5kg custou 22 reais”";
+  }
 
   return (
-    <View style={styles.dock}>
-      <Pressable onPress={onMic} disabled={uploading} style={({ pressed }) => [pressed && styles.pressed]}>
-        <Animated.View style={{ transform: [{ scale: pulse }] }}>
-          <LinearGradient
-            colors={recording ? (["#ff5252", "#d81b43"] as const) : gradients.agent}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.micButton, shadows.agent]}
-          >
-            <Mic size={28} color="#fff" />
-            <Text style={styles.micText}>{recording ? "Gravando... toque para parar" : uploading ? "Enviando..." : idleText}</Text>
-            {!recording && !uploading ? <Text style={styles.micHint}>{hint}</Text> : null}
-          </LinearGradient>
-        </Animated.View>
-      </Pressable>
-
-      <View style={styles.dockRow}>
-        <Pressable onPress={busy ? undefined : onWrite} style={({ pressed }) => [styles.dockAction, pressed && styles.pressed]}>
-          <KeyboardIcon size={19} color={colors.agentDeep} />
-          <Text style={styles.dockActionText}>Escrever</Text>
-        </Pressable>
-        <Pressable onPress={busy ? undefined : onPhoto} style={({ pressed }) => [styles.dockAction, pressed && styles.pressed]}>
-          <Camera size={19} color={colors.agentDeep} />
-          <Text style={styles.dockActionText}>{recipe ? "Foto da receita" : "Foto da nota"}</Text>
-        </Pressable>
+    <View style={styles.methods}>
+      <Text style={styles.methodsTitle}>Como você quer contar?</Text>
+      <View style={styles.methodsRow}>
+        <MethodTile
+          primary
+          label="Falar"
+          caption="por voz"
+          icon={<Mic size={22} color="#fff" />}
+          busy={audioUploading}
+          disabled={busy && !audioUploading}
+          onPress={onMic}
+        />
+        <MethodTile
+          label="Escrever"
+          caption="digitar"
+          icon={<KeyboardIcon size={22} color={colors.agentDeep} />}
+          busy={false}
+          disabled={busy}
+          onPress={onWrite}
+        />
+        <MethodTile
+          label="Foto"
+          caption={recipe ? "da receita" : "da nota"}
+          icon={<Camera size={22} color={colors.agentDeep} />}
+          busy={photoUploading}
+          disabled={busy && !photoUploading}
+          onPress={onPhoto}
+        />
       </View>
+      <Text style={styles.methodsFootnote}>Ou toque num item da lista abaixo para preencher você mesmo.</Text>
     </View>
+  );
+}
+
+function MethodTile({
+  primary,
+  label,
+  caption,
+  icon,
+  busy,
+  disabled,
+  onPress
+}: {
+  primary?: boolean;
+  label: string;
+  caption: string;
+  icon: ReactNode;
+  busy: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      style={({ pressed }) => [styles.tile, pressed && !disabled ? styles.pressed : null, disabled && styles.tileDisabled]}
+    >
+      <View style={[styles.tileIcon, primary && styles.tileIconPrimary]}>
+        {busy ? <ActivityIndicator size="small" color={primary ? "#fff" : colors.agentDeep} /> : icon}
+      </View>
+      <Text style={styles.tileLabel}>{busy ? "Enviando..." : label}</Text>
+      {!busy ? <Text style={styles.tileCaption}>{caption}</Text> : null}
+    </Pressable>
   );
 }
 
@@ -1019,53 +1087,121 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: fonts.body
   },
-  dock: {
+  phaseHeader: {
     gap: 10
   },
-  micButton: {
-    alignItems: "center",
-    gap: 4,
-    borderRadius: radius.xl,
-    paddingHorizontal: 18,
-    paddingVertical: 18
-  },
-  micText: {
-    color: "#fff",
-    fontSize: 16.5,
-    fontFamily: fonts.bodyBold
-  },
-  micHint: {
-    color: "rgba(255,255,255,0.82)",
-    fontSize: 12.5,
-    fontFamily: fonts.body,
-    textAlign: "center"
-  },
-  dockRow: {
-    flexDirection: "row",
-    gap: 10
-  },
-  dockAction: {
-    flex: 1,
+  phaseChip: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
-    minHeight: 50,
+    alignSelf: "flex-start",
     borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.agentSoft,
-    backgroundColor: colors.surface
+    backgroundColor: colors.agentSoft,
+    paddingHorizontal: 13,
+    paddingVertical: 6
   },
-  dockActionText: {
+  phaseChipStep: {
     color: colors.agentDeep,
+    fontSize: 11,
+    fontFamily: fonts.bodyBold,
+    letterSpacing: 0.7
+  },
+  phaseChipDot: {
+    height: 4,
+    width: 4,
+    borderRadius: 2,
+    backgroundColor: colors.agentDeep
+  },
+  phaseChipTitle: {
+    color: colors.ink,
     fontSize: 14.5,
     fontFamily: fonts.bodyBold
   },
-  entryCount: {
+  methods: {
+    gap: 10,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceGlow,
+    padding: 14
+  },
+  methodsTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold
+  },
+  methodsRow: {
+    flexDirection: "row",
+    gap: 10
+  },
+  methodsFootnote: {
     color: colors.muted,
-    fontSize: 13,
-    fontFamily: fonts.body,
-    textAlign: "center"
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontFamily: fonts.body
+  },
+  tile: {
+    flex: 1,
+    alignItems: "center",
+    gap: 5,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.agentSoft,
+    backgroundColor: colors.surface,
+    paddingVertical: 12
+  },
+  tileDisabled: {
+    opacity: 0.45
+  },
+  tileIcon: {
+    height: 44,
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.agentSoft
+  },
+  tileIconPrimary: {
+    backgroundColor: colors.agentDeep
+  },
+  tileLabel: {
+    color: colors.ink,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
+  },
+  tileCaption: {
+    color: colors.muted,
+    fontSize: 11.5,
+    fontFamily: fonts.body
+  },
+  recBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: radius.lg,
+    padding: 16
+  },
+  recPulse: {
+    height: 44,
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.22)"
+  },
+  recBody: {
+    flex: 1,
+    gap: 2
+  },
+  recTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: fonts.bodyBold
+  },
+  recHint: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 12.5,
+    fontFamily: fonts.body
   },
   sectionHint: {
     marginTop: -6,
@@ -1083,18 +1219,29 @@ const styles = StyleSheet.create({
   recipeRecap: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+    gap: 12,
     borderRadius: radius.lg,
-    backgroundColor: colors.surfaceWarm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 12
   },
+  recipeRecapEmoji: {
+    fontSize: 24
+  },
+  recipeRecapBody: {
+    flex: 1
+  },
   recipeRecapText: {
-    flex: 1,
     color: colors.ink,
-    fontSize: 14.5,
+    fontSize: 15.5,
     fontFamily: fonts.bodyBold
+  },
+  recipeRecapSub: {
+    color: colors.muted,
+    fontSize: 13,
+    fontFamily: fonts.body
   },
   recipeRecapEdit: {
     color: colors.brandDeep,
