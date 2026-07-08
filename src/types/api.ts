@@ -227,6 +227,18 @@ export interface CriarDiaDeVendaRequest {
   itens_producao?: CriarItemProducaoRequest[];
 }
 
+// Correção retroativa de um dia fechado (backend ainda vai implementar).
+export interface CorrecaoItemRequest {
+  produto_id: UUID;
+  quantidade_produzida?: number | null;
+  quantidade_vendida?: number | null;
+}
+
+export interface CorrigirDiaRequest {
+  itens: CorrecaoItemRequest[];
+  motivo?: string | null;
+}
+
 export interface RegistrarVendaRequest {
   dia_de_venda_id: UUID;
   itens: {

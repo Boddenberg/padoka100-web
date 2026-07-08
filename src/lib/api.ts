@@ -1,5 +1,6 @@
 import { getBaseUrl, readApiSettings, type ApiSettings } from "@/lib/settings";
 import type {
+  CorrigirDiaRequest,
   CriarDiaDeVendaRequest,
   CriarItemProducaoRequest,
   DiaDeVenda,
@@ -165,7 +166,11 @@ export const api = {
       apiRequest<DiaDeVenda>(`/api/v1/dias-de-venda/${diaId}/fechar`, {
         method: "POST",
         body: { observacoes: observacoes || null }
-      })
+      }),
+    // Correção retroativa de dia fechado. Contrato definido pelo app;
+    // o backend ainda precisa implementar este endpoint.
+    correct: (diaId: UUID, body: CorrigirDiaRequest) =>
+      apiRequest<ResumoDoDia>(`/api/v1/dias-de-venda/${diaId}/correcao`, { method: "PATCH", body })
   },
   vendas: {
     create: (body: RegistrarVendaRequest) => apiRequest<Venda>("/api/v1/vendas", { method: "POST", body }),

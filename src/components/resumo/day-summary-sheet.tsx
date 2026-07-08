@@ -1,28 +1,34 @@
-import { CalendarDays } from "lucide-react-native";
+import { CalendarDays, PencilLine } from "lucide-react-native";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { Badge, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
+import { EditDayFlow } from "@/components/resumo/edit-day-flow";
+import { Badge, Button, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { colors, fonts, radius } from "@/lib/theme";
 import { humanizeEventDetail, humanizeEventTitle } from "@/utils/events";
 import { fixProductName } from "@/utils/text";
-import type { ResumoDoDia } from "@/types/api";
 
 // Resumo completo de um dia (aberto ou fechado): status, faturamento,
 // produtos com produzido/vendido/sobra e a linha do tempo daquele dia.
+// Dias fechados ganham o modo de correção retroativa.
 export function DaySummarySheet({
   visible,
   dayId,
-  onClose,
-  footer
+  onClose
 }: {
   visible: boolean;
   dayId: string | null;
   onClose: () => void;
-  // Espaço para ações extras (ex.: corrigir dia fechado).
-  footer?: (resumo: ResumoDoDia) => React.ReactNode;
 }) {
+  const [editing, setEditing] = useState(false);
+
+  // Cada dia aberto no sheet começa fora do modo de edição.
+  useEffect(() => {
+    setEditing(false);
+  }, [dayId, visible]);
+
   const resumoQuery = useQuery({
     queryKey: ["relatorios", "dia", dayId],
     queryFn: () => api.relatorios.day(dayId!),
@@ -45,14 +51,24 @@ export function DaySummarySheet({
   return (
     <Sheet
       visible={visible}
-      title={resumo ? `Resumo do dia ${formatDate(resumo.data_venda)}` : "Resumo do dia"}
-      subtitle={resumo?.nome_local ? fixProductName(resumo.nome_local) : undefined}
+      title={
+        editing
+          ? `Corrigir dia ${resumo ? formatDate(resumo.data_venda) : ""}`.trim()
+          : resumo
+            ? `Resumo do dia ${formatDate(resumo.data_venda)}`
+            : "Resumo do dia"
+      }
+      subtitle={editing ? "Correção retroativa" : resumo?.nome_local ? fixProductName(resumo.nome_local) : undefined}
       onClose={onClose}
     >
       {resumoQuery.isLoading ? <StateText text="Carregando o dia..." /> : null}
       {resumoQuery.error instanceof Error ? <StateText tone="error" text={resumoQuery.error.message} /> : null}
 
-      {resumo ? (
+      {resumo && editing ? (
+        <EditDayFlow resumo={resumo} onCancel={() => setEditing(false)} onSaved={() => setEditing(false)} />
+      ) : null}
+
+      {resumo && !editing ? (
         <>
           <View style={styles.statusRow}>
             <Badge text={isOpen ? "Dia aberto" : "Dia fechado"} tone={isOpen ? "good" : "neutral"} />
@@ -95,7 +111,14 @@ export function DaySummarySheet({
             );
           })}
 
-          {footer ? footer(resumo) : null}
+          {!isOpen ? (
+            <Button
+              title="Corrigir informações"
+              tone="soft"
+              icon={<PencilLine size={18} color={colors.ink} />}
+              onPress={() => setEditing(true)}
+            />
+          ) : null}
 
           <SectionTitle text="Histórico do dia" />
           {historyQuery.isLoading ? <StateText text="Carregando histórico..." /> : null}
