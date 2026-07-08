@@ -60,6 +60,19 @@ export type ProximaAcaoCusteio =
   | "sessao_descartada"
   | string;
 
+// Etapa real da sessão no backend, usada para orientar a jornada da tela.
+export type FaseCusteio =
+  | "vinculando_produto"
+  | "coletando_ingredientes"
+  | "coletando_precos"
+  | "revisando"
+  | "confirmada"
+  | "descartada"
+  | string;
+
+// Segregação da jornada: cada entrada diz se é receita, compra/preço ou tudo.
+export type FinalidadeCusteio = "auto" | "receita" | "compras" | "completo";
+
 export interface SessaoCusteio {
   id?: UUID;
   sessao_id?: UUID;
@@ -72,6 +85,7 @@ export interface SessaoCusteio {
   avisos?: ItemGuiado[] | null;
   custo_simulado?: CustoSimulado | null;
   pode_confirmar?: boolean;
+  fase?: FaseCusteio | null;
   proxima_acao?: ProximaAcaoCusteio | null;
   entradas?: EntradaSessaoCusteio[] | null;
   [key: string]: unknown;
@@ -86,6 +100,7 @@ export interface EntradaTextoCusteioRequest {
   texto: string;
   contexto?: string | null;
   permitir_fallback?: boolean;
+  finalidade?: FinalidadeCusteio;
 }
 
 export interface CorrigirRascunhoCusteioRequest {

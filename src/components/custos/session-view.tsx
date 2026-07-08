@@ -10,11 +10,13 @@ import {
   custoTotal,
   extraCostEmoji,
   extraCostSubtitle,
+  hasPurchaseData,
+  hasRecipeData,
   ingredientEmoji,
-  ingredientPendingHint,
-  ingredientSubtitle,
-  isConfirmedStatus,
-  receitaPendingHint
+  purchaseText,
+  receitaPendingHint,
+  recipeUsageText,
+  type CusteioPhase
 } from "@/lib/custeio";
 import { formatCurrency, toNumber } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -24,7 +26,7 @@ import type { CustoAdicionalRascunho, CustoSimulado, IngredienteRascunho, Rascun
 // Trilha de progresso: contar → revisar → confirmar.
 // ---------------------------------------------------------------------------
 
-const STEPS = ["Contar", "Revisar", "Confirmar"] as const;
+const STEPS = ["Receita", "Preços", "Resultado"] as const;
 
 export function ProgressTrail({ step }: { step: 1 | 2 | 3 | 4 }) {
   return (
@@ -192,7 +194,7 @@ function StatusPill({ confirmed }: { confirmed: boolean }) {
 export function ReceitaCard({ rascunho, onEdit }: { rascunho: RascunhoCusteio; onEdit: () => void }) {
   const receita = rascunho.receita;
   const rendimento = receita?.rendimento;
-  const hasYield = rendimento !== null && rendimento !== undefined && rendimento !== "" && toNumber(rendimento) > 0;
+  const hasYield = toNumber(rendimento) > 0;
   const hint = receitaPendingHint(receita);
 
   return (
@@ -208,15 +210,32 @@ export function ReceitaCard({ rascunho, onEdit }: { rascunho: RascunhoCusteio; o
         {hint ? <Text style={styles.draftHint}>{hint}</Text> : null}
       </View>
       <View style={styles.draftMeta}>
-        <StatusPill confirmed={isConfirmedStatus(receita?.status)} />
+        <StatusPill confirmed={hasYield} />
         <Pencil size={17} color={colors.muted} />
       </View>
     </Pressable>
   );
 }
 
-export function IngredientRow({ ingrediente, onEdit }: { ingrediente: IngredienteRascunho; onEdit: () => void }) {
-  const hint = ingredientPendingHint(ingrediente);
+// A prontidão e a legenda do ingrediente dependem da etapa: na receita conta a
+// quantidade usada; nos preços, quanto comprou/pagou.
+export function IngredientRow({
+  ingrediente,
+  phase,
+  onEdit
+}: {
+  ingrediente: IngredienteRascunho;
+  phase: CusteioPhase;
+  onEdit: () => void;
+}) {
+  const recipePhase = phase === "receita";
+  const ready = recipePhase ? hasRecipeData(ingrediente) : hasPurchaseData(ingrediente);
+
+  const subtitle = recipePhase
+    ? recipeUsageText(ingrediente) || "Toque para informar a quantidade usada"
+    : purchaseText(ingrediente, formatCurrency) || recipeUsageText(ingrediente) || "Toque para informar o preço";
+  const hint = ready ? null : recipePhase ? "Toque para informar a quantidade usada" : "Toque para informar quanto pagou";
+
   return (
     <Pressable onPress={onEdit} style={({ pressed }) => [styles.draftCard, shadows.soft, pressed && styles.pressed]}>
       <Text style={styles.draftEmoji}>{ingredientEmoji(ingrediente)}</Text>
@@ -224,11 +243,11 @@ export function IngredientRow({ ingrediente, onEdit }: { ingrediente: Ingredient
         <Text style={styles.draftTitle} numberOfLines={2}>
           {ingrediente.nome || "Ingrediente"}
         </Text>
-        <Text style={styles.draftSubtitle}>{ingredientSubtitle(ingrediente, formatCurrency) || "Toque para completar os dados"}</Text>
+        <Text style={styles.draftSubtitle}>{subtitle}</Text>
         {hint ? <Text style={styles.draftHint}>{hint}</Text> : null}
       </View>
       <View style={styles.draftMeta}>
-        <StatusPill confirmed={isConfirmedStatus(ingrediente.status)} />
+        <StatusPill confirmed={ready} />
         <Pencil size={17} color={colors.muted} />
       </View>
     </Pressable>
@@ -246,7 +265,7 @@ export function ExtraCostRow({ custo, onEdit }: { custo: CustoAdicionalRascunho;
         <Text style={styles.draftSubtitle}>{extraCostSubtitle(custo, formatCurrency)}</Text>
       </View>
       <View style={styles.draftMeta}>
-        <StatusPill confirmed={isConfirmedStatus(custo.status)} />
+        <StatusPill confirmed={toNumber(custo.valor) > 0} />
         <Pencil size={17} color={colors.muted} />
       </View>
     </Pressable>

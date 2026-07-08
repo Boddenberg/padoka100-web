@@ -4,6 +4,7 @@ import type {
   CorrigirRascunhoCusteioRequest,
   CriarSessaoCusteioRequest,
   EntradaTextoCusteioRequest,
+  FinalidadeCusteio,
   SessaoCusteio
 } from "@/types/custeio";
 import type {
@@ -167,11 +168,17 @@ export function createAudioForm(file: NativeFile, diaDeVendaId?: UUID | null) {
 }
 
 // Entrada de áudio/imagem do custeio assistido (multipart em /entradas/arquivo).
-export function createCusteioFileForm(file: NativeFile, tipo: "audio" | "imagem", contexto?: string | null) {
+// `finalidade` segrega a etapa: foto da receita vs. foto da nota/preços.
+export function createCusteioFileForm(
+  file: NativeFile,
+  tipo: "audio" | "imagem",
+  options?: { contexto?: string | null; finalidade?: FinalidadeCusteio }
+) {
   const form = new FormData();
   form.append("file", file as unknown as Blob);
   form.append("tipo", tipo);
-  if (contexto) form.append("contexto", contexto);
+  form.append("finalidade", options?.finalidade || "auto");
+  if (options?.contexto) form.append("contexto", options.contexto);
   if (tipo === "audio") form.append("permitir_fallback", "true");
   return form;
 }
@@ -285,10 +292,10 @@ export const api = {
           method: "POST",
           body: { permitir_fallback: true, ...body }
         }),
-      enviarFormulario: (sessaoId: UUID, dados: Record<string, unknown>) =>
+      enviarFormulario: (sessaoId: UUID, dados: Record<string, unknown>, finalidade: FinalidadeCusteio = "auto") =>
         apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/entradas/formulario`, {
           method: "POST",
-          body: { dados }
+          body: { finalidade, dados }
         }),
       enviarArquivo: (sessaoId: UUID, formData: FormData) =>
         apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/entradas/arquivo`, {

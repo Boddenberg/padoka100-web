@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AgentTag } from "@/components/agent";
 import { Button, Field, Input, Money, Sheet, StateText } from "@/components/ui";
-import { custoPorUnidade, parseDecimalInput } from "@/lib/custeio";
+import { custoPorUnidade, parseDecimalInput, recipeUsageText } from "@/lib/custeio";
 import { formatCurrency } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import type { CustoAdicionalRascunho, CustoSimulado, IngredienteRascunho, ReceitaRascunho } from "@/types/custeio";
@@ -216,6 +216,7 @@ function ReceitaForm({
 
 export function IngredienteSheet({
   visible,
+  mode,
   ingrediente,
   onClose,
   onSave,
@@ -224,6 +225,7 @@ export function IngredienteSheet({
   errorText
 }: {
   visible: boolean;
+  mode: "receita" | "preco";
   ingrediente: IngredienteRascunho | null;
   onClose: () => void;
   onSave: (ingrediente: IngredienteRascunho) => void;
@@ -231,27 +233,26 @@ export function IngredienteSheet({
   pending: boolean;
   errorText: string | null;
 }) {
+  const title = ingrediente?.nome || "Novo ingrediente";
+  const subtitle = mode === "receita" ? "Quanto você usa na receita" : "Quanto comprou e quanto pagou";
   return (
-    <Sheet
-      visible={visible}
-      title={ingrediente?.nome || "Novo ingrediente"}
-      subtitle="Quanto usou na receita e quanto pagou"
-      onClose={onClose}
-    >
+    <Sheet visible={visible} title={title} subtitle={subtitle} onClose={onClose}>
       {visible ? (
-        <IngredienteForm ingrediente={ingrediente} onSave={onSave} onRemove={onRemove} pending={pending} errorText={errorText} />
+        <IngredienteForm mode={mode} ingrediente={ingrediente} onSave={onSave} onRemove={onRemove} pending={pending} errorText={errorText} />
       ) : null}
     </Sheet>
   );
 }
 
 function IngredienteForm({
+  mode,
   ingrediente,
   onSave,
   onRemove,
   pending,
   errorText
 }: {
+  mode: "receita" | "preco";
   ingrediente: IngredienteRascunho | null;
   onSave: (ingrediente: IngredienteRascunho) => void;
   onRemove: (() => void) | null;
@@ -273,53 +274,76 @@ function IngredienteForm({
     ingrediente?.preco_total !== null && ingrediente?.preco_total !== undefined ? String(ingrediente.preco_total) : ""
   );
 
-  const usada = parseDecimalInput(quantidadeUsada);
-  const canSave = Boolean(nome.trim()) && usada !== null && usada > 0;
+  // Etapa RECEITA: só nome + quanto usa. Nada de preço, para não misturar.
+  if (mode === "receita") {
+    const usada = parseDecimalInput(quantidadeUsada);
+    const canSave = Boolean(nome.trim()) && usada !== null && usada > 0;
+    return (
+      <>
+        <Field label="Ingrediente">
+          <Input value={nome} onChangeText={setNome} placeholder="Ex: Farinha de trigo" />
+        </Field>
+        <Field label="Quantidade usada na receita">
+          <Input value={quantidadeUsada} onChangeText={setQuantidadeUsada} keyboardType="decimal-pad" placeholder="Ex: 800" />
+        </Field>
+        <ChoiceChips options={UNIT_OPTIONS} value={unidadeUsada} onChange={setUnidadeUsada} />
+        {errorText ? <StateText tone="error" text={errorText} /> : null}
+        <Button
+          title={pending ? "Salvando..." : "Salvar ingrediente"}
+          disabled={pending || !canSave}
+          onPress={() =>
+            onSave({
+              ...ingrediente,
+              nome: nome.trim(),
+              quantidade_usada: usada,
+              unidade_usada: unidadeUsada,
+              status: "CONFIRMADO"
+            })
+          }
+        />
+        {onRemove ? (
+          <Pressable onPress={pending ? undefined : onRemove} style={({ pressed }) => [styles.removeLink, pressed && styles.pressed]}>
+            <Trash2 size={16} color={colors.danger} />
+            <Text style={styles.removeLinkText}>Tirar da receita</Text>
+          </Pressable>
+        ) : null}
+      </>
+    );
+  }
 
+  // Etapa PREÇOS: mostra o uso na receita como contexto e pede só a compra.
+  const usadaContexto = recipeUsageText(ingrediente || {});
+  const comprada = parseDecimalInput(quantidadeComprada);
+  const preco = parseDecimalInput(precoTotal);
+  const canSave = comprada !== null && comprada > 0 && preco !== null && preco > 0;
   return (
     <>
-      <Field label="Ingrediente">
-        <Input value={nome} onChangeText={setNome} placeholder="Ex: Farinha de trigo" />
-      </Field>
-
-      <Text style={styles.formSection}>Na receita</Text>
-      <Field label="Quantidade usada">
-        <Input value={quantidadeUsada} onChangeText={setQuantidadeUsada} keyboardType="decimal-pad" placeholder="Ex: 800" />
-      </Field>
-      <ChoiceChips options={UNIT_OPTIONS} value={unidadeUsada} onChange={setUnidadeUsada} />
-
-      <Text style={styles.formSection}>Na compra</Text>
-      <Field label="Quanto veio no pacote?">
+      {usadaContexto ? (
+        <View style={styles.contextRow}>
+          <Text style={styles.contextText}>Na receita: {usadaContexto}</Text>
+        </View>
+      ) : null}
+      <Field label="Quanto veio no pacote/compra?">
         <Input value={quantidadeComprada} onChangeText={setQuantidadeComprada} keyboardType="decimal-pad" placeholder="Ex: 5" />
       </Field>
       <ChoiceChips options={UNIT_OPTIONS} value={unidadeCompra} onChange={setUnidadeCompra} />
-      <Field label="Quanto pagou no pacote? (R$)">
+      <Field label="Quanto pagou no total? (R$)">
         <Input value={precoTotal} onChangeText={setPrecoTotal} keyboardType="decimal-pad" placeholder="Ex: 22,00" />
       </Field>
-
       {errorText ? <StateText tone="error" text={errorText} /> : null}
       <Button
-        title={pending ? "Salvando..." : "Salvar ingrediente"}
+        title={pending ? "Salvando..." : "Salvar preço"}
         disabled={pending || !canSave}
         onPress={() =>
           onSave({
             ...ingrediente,
-            nome: nome.trim(),
-            quantidade_usada: usada,
-            unidade_usada: unidadeUsada,
-            quantidade_comprada: parseDecimalInput(quantidadeComprada),
+            quantidade_comprada: comprada,
             unidade_compra: unidadeCompra,
-            preco_total: parseDecimalInput(precoTotal),
+            preco_total: preco,
             status: "CONFIRMADO"
           })
         }
       />
-      {onRemove ? (
-        <Pressable onPress={pending ? undefined : onRemove} style={({ pressed }) => [styles.removeLink, pressed && styles.pressed]}>
-          <Trash2 size={16} color={colors.danger} />
-          <Text style={styles.removeLinkText}>Tirar da receita</Text>
-        </Pressable>
-      ) : null}
     </>
   );
 }
@@ -583,13 +607,16 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     textAlignVertical: "top"
   },
-  formSection: {
-    marginTop: 4,
-    color: colors.agentDeep,
-    fontSize: 13,
-    fontFamily: fonts.bodyBold,
-    textTransform: "uppercase",
-    letterSpacing: 0.6
+  contextRow: {
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceWarm,
+    paddingHorizontal: 13,
+    paddingVertical: 11
+  },
+  contextText: {
+    color: colors.ink,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
   },
   removeLink: {
     flexDirection: "row",

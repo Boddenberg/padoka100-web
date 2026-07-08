@@ -30,6 +30,44 @@ export function sessionId(sessao: SessaoCusteio | null | undefined) {
   return sessao.id || sessao.sessao_id || null;
 }
 
+// --- Jornada em etapas: Receita → Preços → Resultado. ----------------------
+// O front conduz a etapa (e a persiste por produto) para o usuário nunca
+// misturar "o que usei" com "quanto paguei". Inicializa pela fase do backend.
+
+export type CusteioPhase = "receita" | "precos" | "resultado";
+
+const PHASE_KEY_PREFIX = "padoka100:custeio:fase:";
+
+export function readStoredPhase(produtoId: string): Promise<CusteioPhase | null> {
+  return AsyncStorage.getItem(PHASE_KEY_PREFIX + produtoId).then((value) =>
+    value === "receita" || value === "precos" || value === "resultado" ? value : null
+  );
+}
+
+export function storeStoredPhase(produtoId: string, phase: CusteioPhase) {
+  return AsyncStorage.setItem(PHASE_KEY_PREFIX + produtoId, phase);
+}
+
+export function clearStoredPhase(produtoId: string) {
+  return AsyncStorage.removeItem(PHASE_KEY_PREFIX + produtoId);
+}
+
+// Etapa sugerida a partir da `fase` que o backend devolve.
+export function phaseFromSession(sessao: SessaoCusteio | null | undefined): CusteioPhase {
+  if (isConfirmedSession(sessao)) return "resultado";
+  const fase = (sessao?.fase || "").toLowerCase();
+  if (fase === "confirmada" || fase === "revisando") return "resultado";
+  if (fase === "coletando_precos") return "precos";
+  return "receita";
+}
+
+// Cada etapa manda a `finalidade` certa nas entradas de IA (texto/áudio/foto).
+export function finalidadeForPhase(phase: CusteioPhase): "receita" | "compras" | "completo" {
+  if (phase === "receita") return "receita";
+  if (phase === "precos") return "compras";
+  return "completo";
+}
+
 // Perguntas/pendências/avisos podem chegar como string ou objeto: extraímos
 // o texto de forma tolerante para a tela nunca quebrar.
 const TEXT_KEYS = ["pergunta", "texto", "mensagem", "descricao", "detalhe", "titulo", "campo", "nome"];
@@ -127,24 +165,40 @@ export function isConfirmedStatus(status?: string | null) {
   return (status || "").toUpperCase() === "CONFIRMADO";
 }
 
-// Frase curta que explica por que um ingrediente ainda está em laranja:
-// falta o preço da compra ou a medida não fechou. Guia a próxima ação.
-export function ingredientPendingHint(ingrediente: IngredienteRascunho): string | null {
-  if (isConfirmedStatus(ingrediente.status)) return null;
-  const temPreco = toNumber(ingrediente.preco_total) > 0 && toNumber(ingrediente.quantidade_comprada) > 0;
-  if (!temPreco) return "Toque para informar quanto pagou";
-  return "Toque para revisar a medida";
+// Prontidão por etapa: na receita basta a quantidade usada; nos preços, é
+// preciso quanto comprou e quanto pagou. Assim o "pronto/revisar" faz sentido
+// em cada fase, sem depender só do status global do backend.
+export function hasRecipeData(ingrediente: IngredienteRascunho) {
+  return toNumber(ingrediente.quantidade_usada) > 0;
+}
+
+export function hasPurchaseData(ingrediente: IngredienteRascunho) {
+  return toNumber(ingrediente.preco_total) > 0 && toNumber(ingrediente.quantidade_comprada) > 0;
+}
+
+// Frase da quantidade usada na receita ("800 g na receita").
+export function recipeUsageText(ingrediente: IngredienteRascunho) {
+  if (!hasRecipeData(ingrediente)) return "";
+  return `${ingrediente.quantidade_usada} ${ingrediente.unidade_usada || ""} na receita`.replace(/\s+/g, " ").trim();
+}
+
+// Frase da compra ("comprou 5 kg por R$ 22,00").
+export function purchaseText(ingrediente: IngredienteRascunho, formatCurrency: (value: number) => string) {
+  if (toNumber(ingrediente.quantidade_comprada) <= 0) return "";
+  const compra = `comprou ${ingrediente.quantidade_comprada} ${ingrediente.unidade_compra || ""}`.replace(/\s+/g, " ").trim();
+  const preco = toNumber(ingrediente.preco_total);
+  return preco > 0 ? `${compra} por ${formatCurrency(preco)}` : compra;
 }
 
 export function receitaPendingHint(receita: ReceitaRascunho | null | undefined): string | null {
-  if (!receita || isConfirmedStatus(receita.status)) return null;
+  if (!receita) return null;
   if (toNumber(receita.rendimento) <= 0) return "Toque para dizer quantas unidades rende";
-  return "Toque para revisar";
+  return null;
 }
 
-// Quantos itens do rascunho ainda precisam de retoque (para orientar o resumo).
-export function pendingIngredientCount(ingredientes: IngredienteRascunho[] | null | undefined) {
-  return (ingredientes || []).filter((item) => !isConfirmedStatus(item.status)).length;
+// Quantos ingredientes ainda faltam preço (usado no resumo dos preços).
+export function missingPurchaseCount(ingredientes: IngredienteRascunho[] | null | undefined) {
+  return (ingredientes || []).filter((item) => !hasPurchaseData(item)).length;
 }
 
 // Entradas numéricas em pt-BR aceitam vírgula ("1,5" → 1.5).
@@ -207,22 +261,6 @@ export function extraCostEmoji(custo: CustoAdicionalRascunho) {
     if (pattern.test(texto)) return emoji;
   }
   return "🧾";
-}
-
-// Frase amigável de quantidade: "800 g usados • pacote de 5 kg por R$ 22,00".
-export function ingredientSubtitle(ingrediente: IngredienteRascunho, formatCurrency: (value: number) => string) {
-  const parts: string[] = [];
-  const usada = ingrediente.quantidade_usada;
-  const comprada = ingrediente.quantidade_comprada;
-  if (usada !== null && usada !== undefined && usada !== "") {
-    parts.push(`${usada} ${ingrediente.unidade_usada || ""} na receita`.replace(/\s+/g, " ").trim());
-  }
-  if (comprada !== null && comprada !== undefined && comprada !== "") {
-    const preco = toNumber(ingrediente.preco_total);
-    const compra = `comprou ${comprada} ${ingrediente.unidade_compra || ""}`.replace(/\s+/g, " ").trim();
-    parts.push(preco > 0 ? `${compra} por ${formatCurrency(preco)}` : compra);
-  }
-  return parts.join(" • ");
 }
 
 export function extraCostSubtitle(custo: CustoAdicionalRascunho, formatCurrency: (value: number) => string) {

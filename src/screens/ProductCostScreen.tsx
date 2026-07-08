@@ -1,7 +1,7 @@
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { ArrowLeft, BadgeCheck, Camera, Keyboard as KeyboardIcon, Mic, PartyPopper } from "lucide-react-native";
+import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Keyboard as KeyboardIcon, Mic, PartyPopper } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Animated, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,15 +27,21 @@ import {
 import { Button, Screen, SectionTitle, Skeleton, StateText, ProductPhoto } from "@/components/ui";
 import { api, ApiError, createCusteioFileForm, type NativeFile } from "@/lib/api";
 import {
+  clearStoredPhase,
   clearStoredSessionId,
+  finalidadeForPhase,
   guidedItems,
+  hasRecipeData,
   isConfirmedSession,
   isDiscardedSession,
-  pendingIngredientCount,
+  missingPurchaseCount,
+  phaseFromSession,
+  readStoredPhase,
   readStoredSessionId,
   sessionId,
-  stepForAction,
-  storeSessionId
+  storeSessionId,
+  storeStoredPhase,
+  type CusteioPhase
 } from "@/lib/custeio";
 import { formatCurrency, todayInputValue, toNumber } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -48,7 +54,8 @@ type BootState = "loading" | "none" | "ready" | "unavailable";
 type ActiveSheet =
   | { kind: "texto"; pergunta: string | null }
   | { kind: "receita" }
-  | { kind: "ingrediente"; index: number | null }
+  | { kind: "ingrediente-receita"; index: number | null }
+  | { kind: "ingrediente-preco"; index: number | null }
   | { kind: "extra"; index: number | null }
   | { kind: "confirmar" }
   | null;
@@ -76,6 +83,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
 
   const [boot, setBoot] = useState<BootState>("loading");
   const [session, setSession] = useState<SessaoCusteio | null>(null);
+  const [phase, setPhase] = useState<CusteioPhase>("receita");
   const [sheet, setSheet] = useState<ActiveSheet>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
 
@@ -90,6 +98,14 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     [produtoId]
   );
 
+  const goToPhase = useCallback(
+    (next: CusteioPhase) => {
+      setPhase(next);
+      void storeStoredPhase(produtoId, next);
+    },
+    [produtoId]
+  );
+
   // Retoma a sessão guardada do produto; sem sessão válida, começa do zero.
   useEffect(() => {
     let cancelled = false;
@@ -100,18 +116,22 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
           if (!cancelled) setBoot("none");
           return;
         }
-        const remote = await api.custos.assistente.obterSessao(stored);
+        const [remote, storedPhase] = await Promise.all([
+          api.custos.assistente.obterSessao(stored),
+          readStoredPhase(produtoId)
+        ]);
         if (cancelled) return;
         if (!remote || isDiscardedSession(remote)) {
-          await clearStoredSessionId(produtoId);
+          await Promise.all([clearStoredSessionId(produtoId), clearStoredPhase(produtoId)]);
           if (!cancelled) setBoot("none");
           return;
         }
         setSession(remote);
+        setPhase(isConfirmedSession(remote) ? "resultado" : storedPhase || phaseFromSession(remote));
         setBoot("ready");
       } catch {
         if (!cancelled) {
-          await clearStoredSessionId(produtoId);
+          await Promise.all([clearStoredSessionId(produtoId), clearStoredPhase(produtoId)]);
           setBoot("none");
         }
       }
@@ -129,6 +149,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
       }),
     onSuccess: (response) => {
       applySession(response);
+      goToPhase("receita");
       setBoot("ready");
     },
     onError: (error) => {
@@ -137,9 +158,10 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     }
   });
 
+  // Entradas de IA carregam a finalidade da etapa: receita não vira preço.
   const sendText = useMutation({
     mutationFn: ({ texto, contexto }: { texto: string; contexto?: string | null }) =>
-      api.custos.assistente.enviarTexto(sid || "", { texto, contexto }),
+      api.custos.assistente.enviarTexto(sid || "", { texto, contexto, finalidade: finalidadeForPhase(phase) }),
     onSuccess: (response) => {
       applySession(response);
       setSheet(null);
@@ -148,7 +170,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
 
   const sendFile = useMutation({
     mutationFn: ({ file, tipo }: { file: NativeFile; tipo: "audio" | "imagem" }) =>
-      api.custos.assistente.enviarArquivo(sid || "", createCusteioFileForm(file, tipo)),
+      api.custos.assistente.enviarArquivo(sid || "", createCusteioFileForm(file, tipo, { finalidade: finalidadeForPhase(phase) })),
     onSuccess: applySession
   });
 
@@ -176,6 +198,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     onSuccess: (response) => {
       applySession(response);
       setSheet(null);
+      goToPhase("resultado");
       // O custo vigente do produto pode ter mudado.
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
     }
@@ -184,7 +207,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   const discardSession = useMutation({
     mutationFn: () => api.custos.assistente.descartar(sid || ""),
     onSuccess: async () => {
-      await clearStoredSessionId(produtoId);
+      await Promise.all([clearStoredSessionId(produtoId), clearStoredPhase(produtoId)]);
       setSession(null);
       setBoot("none");
     }
@@ -193,13 +216,16 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   // Recomeço depois de confirmar: limpa a sessão antiga e cria outra.
   const restartSession = useMutation({
     mutationFn: async () => {
-      await clearStoredSessionId(produtoId);
+      await Promise.all([clearStoredSessionId(produtoId), clearStoredPhase(produtoId)]);
       return api.custos.assistente.criarSessao({
         produto_id: produtoId,
         contexto: `Usuário quer recalcular o custo de ${productName}`
       });
     },
-    onSuccess: applySession
+    onSuccess: (response) => {
+      applySession(response);
+      goToPhase("receita");
+    }
   });
 
   // --- Gravação de áudio (mesmo padrão da tela de vendas). -----------------
@@ -242,11 +268,12 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
         setMediaError(error instanceof Error ? error.message : "Não foi possível escolher a foto.");
       }
     };
+    const label = phase === "receita" ? "Foto ou print da receita." : "Foto da nota, cupom ou preços do mercado.";
     if (Platform.OS === "web") {
       void doPick("gallery");
       return;
     }
-    Alert.alert("Foto para o assistente", "Nota fiscal, recibo ou print de preço.", [
+    Alert.alert("Foto para o assistente", label, [
       { text: "Tirar foto", onPress: () => void doPick("camera") },
       { text: "Galeria / print", onPress: () => void doPick("gallery") },
       { text: "Cancelar", style: "cancel" }
@@ -289,17 +316,20 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
 
   // --- Estado derivado para a tela. -----------------------------------------
   const confirmed = isConfirmedSession(session);
-  const step = confirmed ? 4 : stepForAction(session?.proxima_acao);
+  const step = confirmed ? 4 : phase === "receita" ? 1 : phase === "precos" ? 2 : 3;
   const perguntas = guidedItems(session?.perguntas);
   const pendencias = guidedItems(session?.pendencias);
   const avisos = guidedItems(session?.avisos);
-  const hasDraft = Boolean(rascunho.receita) || ingredientes.length > 0 || custosAdicionais.length > 0;
   const thinking = sendText.isPending || sendFile.isPending || patchDraft.isPending;
   const entryCount = session?.entradas?.length || 0;
-  const pendingCount = pendingIngredientCount(ingredientes);
+
+  const rendimentoOk = toNumber(rascunho.receita?.rendimento) > 0;
+  const recipeReadyCount = ingredientes.filter(hasRecipeData).length;
+  const canAdvanceToPrecos = rendimentoOk && recipeReadyCount > 0;
+  const missingPrices = missingPurchaseCount(ingredientes);
   const incompleteHint =
-    pendingCount > 0
-      ? `Faltam ${pendingCount} ${pendingCount === 1 ? "item" : "itens"} em laranja para eu fechar a conta.`
+    missingPrices > 0
+      ? `Faltam ${missingPrices} ${missingPrices === 1 ? "preço" : "preços"} para eu fechar a conta.`
       : undefined;
 
   const sendError =
@@ -308,16 +338,16 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     mediaError;
 
   const agentMessage = recorderState.isRecording
-    ? "Tô ouvindo... me conta da receita!"
+    ? phase === "receita"
+      ? "Tô ouvindo... me conta a receita!"
+      : "Tô ouvindo... me diz os preços!"
     : confirmed
       ? `Custo confirmado e guardado em ${productName}! 🎉`
-      : step === 3
-        ? "Fechei a conta! 🎉 Confere os números aí embaixo e toca em Confirmar."
-        : step === 2
-          ? perguntas.length > 0
-            ? "Boa! Só faltam alguns detalhes. Me responde aqui embaixo: 👇"
-            : "Quase lá! Dá uma olhada nas pendências aqui embaixo."
-          : `Me conta como você faz ${productName}: os ingredientes, quanto pagou em cada um e quantas unidades a receita rende. Pode falar do seu jeito!`;
+      : phase === "resultado"
+        ? "Tá fechando! Confere o custo aqui embaixo e, se estiver certo, é só confirmar."
+        : phase === "precos"
+          ? "Agora os preços 💰 Pra cada item, me diz quanto você comprou e quanto pagou. Pode mandar a foto da nota também."
+          : `Vamos começar pela receita de ${productName}! Me conta os ingredientes, quanto de cada um você usa e quantas unidades rende. Os preços ficam pra próxima etapa.`;
 
   // --- Render. ----------------------------------------------------------------
   return (
@@ -366,29 +396,21 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
             <ProgressTrail step={step} />
             <AgentBubble message={agentMessage} thinking={thinking && !sheet} />
 
-            {confirmed ? (
-              <>
-                <View style={[styles.celebration, shadows.soft]}>
-                  <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.celebrationBadge}>
-                    <PartyPopper size={26} color="#fff" />
-                  </LinearGradient>
-                  <Text style={styles.celebrationTitle}>Custo confirmado!</Text>
-                  <Text style={styles.celebrationHint}>
-                    Agora cada venda de {productName} já sabe quanto custou para ser feita.
-                  </Text>
-                </View>
-                {session?.custo_simulado ? (
-                  <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} confirmed />
-                ) : null}
-                {restartSession.error instanceof Error ? <StateText tone="error" text={restartSession.error.message} /> : null}
-                <Button
-                  title={restartSession.isPending ? "Preparando..." : "Calcular de novo"}
-                  tone="outline"
-                  disabled={restartSession.isPending}
-                  onPress={() => restartSession.mutate()}
-                />
-                <Button title="Voltar ao catálogo" tone="soft" onPress={() => router.back()} />
-              </>
+            {phase === "resultado" ? (
+              <ResultPhase
+                confirmed={confirmed}
+                productName={productName}
+                session={session}
+                precoVenda={precoVenda}
+                incompleteHint={incompleteHint}
+                pendencias={pendencias}
+                restartPending={restartSession.isPending}
+                restartError={restartSession.error instanceof Error ? restartSession.error.message : null}
+                onConfirm={() => setSheet({ kind: "confirmar" })}
+                onRestart={() => restartSession.mutate()}
+                onBackToPrecos={() => goToPhase("precos")}
+                onBackToCatalog={() => router.back()}
+              />
             ) : (
               <>
                 {perguntas.map((pergunta) => (
@@ -397,6 +419,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 <NoticeStack items={pendencias} tone="danger" />
 
                 <InputDock
+                  phase={phase}
                   recording={recorderState.isRecording}
                   busy={thinking}
                   uploading={sendFile.isPending}
@@ -411,52 +434,33 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                   </Text>
                 ) : null}
 
-                {hasDraft ? (
-                  <>
-                    <SectionTitle text="O que já anotei" />
-                    <Text style={styles.sectionHint}>
-                      {pendingCount > 0
-                        ? "Toque nos itens marcados como “revisar” para completar preço e medida."
-                        : "Tudo pronto! Confira os itens abaixo antes de confirmar."}
-                    </Text>
-                    <ReceitaCard rascunho={rascunho} onEdit={() => setSheet({ kind: "receita" })} />
-                    {ingredientes.map((ingrediente, index) => (
-                      <IngredientRow
-                        key={`${ingrediente.nome || "ingrediente"}-${index}`}
-                        ingrediente={ingrediente}
-                        onEdit={() => setSheet({ kind: "ingrediente", index })}
-                      />
-                    ))}
-                    <AddRowButton label="Adicionar ingrediente" onPress={() => setSheet({ kind: "ingrediente", index: null })} />
-                    {custosAdicionais.map((custo, index) => (
-                      <ExtraCostRow
-                        key={`${custo.nome || custo.tipo || "custo"}-${index}`}
-                        custo={custo}
-                        onEdit={() => setSheet({ kind: "extra", index })}
-                      />
-                    ))}
-                    <AddRowButton label="Adicionar embalagem, gás..." onPress={() => setSheet({ kind: "extra", index: null })} />
-                  </>
-                ) : (
-                  <Pressable onPress={() => setSheet({ kind: "ingrediente", index: null })} style={({ pressed }) => [pressed && styles.pressed]}>
-                    <Text style={styles.manualLink}>Prefiro preencher os ingredientes na mão</Text>
-                  </Pressable>
-                )}
-
-                <NoticeStack items={avisos} tone="warn" />
-
-                {session?.custo_simulado && hasDraft ? (
-                  <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} incompleteHint={incompleteHint} />
-                ) : null}
-
-                {session?.pode_confirmar ? (
-                  <Button
-                    title="Confirmar custo"
-                    tone="success"
-                    icon={<BadgeCheck size={18} color="#fff" />}
-                    onPress={() => setSheet({ kind: "confirmar" })}
+                {phase === "receita" ? (
+                  <RecipePhaseBody
+                    rascunho={rascunho}
+                    ingredientes={ingredientes}
+                    canAdvance={canAdvanceToPrecos}
+                    onEditReceita={() => setSheet({ kind: "receita" })}
+                    onEditIngrediente={(index) => setSheet({ kind: "ingrediente-receita", index })}
+                    onAddIngrediente={() => setSheet({ kind: "ingrediente-receita", index: null })}
+                    onAdvance={() => goToPhase("precos")}
                   />
-                ) : null}
+                ) : (
+                  <PricePhaseBody
+                    rascunho={rascunho}
+                    ingredientes={ingredientes}
+                    custosAdicionais={custosAdicionais}
+                    avisos={avisos}
+                    custoSimulado={session?.custo_simulado || null}
+                    precoVenda={precoVenda}
+                    incompleteHint={incompleteHint}
+                    onEditIngrediente={(index) => setSheet({ kind: "ingrediente-preco", index })}
+                    onEditExtra={(index) => setSheet({ kind: "extra", index })}
+                    onAddExtra={() => setSheet({ kind: "extra", index: null })}
+                    onEditReceita={() => setSheet({ kind: "receita" })}
+                    onBack={() => goToPhase("receita")}
+                    onSeeResult={() => goToPhase("resultado")}
+                  />
+                )}
 
                 {discardSession.error instanceof Error ? <StateText tone="error" text={discardSession.error.message} /> : null}
                 <Pressable
@@ -470,9 +474,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                   }
                   style={({ pressed }) => [pressed && styles.pressed]}
                 >
-                  <Text style={styles.discardLink}>
-                    {discardSession.isPending ? "Descartando..." : "Descartar e começar de novo"}
-                  </Text>
+                  <Text style={styles.discardLink}>{discardSession.isPending ? "Descartando..." : "Descartar e começar de novo"}</Text>
                 </Pressable>
               </>
             )}
@@ -497,14 +499,22 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
         errorText={patchDraft.error instanceof Error ? patchDraft.error.message : null}
       />
       <IngredienteSheet
-        visible={sheet?.kind === "ingrediente"}
-        ingrediente={sheet?.kind === "ingrediente" && sheet.index !== null ? ingredientes[sheet.index] || null : null}
-        onClose={() => setSheet(null)}
-        onSave={(item) => saveIngrediente(sheet?.kind === "ingrediente" ? sheet.index : null, item)}
-        onRemove={
-          sheet?.kind === "ingrediente" && sheet.index !== null
-            ? () => removeIngrediente(sheet.index as number)
+        visible={sheet?.kind === "ingrediente-receita" || sheet?.kind === "ingrediente-preco"}
+        mode={sheet?.kind === "ingrediente-preco" ? "preco" : "receita"}
+        ingrediente={
+          (sheet?.kind === "ingrediente-receita" || sheet?.kind === "ingrediente-preco") && sheet.index !== null
+            ? ingredientes[sheet.index] || null
             : null
+        }
+        onClose={() => setSheet(null)}
+        onSave={(item) =>
+          saveIngrediente(
+            (sheet?.kind === "ingrediente-receita" || sheet?.kind === "ingrediente-preco") ? sheet.index : null,
+            item
+          )
+        }
+        onRemove={
+          sheet?.kind === "ingrediente-receita" && sheet.index !== null ? () => removeIngrediente(sheet.index as number) : null
         }
         pending={patchDraft.isPending}
         errorText={patchDraft.error instanceof Error ? patchDraft.error.message : null}
@@ -532,7 +542,219 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Boas-vindas: explica a mágica em três passos e cria a sessão.
+// Etapa 1 — Receita: ingredientes + quantidades usadas + rendimento.
+// ---------------------------------------------------------------------------
+
+function RecipePhaseBody({
+  rascunho,
+  ingredientes,
+  canAdvance,
+  onEditReceita,
+  onEditIngrediente,
+  onAddIngrediente,
+  onAdvance
+}: {
+  rascunho: RascunhoCusteio;
+  ingredientes: IngredienteRascunho[];
+  canAdvance: boolean;
+  onEditReceita: () => void;
+  onEditIngrediente: (index: number) => void;
+  onAddIngrediente: () => void;
+  onAdvance: () => void;
+}) {
+  const hasDraft = Boolean(rascunho.receita) || ingredientes.length > 0;
+
+  if (!hasDraft) {
+    return (
+      <Pressable onPress={onAddIngrediente} style={({ pressed }) => [pressed && styles.pressed]}>
+        <Text style={styles.manualLink}>Prefiro preencher os ingredientes na mão</Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <>
+      <SectionTitle text="A receita" />
+      <Text style={styles.sectionHint}>Aqui vai só o que entra na receita e quanto de cada um. Os preços são a próxima etapa.</Text>
+      <ReceitaCard rascunho={rascunho} onEdit={onEditReceita} />
+      {ingredientes.map((ingrediente, index) => (
+        <IngredientRow
+          key={`${ingrediente.nome || "ingrediente"}-${index}`}
+          ingrediente={ingrediente}
+          phase="receita"
+          onEdit={() => onEditIngrediente(index)}
+        />
+      ))}
+      <AddRowButton label="Adicionar ingrediente" onPress={onAddIngrediente} />
+
+      <Button
+        title="Avançar para os preços"
+        tone="agent"
+        icon={<ArrowRight size={18} color={canAdvance ? "#fff" : colors.muted} />}
+        disabled={!canAdvance}
+        onPress={onAdvance}
+      />
+      {!canAdvance ? (
+        <Text style={styles.gateHint}>Informe o rendimento e ao menos um ingrediente para avançar.</Text>
+      ) : null}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Etapa 2 — Preços: quanto comprou e pagou de cada item + custos extras.
+// ---------------------------------------------------------------------------
+
+function PricePhaseBody({
+  rascunho,
+  ingredientes,
+  custosAdicionais,
+  avisos,
+  custoSimulado,
+  precoVenda,
+  incompleteHint,
+  onEditIngrediente,
+  onEditExtra,
+  onAddExtra,
+  onEditReceita,
+  onBack,
+  onSeeResult
+}: {
+  rascunho: RascunhoCusteio;
+  ingredientes: IngredienteRascunho[];
+  custosAdicionais: CustoAdicionalRascunho[];
+  avisos: string[];
+  custoSimulado: SessaoCusteio["custo_simulado"];
+  precoVenda: number | null;
+  incompleteHint?: string;
+  onEditIngrediente: (index: number) => void;
+  onEditExtra: (index: number) => void;
+  onAddExtra: () => void;
+  onEditReceita: () => void;
+  onBack: () => void;
+  onSeeResult: () => void;
+}) {
+  const receita = rascunho.receita;
+
+  return (
+    <>
+      {receita ? (
+        <Pressable onPress={onEditReceita} style={({ pressed }) => [styles.recipeRecap, pressed && styles.pressed]}>
+          <Text style={styles.recipeRecapText}>
+            🍞 {receita.nome || "Receita"} · rende {receita.rendimento || "?"} {receita.unidade_rendimento || "un"}
+          </Text>
+          <Text style={styles.recipeRecapEdit}>editar receita</Text>
+        </Pressable>
+      ) : null}
+
+      <SectionTitle text="Preço de cada item" />
+      <Text style={styles.sectionHint}>Toque em cada ingrediente e diga quanto comprou e quanto pagou.</Text>
+      {ingredientes.map((ingrediente, index) => (
+        <IngredientRow
+          key={`${ingrediente.nome || "ingrediente"}-${index}`}
+          ingrediente={ingrediente}
+          phase="precos"
+          onEdit={() => onEditIngrediente(index)}
+        />
+      ))}
+
+      <SectionTitle text="Outros custos" />
+      <Text style={styles.sectionHint}>Embalagem, gás, energia, transporte... o que mais entra no bolso.</Text>
+      {custosAdicionais.map((custo, index) => (
+        <ExtraCostRow key={`${custo.nome || custo.tipo || "custo"}-${index}`} custo={custo} onEdit={() => onEditExtra(index)} />
+      ))}
+      <AddRowButton label="Adicionar embalagem, gás..." onPress={onAddExtra} />
+
+      <NoticeStack items={avisos} tone="warn" />
+
+      {custoSimulado ? <CostSummaryCard custo={custoSimulado} precoVenda={precoVenda} incompleteHint={incompleteHint} /> : null}
+
+      <Button title="Ver o resultado" tone="agent" icon={<ArrowRight size={18} color="#fff" />} onPress={onSeeResult} />
+      <Pressable onPress={onBack} style={({ pressed }) => [styles.backLinkRow, pressed && styles.pressed]}>
+        <ArrowLeft size={16} color={colors.muted} />
+        <Text style={styles.backLinkText}>Voltar à receita</Text>
+      </Pressable>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Etapa 3 — Resultado: revisar e confirmar, depois ficha final.
+// ---------------------------------------------------------------------------
+
+function ResultPhase({
+  confirmed,
+  productName,
+  session,
+  precoVenda,
+  incompleteHint,
+  pendencias,
+  restartPending,
+  restartError,
+  onConfirm,
+  onRestart,
+  onBackToPrecos,
+  onBackToCatalog
+}: {
+  confirmed: boolean;
+  productName: string;
+  session: SessaoCusteio | null;
+  precoVenda: number | null;
+  incompleteHint?: string;
+  pendencias: string[];
+  restartPending: boolean;
+  restartError: string | null;
+  onConfirm: () => void;
+  onRestart: () => void;
+  onBackToPrecos: () => void;
+  onBackToCatalog: () => void;
+}) {
+  if (confirmed) {
+    return (
+      <>
+        <View style={[styles.celebration, shadows.soft]}>
+          <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.celebrationBadge}>
+            <PartyPopper size={26} color="#fff" />
+          </LinearGradient>
+          <Text style={styles.celebrationTitle}>Custo confirmado!</Text>
+          <Text style={styles.celebrationHint}>Agora cada venda de {productName} já sabe quanto custou para ser feita.</Text>
+        </View>
+        {session?.custo_simulado ? <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} confirmed /> : null}
+        {restartError ? <StateText tone="error" text={restartError} /> : null}
+        <Button title={restartPending ? "Preparando..." : "Calcular de novo"} tone="outline" disabled={restartPending} onPress={onRestart} />
+        <Button title="Voltar ao catálogo" tone="soft" onPress={onBackToCatalog} />
+      </>
+    );
+  }
+
+  const podeConfirmar = Boolean(session?.pode_confirmar);
+
+  return (
+    <>
+      <SectionTitle text="Resultado" />
+      {session?.custo_simulado ? (
+        <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} incompleteHint={incompleteHint} />
+      ) : null}
+
+      {podeConfirmar ? (
+        <Button title="Confirmar custo" tone="success" icon={<BadgeCheck size={18} color="#fff" />} onPress={onConfirm} />
+      ) : (
+        <>
+          <NoticeStack items={pendencias} tone="danger" />
+          <Text style={styles.gateHint}>Ainda faltam dados para fechar o custo. Volte aos preços e complete os itens em laranja.</Text>
+        </>
+      )}
+
+      <Pressable onPress={onBackToPrecos} style={({ pressed }) => [styles.backLinkRow, pressed && styles.pressed]}>
+        <ArrowLeft size={16} color={colors.muted} />
+        <Text style={styles.backLinkText}>Voltar aos preços</Text>
+      </Pressable>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Boas-vindas: explica a jornada em três passos e cria a sessão.
 // ---------------------------------------------------------------------------
 
 function WelcomeView({
@@ -554,8 +776,8 @@ function WelcomeView({
         <AgentAvatar size={72} />
         <Text style={styles.welcomeTitle}>Quanto custa fazer {productName}?</Text>
         <Text style={styles.welcomeText}>
-          Me conta a receita — falando, escrevendo ou mandando a foto do recibo — que eu calculo o custo de cada unidade e
-          mostro quanto sobra de lucro.
+          Vamos por partes: primeiro a receita, depois os preços do que você comprou. No fim eu mostro o custo de cada unidade
+          e quanto sobra de lucro.
         </Text>
         {currentCost > 0 ? (
           <Text style={styles.welcomeCurrentCost}>Custo cadastrado hoje: {formatCurrency(currentCost)} por unidade</Text>
@@ -563,9 +785,9 @@ function WelcomeView({
       </View>
 
       <View style={styles.welcomeSteps}>
-        <WelcomeStep emoji="🎤" text="Você me conta a receita do seu jeito" />
-        <WelcomeStep emoji="🧾" text="Eu monto as contas e pergunto o que faltar" />
-        <WelcomeStep emoji="✅" text="Você confere, confirma e o custo entra no produto" />
+        <WelcomeStep number="1" emoji="🍞" title="A receita" text="Os ingredientes e quanto de cada um você usa" />
+        <WelcomeStep number="2" emoji="💰" title="Os preços" text="Quanto comprou e pagou em cada item" />
+        <WelcomeStep number="3" emoji="✅" title="O resultado" text="Confere o custo e confirma no produto" />
       </View>
 
       {errorText ? <StateText tone="error" text={errorText} /> : null}
@@ -574,11 +796,17 @@ function WelcomeView({
   );
 }
 
-function WelcomeStep({ emoji, text }: { emoji: string; text: string }) {
+function WelcomeStep({ number, emoji, title, text }: { number: string; emoji: string; title: string; text: string }) {
   return (
     <View style={styles.welcomeStep}>
+      <View style={styles.welcomeStepNumber}>
+        <Text style={styles.welcomeStepNumberText}>{number}</Text>
+      </View>
       <Text style={styles.welcomeStepEmoji}>{emoji}</Text>
-      <Text style={styles.welcomeStepText}>{text}</Text>
+      <View style={styles.welcomeStepBody}>
+        <Text style={styles.welcomeStepTitle}>{title}</Text>
+        <Text style={styles.welcomeStepText}>{text}</Text>
+      </View>
     </View>
   );
 }
@@ -588,6 +816,7 @@ function WelcomeStep({ emoji, text }: { emoji: string; text: string }) {
 // ---------------------------------------------------------------------------
 
 function InputDock({
+  phase,
   recording,
   busy,
   uploading,
@@ -595,6 +824,7 @@ function InputDock({
   onWrite,
   onPhoto
 }: {
+  phase: CusteioPhase;
   recording: boolean;
   busy: boolean;
   uploading: boolean;
@@ -603,6 +833,7 @@ function InputDock({
   onPhoto: () => void;
 }) {
   const pulse = useRef(new Animated.Value(1)).current;
+  const recipe = phase === "receita";
 
   useEffect(() => {
     if (!recording) {
@@ -619,6 +850,11 @@ function InputDock({
     return () => loop.stop();
   }, [recording, pulse]);
 
+  const idleText = recipe ? "Toque e fala a receita" : "Toque e fala os preços";
+  const hint = recipe
+    ? "Ex: “uso 800g de farinha, 3 ovos e 250ml de leite, rende 12”"
+    : "Ex: “o pacote de farinha de 5kg custou 22 reais”";
+
   return (
     <View style={styles.dock}>
       <Pressable onPress={onMic} disabled={uploading} style={({ pressed }) => [pressed && styles.pressed]}>
@@ -630,12 +866,8 @@ function InputDock({
             style={[styles.micButton, shadows.agent]}
           >
             <Mic size={28} color="#fff" />
-            <Text style={styles.micText}>
-              {recording ? "Gravando... toque para parar" : uploading ? "Enviando..." : "Toque e fala a receita"}
-            </Text>
-            {!recording && !uploading ? (
-              <Text style={styles.micHint}>Ex: “usei 800g de farinha, o pacote de 5kg custou 22 reais”</Text>
-            ) : null}
+            <Text style={styles.micText}>{recording ? "Gravando... toque para parar" : uploading ? "Enviando..." : idleText}</Text>
+            {!recording && !uploading ? <Text style={styles.micHint}>{hint}</Text> : null}
           </LinearGradient>
         </Animated.View>
       </Pressable>
@@ -647,7 +879,7 @@ function InputDock({
         </Pressable>
         <Pressable onPress={busy ? undefined : onPhoto} style={({ pressed }) => [styles.dockAction, pressed && styles.pressed]}>
           <Camera size={19} color={colors.agentDeep} />
-          <Text style={styles.dockActionText}>Foto ou print</Text>
+          <Text style={styles.dockActionText}>{recipe ? "Foto da receita" : "Foto da nota"}</Text>
         </Pressable>
       </View>
     </View>
@@ -754,18 +986,38 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceGlow,
-    paddingHorizontal: 15,
+    paddingHorizontal: 14,
     paddingVertical: 12
+  },
+  welcomeStepNumber: {
+    height: 26,
+    width: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.agentSoft
+  },
+  welcomeStepNumberText: {
+    color: colors.agentDeep,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold
   },
   welcomeStepEmoji: {
     fontSize: 22
   },
-  welcomeStepText: {
-    flex: 1,
+  welcomeStepBody: {
+    flex: 1
+  },
+  welcomeStepTitle: {
     color: colors.ink,
-    fontSize: 14.5,
-    lineHeight: 21,
+    fontSize: 15,
     fontFamily: fonts.bodyBold
+  },
+  welcomeStepText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.body
   },
   dock: {
     gap: 10
@@ -821,6 +1073,45 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 19,
     fontFamily: fonts.body
+  },
+  gateHint: {
+    color: colors.muted,
+    fontSize: 13,
+    fontFamily: fonts.body,
+    textAlign: "center"
+  },
+  recipeRecap: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceWarm,
+    paddingHorizontal: 14,
+    paddingVertical: 12
+  },
+  recipeRecapText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 14.5,
+    fontFamily: fonts.bodyBold
+  },
+  recipeRecapEdit: {
+    color: colors.brandDeep,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold
+  },
+  backLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 42
+  },
+  backLinkText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
   },
   manualLink: {
     color: colors.agentDeep,
