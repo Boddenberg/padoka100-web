@@ -1,11 +1,13 @@
-import { Camera, ChevronRight, Images, MapPin, Trash2 } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import { Calculator, Camera, ChevronRight, Images, MapPin, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { api, createMediaForm, type NativeFile } from "@/lib/api";
-import { cleanPayload, formatCurrency, todayInputValue } from "@/lib/format";
-import { colors, fonts, radius, shadows } from "@/lib/theme";
+import { cleanPayload, formatCurrency, toNumber, todayInputValue } from "@/lib/format";
+import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
 import type { LocalVenda, Produto } from "@/types/api";
@@ -202,6 +204,7 @@ function EditProductSheet({ visible, onClose, product }: { visible: boolean; onC
 
 function EditProductForm({ onClose, product }: { onClose: () => void; product: Produto }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [nome, setNome] = useState(product.nome);
   const [descricao, setDescricao] = useState(product.descricao || "");
   const [situacao, setSituacao] = useState(product.situacao || "ativo");
@@ -287,6 +290,30 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
           <Badge text={situacao} tone={situacao === "ativo" ? "good" : "warn"} />
         </View>
       </View>
+
+      {/* Porta de entrada do custeio assistido: fecha o sheet e abre a sessão guiada. */}
+      <Pressable
+        onPress={() => {
+          onClose();
+          router.push(`/produto/${product.id}/custos`);
+        }}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
+        <LinearGradient colors={gradients.agent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.costCard, shadows.agent]}>
+          <View style={styles.costCardIcon}>
+            <Calculator size={22} color="#fff" />
+          </View>
+          <View style={styles.costCardInfo}>
+            <Text style={styles.costCardTitle}>Quanto custa fazer?</Text>
+            <Text style={styles.costCardSubtitle}>
+              {toNumber(product.preco_atual?.preco_custo) > 0
+                ? `Custo atual: ${formatCurrency(product.preco_atual?.preco_custo)} — recalcule com o assistente`
+                : "Descubra o custo e o lucro de cada unidade com o assistente"}
+            </Text>
+          </View>
+          <ChevronRight size={20} color="#fff" />
+        </LinearGradient>
+      </Pressable>
 
       <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
       {photoUrl ? (
@@ -717,6 +744,36 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontFamily: fonts.display,
     letterSpacing: -0.5
+  },
+  costCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: radius.xl,
+    padding: 14
+  },
+  costCardIcon: {
+    height: 44,
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.22)"
+  },
+  costCardInfo: {
+    flex: 1,
+    gap: 2
+  },
+  costCardTitle: {
+    color: "#fff",
+    fontSize: 16.5,
+    fontFamily: fonts.bodyBold
+  },
+  costCardSubtitle: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontFamily: fonts.body
   },
   photoActions: {
     flexDirection: "row",

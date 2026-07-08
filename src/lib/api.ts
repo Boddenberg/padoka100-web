@@ -1,5 +1,12 @@
 import { getBaseUrl, readApiSettings, type ApiSettings } from "@/lib/settings";
 import type {
+  ConfirmarCusteioRequest,
+  CorrigirRascunhoCusteioRequest,
+  CriarSessaoCusteioRequest,
+  EntradaTextoCusteioRequest,
+  SessaoCusteio
+} from "@/types/custeio";
+import type {
   AnaliseEspecificaRequest,
   AnalisePadraoRequest,
   AtualizarPerfilRequest,
@@ -159,6 +166,16 @@ export function createAudioForm(file: NativeFile, diaDeVendaId?: UUID | null) {
   return form;
 }
 
+// Entrada de áudio/imagem do custeio assistido (multipart em /entradas/arquivo).
+export function createCusteioFileForm(file: NativeFile, tipo: "audio" | "imagem", contexto?: string | null) {
+  const form = new FormData();
+  form.append("file", file as unknown as Blob);
+  form.append("tipo", tipo);
+  if (contexto) form.append("contexto", contexto);
+  if (tipo === "audio") form.append("permitir_fallback", "true");
+  return form;
+}
+
 export const api = {
   health: (settings?: ApiSettings) => apiRequest<HealthStatus>("/health", { settings }),
   // Autenticação e perfil. O primeiro usuário registrado vira "dono".
@@ -255,8 +272,42 @@ export const api = {
       })
   },
   // Custos, insumos e receitas (exigem Bearer token e papel "dono").
-  // Cliente pronto; a UI guiada de custos (README §15) ainda será construída.
   custos: {
+    // Custeio assistido: sessão guiada por produto. O backend devolve sempre
+    // a sessão completa (rascunho, perguntas, pendências, custo simulado).
+    assistente: {
+      criarSessao: (body: CriarSessaoCusteioRequest) =>
+        apiRequest<SessaoCusteio>("/api/v1/custos/assistente/sessoes", { method: "POST", body }),
+      obterSessao: (sessaoId: UUID) =>
+        apiRequest<SessaoCusteio | null>(`/api/v1/custos/assistente/sessoes/${sessaoId}`, { allowNotFound: true }),
+      enviarTexto: (sessaoId: UUID, body: EntradaTextoCusteioRequest) =>
+        apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/entradas/texto`, {
+          method: "POST",
+          body: { permitir_fallback: true, ...body }
+        }),
+      enviarFormulario: (sessaoId: UUID, dados: Record<string, unknown>) =>
+        apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/entradas/formulario`, {
+          method: "POST",
+          body: { dados }
+        }),
+      enviarArquivo: (sessaoId: UUID, formData: FormData) =>
+        apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/entradas/arquivo`, {
+          method: "POST",
+          formData
+        }),
+      corrigirRascunho: (sessaoId: UUID, body: CorrigirRascunhoCusteioRequest) =>
+        apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/rascunho`, {
+          method: "PATCH",
+          body
+        }),
+      confirmar: (sessaoId: UUID, body: ConfirmarCusteioRequest) =>
+        apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/confirmar`, {
+          method: "POST",
+          body
+        }),
+      descartar: (sessaoId: UUID) =>
+        apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/descartar`, { method: "POST" })
+    },
     listInsumos: () => apiRequest<Record<string, unknown>[]>("/api/v1/custos/insumos"),
     createInsumo: (body: Record<string, unknown>) => apiRequest("/api/v1/custos/insumos", { method: "POST", body }),
     updateInsumo: (insumoId: UUID, body: Record<string, unknown>) =>
