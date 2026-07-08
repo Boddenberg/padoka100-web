@@ -126,6 +126,9 @@ export function loginErrorMessage(error: unknown) {
     if ([401, 403].includes(error.status)) return "E-mail ou senha inválidos. Confira e tente de novo.";
     if (error.status === 409) return "Já existe uma conta com esse e-mail.";
     if (error.status === 422) return "Confira os dados: e-mail válido e senha com pelo menos 6 caracteres.";
+    if ([404, 405, 501].includes(error.status)) {
+      return "Este servidor ainda não tem contas. Você pode usar o app sem entrar (toque em “Voltar sem entrar”).";
+    }
   }
   return error instanceof Error ? error.message : "Não foi possível continuar. Tente novamente.";
 }

@@ -1,12 +1,11 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { AlertTriangle, Lightbulb, Lock, LogIn, Sparkles, TrendingDown, TrendingUp } from "lucide-react-native";
+import { AlertTriangle, Lightbulb, LogIn, Sparkles, TrendingDown, TrendingUp } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
 import { Button, Card, Input, StateText } from "@/components/ui";
-import { useAuth } from "@/contexts/auth";
 import { api, ApiError } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -22,7 +21,6 @@ interface NormalizedAnalysis {
 // específica quando a pessoa escreve uma pergunta. Exige login como dono.
 export function AiAnalysisCard({ start, end }: { start: string; end: string }) {
   const router = useRouter();
-  const { status, user } = useAuth();
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<NormalizedAnalysis | null>(null);
 
@@ -37,7 +35,8 @@ export function AiAnalysisCard({ start, end }: { start: string; end: string }) {
     onSuccess: setResult
   });
 
-  const isDono = user?.papel === "dono";
+  // O servidor pode exigir sessão de dono; nesse caso oferecemos o login.
+  const needsLogin = analyze.error instanceof ApiError && [401, 403].includes(analyze.error.status);
 
   return (
     <Card style={styles.card}>
@@ -50,58 +49,46 @@ export function AiAnalysisCard({ start, end }: { start: string; end: string }) {
         </View>
       </View>
 
-      {status !== "signed-in" ? (
-        <View style={styles.gate}>
-          <Lock size={18} color={colors.muted} />
-          <Text style={styles.gateText}>Entre como dono da padaria para gerar análises.</Text>
-          <Button title="Entrar" tone="agent" icon={<LogIn size={18} color="#fff" />} onPress={() => router.push("/login")} />
-        </View>
-      ) : !isDono ? (
-        <View style={styles.gate}>
-          <Lock size={18} color={colors.muted} />
-          <Text style={styles.gateText}>As análises com IA são exclusivas do dono da padaria.</Text>
-        </View>
-      ) : (
-        <>
-          <Input
-            value={question}
-            onChangeText={setQuestion}
-            placeholder="Pergunta opcional. Ex: o que devo produzir menos?"
-            multiline
-          />
+      <Input
+        value={question}
+        onChangeText={setQuestion}
+        placeholder="Pergunta opcional. Ex: o que devo produzir menos?"
+        multiline
+      />
 
-          <Pressable
-            onPress={() => analyze.mutate()}
-            disabled={analyze.isPending}
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <LinearGradient
-              colors={gradients.agent}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.button, shadows.agent]}
-            >
-              <Sparkles size={18} color="#fff" />
-              <Text style={styles.buttonText}>{analyze.isPending ? "Analisando as vendas..." : "Gerar análise"}</Text>
-            </LinearGradient>
-          </Pressable>
+      <Pressable
+        onPress={() => analyze.mutate()}
+        disabled={analyze.isPending}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
+        <LinearGradient
+          colors={gradients.agent}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.button, shadows.agent]}
+        >
+          <Sparkles size={18} color="#fff" />
+          <Text style={styles.buttonText}>{analyze.isPending ? "Analisando as vendas..." : "Gerar análise"}</Text>
+        </LinearGradient>
+      </Pressable>
 
-          {analyze.error ? <StateText tone="error" text={analysisErrorMessage(analyze.error)} /> : null}
+      {analyze.error ? <StateText tone="error" text={analysisErrorMessage(analyze.error)} /> : null}
+      {needsLogin ? (
+        <Button title="Entrar como dono" tone="soft" icon={<LogIn size={18} color={colors.ink} />} onPress={() => router.push("/login")} />
+      ) : null}
 
-          {result ? (
-            <View style={styles.result}>
-              {result.summary ? (
-                <View style={styles.summaryBubble}>
-                  <Text style={styles.summaryText}>{result.summary}</Text>
-                </View>
-              ) : null}
-              {result.sections.map((section) => (
-                <AnalysisSection key={section.title} title={section.title} icon={section.icon} items={section.items} />
-              ))}
+      {result ? (
+        <View style={styles.result}>
+          {result.summary ? (
+            <View style={styles.summaryBubble}>
+              <Text style={styles.summaryText}>{result.summary}</Text>
             </View>
           ) : null}
-        </>
-      )}
+          {result.sections.map((section) => (
+            <AnalysisSection key={section.title} title={section.title} icon={section.icon} items={section.items} />
+          ))}
+        </View>
+      ) : null}
     </Card>
   );
 }
@@ -179,8 +166,8 @@ function summarizeObject(item: object) {
 
 function analysisErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
-    if ([401, 403].includes(error.status)) return "Sua sessão expirou. Entre de novo como dono para gerar a análise.";
-    if ([404, 405, 501].includes(error.status)) return "O servidor não tem esse recurso de análise ainda.";
+    if ([401, 403].includes(error.status)) return "Este servidor pede login de dono para analisar. Entre para continuar.";
+    if ([404, 405, 501].includes(error.status)) return "Este servidor ainda não gera análises com IA. Atualize o backend.";
   }
   return error instanceof Error ? error.message : "Não foi possível gerar a análise.";
 }
@@ -212,19 +199,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12.5,
     fontFamily: fonts.body
-  },
-  gate: {
-    alignItems: "center",
-    gap: 10,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceGlow,
-    padding: 18
-  },
-  gateText: {
-    color: colors.muted,
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    textAlign: "center"
   },
   button: {
     minHeight: 52,

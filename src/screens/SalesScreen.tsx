@@ -20,8 +20,8 @@ import {
   StateText,
   Stepper
 } from "@/components/ui";
-import { api, createAudioForm, type NativeFile } from "@/lib/api";
-import { formatCurrency, formatDate, toNumber } from "@/lib/format";
+import { api, ApiError, createAudioForm, type NativeFile } from "@/lib/api";
+import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { getGreeting } from "@/utils/greeting";
 import { fixProductName } from "@/utils/text";
@@ -561,13 +561,21 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
   const [leftoverUse, setLeftoverUse] = useState<Cart>({});
 
   const startDay = useMutation({
-    mutationFn: (decisoes?: DecisaoSobraRequest[]) =>
-      api.dias.startToday({
-        itens_producao: products
-          .map((produto) => ({ produto_id: produto.id, quantidade_produzida: Number(quantities[produto.id] || 0) }))
-          .filter((item) => item.quantidade_produzida > 0),
-        ...(decisoes ? { decisoes_sobra: decisoes } : {})
-      }),
+    mutationFn: async (decisoes?: DecisaoSobraRequest[]) => {
+      const itens_producao = products
+        .map((produto) => ({ produto_id: produto.id, quantidade_produzida: Number(quantities[produto.id] || 0) }))
+        .filter((item) => item.quantidade_produzida > 0);
+      try {
+        return await api.dias.startToday({ itens_producao, ...(decisoes ? { decisoes_sobra: decisoes } : {}) });
+      } catch (error) {
+        // Backend antigo (produção) ainda não tem "iniciar-hoje": abre o dia
+        // pelo endpoint clássico para não travar a venda.
+        if (error instanceof ApiError && error.status === 404) {
+          return api.dias.create({ data_venda: todayInputValue(), itens_producao });
+        }
+        throw error;
+      }
+    },
     onSuccess: (response) => {
       if ("acao" in response) {
         // Sobrou produto de ontem: o dia só abre depois da escolha.

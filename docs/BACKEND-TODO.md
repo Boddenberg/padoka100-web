@@ -2,6 +2,22 @@
 
 Atualizado em 2026-07-08, depois das levas de auth, perfil, análise IA e custos.
 
+## ⚠️ IMPORTANTE: produção (Railway) está atrás do localhost
+
+O app (Expo Go) aponta por padrão para `https://padoka100-production.up.railway.app`.
+Em 2026-07-08 esse servidor **só tem o conjunto antigo** de endpoints. Faltam em
+produção (dão 404): `auth/*`, `perfil/*`, `ia/analises/*`, `ia/dados-estruturados`,
+`custos/*`, `dias-de-venda/iniciar-hoje`, `dias-de-venda/{id}/correcoes`,
+`relatorios/dias/por-data` e `produtos-venda`.
+
+**Consequência:** criar conta / login / análise IA / correção retroativa só
+funcionam apontando para um servidor com o backend novo (o localhost do dev, via
+Perfil → Conexão → Local + IP da máquina), ou **depois de publicar o backend novo
+no Railway**. O app agora degrada com elegância: abrir o dia cai no endpoint
+clássico, e as telas mostram recado amigável em vez de "not found".
+
+👉 **Ação principal do backend: fazer deploy da versão nova no Railway.**
+
 ## ✅ Pronto no backend e já integrado no app
 
 | Recurso | Endpoint | Como o app usa |
