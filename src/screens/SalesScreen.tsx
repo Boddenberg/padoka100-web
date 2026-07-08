@@ -53,11 +53,26 @@ export function SalesScreen() {
     return map;
   }, [currentDay, resumoQuery.data]);
 
+  // A aba Venda não é catálogo: só entram os produtos que participam do dia.
+  // Quem entrou e esgotou continua na tela; quem nunca entrou não aparece.
+  const dayProducts = useMemo(() => {
+    const participating = new Set<string>();
+    currentDay?.itens_producao?.forEach((item) => {
+      if (item.quantidade_produzida > 0) participating.add(item.produto_id);
+    });
+    resumoQuery.data?.produtos?.forEach((produto) => {
+      if ((produto.quantidade_produzida ?? 0) > 0 || (produto.quantidade_vendida ?? 0) > 0) {
+        participating.add(produto.produto_id);
+      }
+    });
+    return products.filter((produto) => participating.has(produto.id));
+  }, [currentDay, resumoQuery.data, products]);
+
   const filteredProducts = useMemo(() => {
     const term = normalize(search.trim());
-    if (!term) return products;
-    return products.filter((produto) => normalize(produto.nome).includes(term));
-  }, [products, search]);
+    if (!term) return dayProducts;
+    return dayProducts.filter((produto) => normalize(produto.nome).includes(term));
+  }, [dayProducts, search]);
 
   const cartItems = useMemo(
     () =>
@@ -148,7 +163,7 @@ export function SalesScreen() {
 
   return (
     <>
-      <Page title="Venda" subtitle="Toque nos produtos ou fale com o agente.">
+      <Page greeting={getGreeting()} title="Venda" subtitle="Toque nos produtos ou fale com o agente.">
         {loading ? <StateText text="Preparando a venda..." /> : null}
         {error instanceof Error ? <StateText tone="error" text={error.message} /> : null}
         {message ? (
@@ -170,7 +185,6 @@ export function SalesScreen() {
           />
         ) : !loading ? (
           <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-            <Text style={styles.heroGreeting}>{getGreeting()}</Text>
             <Text style={styles.heroTitle}>Bora começar o dia de venda?</Text>
             <Text style={styles.heroMuted}>Registre a produção de hoje e venda com um toque.</Text>
             <Button title="Abrir dia de venda" onPress={() => setSheet("open-day")} />
@@ -216,7 +230,13 @@ export function SalesScreen() {
                 )}
               />
             ) : (
-              <StateText text="Nenhum produto encontrado." />
+              <StateText
+                text={
+                  dayProducts.length
+                    ? "Nenhum produto encontrado."
+                    : "Nenhum produto na venda de hoje. Registre a produção para começar."
+                }
+              />
             )}
           </>
         ) : null}
@@ -291,7 +311,6 @@ function DayHero({
       </View>
 
       <View>
-        <Text style={styles.heroGreeting}>{getGreeting()}</Text>
         <Text style={styles.heroTitle}>{day.nome_local_no_momento || "Venda de hoje"}</Text>
       </View>
 
@@ -397,6 +416,7 @@ function ProductTile({
   onRemove: () => void;
 }) {
   const disabled = !product.preco_atual || available <= 0;
+  const soldOut = available <= 0;
   const remaining = Math.max(0, available - quantity);
 
   return (
@@ -406,6 +426,11 @@ function ProductTile({
         {quantity > 0 ? (
           <View style={styles.productBadge}>
             <Text style={styles.productBadgeText}>{quantity}</Text>
+          </View>
+        ) : null}
+        {soldOut ? (
+          <View style={styles.soldOutOverlay}>
+            <Text style={styles.soldOutText}>Esgotado</Text>
           </View>
         ) : null}
       </View>
@@ -931,11 +956,6 @@ const styles = StyleSheet.create({
     width: 8,
     borderRadius: 4
   },
-  heroGreeting: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 14,
-    fontFamily: fonts.body
-  },
   heroTitle: {
     marginTop: 2,
     color: "#fff",
@@ -1095,6 +1115,22 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontFamily: fonts.display
+  },
+  soldOutOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(51, 35, 26, 0.45)"
+  },
+  soldOutText: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: fonts.bodyBold,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(51, 35, 26, 0.75)",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    overflow: "hidden"
   },
   productBody: {
     gap: 6,

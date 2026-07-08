@@ -29,7 +29,17 @@ export function Screen({ children }: { children: ReactNode }) {
   );
 }
 
-export function Page({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+export function Page({
+  title,
+  subtitle,
+  greeting,
+  children
+}: {
+  title: string;
+  subtitle?: string;
+  greeting?: string;
+  children: ReactNode;
+}) {
   return (
     <Screen>
       <ScrollView
@@ -41,6 +51,7 @@ export function Page({ title, subtitle, children }: { title: string; subtitle?: 
         {/* Tocar em qualquer área vazia fecha o teclado. */}
         <Pressable style={styles.page} onPress={Keyboard.dismiss} accessible={false}>
           <View>
+            {greeting ? <Text style={styles.greeting}>{greeting}</Text> : null}
             <Text style={styles.title}>{title}</Text>
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </View>
@@ -309,6 +320,12 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 16,
     paddingBottom: 132
+  },
+  greeting: {
+    marginBottom: 2,
+    color: colors.brandDeep,
+    fontSize: 17,
+    fontFamily: fonts.bodyBold
   },
   title: {
     color: colors.ink,
