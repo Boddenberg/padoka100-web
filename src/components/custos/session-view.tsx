@@ -191,7 +191,7 @@ function StatusPill({ confirmed }: { confirmed: boolean }) {
   );
 }
 
-export function ReceitaCard({ rascunho, onEdit }: { rascunho: RascunhoCusteio; onEdit: () => void }) {
+export function ReceitaCard({ rascunho, title, onEdit }: { rascunho: RascunhoCusteio; title?: string; onEdit: () => void }) {
   const receita = rascunho.receita;
   const rendimento = receita?.rendimento;
   const hasYield = toNumber(rendimento) > 0;
@@ -202,7 +202,7 @@ export function ReceitaCard({ rascunho, onEdit }: { rascunho: RascunhoCusteio; o
       <Text style={styles.draftEmoji}>🍞</Text>
       <View style={styles.draftBody}>
         <Text style={styles.draftTitle} numberOfLines={2}>
-          {receita?.nome || "Receita"}
+          {title || receita?.nome || "Receita"}
         </Text>
         <Text style={styles.draftSubtitle}>
           {hasYield ? `Rende ${rendimento} ${receita?.unidade_rendimento || "unidades"}` : "Toque para informar quanto rende"}

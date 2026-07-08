@@ -132,11 +132,12 @@ function TextComposerForm({
 }
 
 // ---------------------------------------------------------------------------
-// Edição da receita (nome + rendimento).
+// Edição da receita: só o rendimento. O nome da receita é sempre o do produto.
 // ---------------------------------------------------------------------------
 
 export function ReceitaSheet({
   visible,
+  nomeReceita,
   receita,
   onClose,
   onSave,
@@ -144,6 +145,7 @@ export function ReceitaSheet({
   errorText
 }: {
   visible: boolean;
+  nomeReceita: string;
   receita: ReceitaRascunho | null;
   onClose: () => void;
   onSave: (receita: ReceitaRascunho) => void;
@@ -151,34 +153,37 @@ export function ReceitaSheet({
   errorText: string | null;
 }) {
   return (
-    <Sheet visible={visible} title="Receita" subtitle="Nome e quanto ela rende" onClose={onClose}>
-      {visible ? <ReceitaForm receita={receita} onSave={onSave} pending={pending} errorText={errorText} /> : null}
+    <Sheet visible={visible} title="Rendimento da receita" subtitle="Quantas unidades ela rende" onClose={onClose}>
+      {visible ? (
+        <ReceitaForm nomeReceita={nomeReceita} receita={receita} onSave={onSave} pending={pending} errorText={errorText} />
+      ) : null}
     </Sheet>
   );
 }
 
 function ReceitaForm({
+  nomeReceita,
   receita,
   onSave,
   pending,
   errorText
 }: {
+  nomeReceita: string;
   receita: ReceitaRascunho | null;
   onSave: (receita: ReceitaRascunho) => void;
   pending: boolean;
   errorText: string | null;
 }) {
-  const [nome, setNome] = useState(receita?.nome || "");
   const [rendimento, setRendimento] = useState(receita?.rendimento ? String(receita.rendimento) : "");
   const [unidade, setUnidade] = useState(receita?.unidade_rendimento || "unidade");
   const rendimentoValue = parseDecimalInput(rendimento);
 
   return (
     <>
-      <Field label="Nome da receita">
-        <Input value={nome} onChangeText={setNome} placeholder="Ex: Receita base" />
-      </Field>
-      <Field label="Quantas unidades rende?">
+      <View style={styles.contextRow}>
+        <Text style={styles.contextText}>Receita de {nomeReceita}</Text>
+      </View>
+      <Field label="Quantas unidades essa receita rende?">
         <Input value={rendimento} onChangeText={setRendimento} keyboardType="decimal-pad" placeholder="Ex: 12" />
       </Field>
       <Field label="Rende em">
@@ -194,12 +199,12 @@ function ReceitaForm({
       </Field>
       {errorText ? <StateText tone="error" text={errorText} /> : null}
       <Button
-        title={pending ? "Salvando..." : "Salvar receita"}
+        title={pending ? "Salvando..." : "Salvar rendimento"}
         disabled={pending || rendimentoValue === null || rendimentoValue <= 0}
         onPress={() =>
           onSave({
             ...receita,
-            nome: nome.trim() || "Receita base",
+            nome: nomeReceita,
             rendimento: rendimentoValue,
             unidade_rendimento: unidade,
             status: "CONFIRMADO"

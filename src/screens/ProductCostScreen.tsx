@@ -300,9 +300,10 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   const custosAdicionais = rascunho.custos_adicionais || [];
 
   // Receita e ingredientes vão pelo formulário com finalidade (o backend mescla
-  // por nome e preserva os campos da outra etapa).
+  // por nome e preserva os campos da outra etapa). O nome da receita é sempre
+  // o nome do produto — cada produto tem uma receita só.
   function saveReceita(receita: ReceitaRascunho) {
-    sendForm.mutate({ dados: { receita }, finalidade: "receita" });
+    sendForm.mutate({ dados: { receita: { ...receita, nome: productName } }, finalidade: "receita" });
   }
 
   function saveIngredienteReceita(item: IngredienteRascunho) {
@@ -460,6 +461,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 {phase === "receita" ? (
                   <RecipePhaseBody
                     rascunho={rascunho}
+                    productName={productName}
                     ingredientes={ingredientes}
                     canAdvance={canAdvanceToPrecos}
                     recipeComplete={recipeComplete}
@@ -513,6 +515,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
       />
       <ReceitaSheet
         visible={sheet?.kind === "receita"}
+        nomeReceita={productName}
         receita={rascunho.receita || null}
         onClose={() => setSheet(null)}
         onSave={saveReceita}
@@ -569,6 +572,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
 
 function RecipePhaseBody({
   rascunho,
+  productName,
   ingredientes,
   canAdvance,
   recipeComplete,
@@ -578,6 +582,7 @@ function RecipePhaseBody({
   onAdvance
 }: {
   rascunho: RascunhoCusteio;
+  productName: string;
   ingredientes: IngredienteRascunho[];
   canAdvance: boolean;
   recipeComplete: boolean;
@@ -600,7 +605,7 @@ function RecipePhaseBody({
     <>
       <SectionTitle text="A receita" />
       <Text style={styles.sectionHint}>Aqui vai só o que entra na receita e quanto de cada um. Os preços são a próxima etapa.</Text>
-      <ReceitaCard rascunho={rascunho} onEdit={onEditReceita} />
+      <ReceitaCard rascunho={rascunho} title={productName} onEdit={onEditReceita} />
       {ingredientes.map((ingrediente, index) => (
         <IngredientRow
           key={`${ingrediente.nome || "ingrediente"}-${index}`}
