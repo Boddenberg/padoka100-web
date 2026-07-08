@@ -2,10 +2,24 @@ import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule,
 import { LinearGradient } from "expo-linear-gradient";
 import { Ban, CalendarDays, CheckCircle2, ChevronRight, Mic, ReceiptText, Search, Send, Sparkles } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
-import { Badge, Button, Card, Field, Input, Page, ProductPhoto, Sheet, StateText, Stepper } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  Money,
+  Page,
+  ProductPhoto,
+  Sheet,
+  Skeleton,
+  StateText,
+  Stepper
+} from "@/components/ui";
 import { api, createAudioForm, type NativeFile } from "@/lib/api";
 import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -130,6 +144,13 @@ export function SalesScreen() {
     []
   );
 
+  // O recado de sucesso se despede sozinho.
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(null), 3500);
+    return () => clearTimeout(timer);
+  }, [message]);
+
   function addProduct(produto: Produto) {
     if (!produto.preco_atual || !stockReady) return;
     if (itemCount === 0) armCartBarGuard();
@@ -164,14 +185,22 @@ export function SalesScreen() {
   return (
     <>
       <Page greeting={getGreeting()} title="Venda" subtitle="Toque nos produtos ou fale com o agente.">
-        {loading ? <StateText text="Preparando a venda..." /> : null}
-        {error instanceof Error ? <StateText tone="error" text={error.message} /> : null}
-        {message ? (
-          <View style={styles.toast}>
-            <CheckCircle2 size={20} color={colors.success} />
-            <Text style={styles.toastText}>{message}</Text>
+        {loading ? (
+          <View style={styles.skeletonStack}>
+            <Skeleton height={210} rounded={radius.xl} />
+            <Skeleton height={130} rounded={radius.xl} />
+            <View style={styles.skeletonRow}>
+              <View style={styles.skeletonTile}>
+                <Skeleton height={215} rounded={radius.xl} />
+              </View>
+              <View style={styles.skeletonTile}>
+                <Skeleton height={215} rounded={radius.xl} />
+              </View>
+            </View>
           </View>
         ) : null}
+        {error instanceof Error ? <StateText tone="error" text={error.message} /> : null}
+        {message ? <SuccessToast message={message} /> : null}
 
         {currentDay ? (
           <DayHero
@@ -185,6 +214,8 @@ export function SalesScreen() {
           />
         ) : !loading ? (
           <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+            <View pointerEvents="none" style={styles.heroGlowOne} />
+            <View pointerEvents="none" style={styles.heroGlowTwo} />
             <Text style={styles.heroTitle}>Bora começar o dia de venda?</Text>
             <Text style={styles.heroMuted}>Registre a produção de hoje e venda com um toque.</Text>
             <Button title="Abrir dia de venda" onPress={() => setSheet("open-day")} />
@@ -230,12 +261,10 @@ export function SalesScreen() {
                 )}
               />
             ) : (
-              <StateText
-                text={
-                  dayProducts.length
-                    ? "Nenhum produto encontrado."
-                    : "Nenhum produto na venda de hoje. Registre a produção para começar."
-                }
+              <EmptyState
+                emoji="🧺"
+                title={dayProducts.length ? "Nenhum produto encontrado" : "Nenhum produto na venda de hoje"}
+                hint={dayProducts.length ? "Tente outro nome na busca." : "Registre a produção para começar a vender."}
               />
             )}
           </>
@@ -299,6 +328,8 @@ function DayHero({
 
   return (
     <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <View pointerEvents="none" style={styles.heroGlowOne} />
+      <View pointerEvents="none" style={styles.heroGlowTwo} />
       <View style={styles.heroTopRow}>
         <View style={styles.heroPill}>
           <View style={[styles.dot, { backgroundColor: isOpen ? "#4ade80" : "#fbbf24" }]} />
@@ -316,7 +347,9 @@ function DayHero({
 
       <View>
         <Text style={styles.heroMuted}>Vendas de hoje</Text>
-        <Text style={styles.heroRevenue}>{formatCurrency(revenue)}</Text>
+        <View style={styles.heroRevenueRow}>
+          <Money value={revenue} size={38} color="#fff" prefixColor="rgba(255,255,255,0.75)" />
+        </View>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
@@ -331,6 +364,30 @@ function DayHero({
         {isOpen ? <HeroChip label="Fechar dia" onPress={onClose} /> : null}
       </View>
     </LinearGradient>
+  );
+}
+
+// Recado de sucesso que entra deslizando e some sozinho.
+function SuccessToast({ message }: { message: string }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(anim, { toValue: 1, friction: 7, useNativeDriver: true }).start();
+  }, [anim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.toast,
+        {
+          opacity: anim,
+          transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) }]
+        }
+      ]}
+    >
+      <CheckCircle2 size={20} color={colors.success} />
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
   );
 }
 
@@ -930,7 +987,40 @@ const styles = StyleSheet.create({
     gap: 16,
     borderRadius: radius.xl,
     padding: 20,
+    overflow: "hidden",
     ...shadows.floating
+  },
+  // Círculos de luz no gradiente: profundidade sem pesar.
+  heroGlowOne: {
+    position: "absolute",
+    top: -70,
+    right: -50,
+    height: 200,
+    width: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(255,255,255,0.14)"
+  },
+  heroGlowTwo: {
+    position: "absolute",
+    bottom: -90,
+    left: -60,
+    height: 220,
+    width: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(255,255,255,0.08)"
+  },
+  heroRevenueRow: {
+    marginVertical: 4
+  },
+  skeletonStack: {
+    gap: 16
+  },
+  skeletonRow: {
+    flexDirection: "row",
+    gap: 12
+  },
+  skeletonTile: {
+    flex: 1
   },
   heroTopRow: {
     flexDirection: "row",
@@ -1173,7 +1263,8 @@ const styles = StyleSheet.create({
   cartBar: {
     position: "absolute",
     right: 16,
-    bottom: 20,
+    // Acima da tab bar flutuante.
+    bottom: 94,
     left: 16,
     flexDirection: "row",
     alignItems: "center",

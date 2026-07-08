@@ -2,11 +2,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BarChart3 } from "lucide-react-native";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Card } from "@/components/ui";
+import { Card, EmptyState, Skeleton } from "@/components/ui";
 import { formatWholeCurrency, toNumber } from "@/lib/format";
-import { colors, fonts, gradients, radius } from "@/lib/theme";
+import { colors, fonts, gradients } from "@/lib/theme";
 import { addDays, diffDays, monthName, weekdayOf } from "@/utils/dates";
 import type { ResumoDoDia } from "@/types/api";
+
+// Alturas variadas para o esqueleto do gráfico enquanto os dados chegam.
+const SKELETON_HEIGHTS = [58, 96, 42, 118, 74, 128, 62];
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const CHART_HEIGHT = 130;
@@ -28,12 +31,14 @@ export function PeriodChart({
   dias,
   start,
   end,
-  today
+  today,
+  loading
 }: {
   dias: ResumoDoDia[] | undefined;
   start: string;
   end: string;
   today: string;
+  loading?: boolean;
 }) {
   const revenueByDay = useMemo(() => {
     const map: Record<string, number> = {};
@@ -113,13 +118,26 @@ export function PeriodChart({
         <Text style={styles.title}>Gráfico de vendas</Text>
       </View>
 
-      {total > 0 ? (
+      {loading ? (
+        <View style={styles.chartArea}>
+          {SKELETON_HEIGHTS.map((height, index) => (
+            <View key={`skeleton-${index}`} style={styles.column}>
+              <View style={styles.barTrack}>
+                <Skeleton height={height} width="78%" rounded={7} />
+              </View>
+              <Skeleton height={12} width="70%" rounded={6} />
+            </View>
+          ))}
+        </View>
+      ) : total > 0 ? (
         <View style={styles.chartArea}>
           {bars.map((bar) => (
             <View key={bar.key} style={styles.column}>
               {/* Valor e barra na mesma pilha, alinhados pela base: o número
                   acompanha a altura da própria barra. */}
               <View style={styles.barTrack}>
+                {/* Trilho suave ao fundo mostra até onde a barra podia ir. */}
+                <View pointerEvents="none" style={styles.rail} />
                 {bar.value > 0 ? (
                   <Text
                     style={[styles.barValue, compact && styles.barValueCompact]}
@@ -148,10 +166,7 @@ export function PeriodChart({
           ))}
         </View>
       ) : (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyEmoji}>🥖</Text>
-          <Text style={styles.emptyText}>Nenhuma venda registrada nesse período.</Text>
-        </View>
+        <EmptyState title="Nenhuma venda nesse período" hint="Escolha outro período no calendário acima." />
       )}
     </Card>
   );
@@ -186,6 +201,14 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 3
   },
+  rail: {
+    position: "absolute",
+    bottom: 0,
+    height: CHART_HEIGHT,
+    width: "78%",
+    borderRadius: 7,
+    backgroundColor: colors.surfaceGlow
+  },
   bar: {
     width: "78%",
     borderTopLeftRadius: 7,
@@ -219,21 +242,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 11,
     fontFamily: fonts.body
-  },
-  emptyBox: {
-    alignItems: "center",
-    gap: 6,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceGlow,
-    padding: 22
-  },
-  emptyEmoji: {
-    fontSize: 30
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 14,
-    fontFamily: fonts.bodyBold,
-    textAlign: "center"
   }
 });

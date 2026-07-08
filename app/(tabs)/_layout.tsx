@@ -9,16 +9,24 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.brandDeep,
         tabBarInactiveTintColor: colors.muted,
+        // Tab bar flutuante estilo "ilha": descolada do rodapé, cantos
+        // redondos e sombra suave — o conteúdo passa por baixo.
         tabBarStyle: {
-          minHeight: 72,
+          position: "absolute",
+          left: 14,
+          right: 14,
+          bottom: 12,
+          minHeight: 68,
           paddingTop: 8,
+          paddingBottom: 8,
           borderTopWidth: 0,
+          borderRadius: 28,
           backgroundColor: colors.surface,
           shadowColor: "#4a2c12",
-          shadowOpacity: 0.1,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: -6 },
-          elevation: 14
+          shadowOpacity: 0.16,
+          shadowRadius: 22,
+          shadowOffset: { width: 0, height: 10 },
+          elevation: 16
         },
         tabBarLabelStyle: {
           fontSize: 12,

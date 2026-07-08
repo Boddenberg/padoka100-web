@@ -6,7 +6,7 @@ import { RangeCalendar } from "@/components/calendar";
 import { AiAnalysisCard } from "@/components/resumo/ai-analysis";
 import { DaySummarySheet } from "@/components/resumo/day-summary-sheet";
 import { PeriodChart } from "@/components/resumo/period-chart";
-import { Badge, Card, Page, SectionTitle, StateText } from "@/components/ui";
+import { Badge, Card, Money, Page, SectionTitle, Skeleton, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, formatWholeCurrency, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
@@ -72,11 +72,20 @@ export function SummaryScreen() {
             <TrendingUp size={20} color={colors.brandDeep} />
             <Text style={styles.revenueLabel}>Faturamento do período</Text>
           </View>
-          {periodQuery.isLoading ? <StateText text="Somando as vendas..." /> : null}
+          {periodQuery.isLoading ? (
+            <>
+              <Skeleton height={44} width="65%" rounded={radius.md} />
+              <View style={styles.metricsGrid}>
+                <Skeleton height={64} rounded={radius.md} style={styles.metricSkeleton} />
+                <Skeleton height={64} rounded={radius.md} style={styles.metricSkeleton} />
+                <Skeleton height={64} rounded={radius.md} style={styles.metricSkeleton} />
+              </View>
+            </>
+          ) : null}
           {periodQuery.error instanceof Error ? <StateText tone="error" text={periodQuery.error.message} /> : null}
           {totals ? (
             <>
-              <Text style={styles.total}>{formatCurrency(totals.faturamento_bruto)}</Text>
+              <Money value={totals.faturamento_bruto} size={40} />
               <Badge text={periodLabel} tone="good" />
               <ComparisonLine
                 total={toNumber(totals.faturamento_bruto)}
@@ -124,7 +133,7 @@ export function SummaryScreen() {
         </Card>
 
         {/* 3. Gráfico de vendas do período selecionado. */}
-        <PeriodChart dias={totals?.dias} start={start} end={end} today={today} />
+        <PeriodChart dias={totals?.dias} start={start} end={end} today={today} loading={periodQuery.isLoading} />
 
         {/* 4. Análise com IA do período selecionado. */}
         <AiAnalysisCard start={start} end={end} />
@@ -248,11 +257,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fonts.bodyBold
   },
-  total: {
-    color: colors.ink,
-    fontSize: 40,
-    fontFamily: fonts.display,
-    letterSpacing: -1
+  metricSkeleton: {
+    flex: 1
   },
   comparisonRow: {
     flexDirection: "row",

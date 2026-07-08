@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { EditDayFlow } from "@/components/resumo/edit-day-flow";
-import { Badge, Button, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
+import { Badge, Button, Money, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { colors, fonts, radius } from "@/lib/theme";
@@ -80,7 +80,7 @@ export function DaySummarySheet({
 
           <View style={styles.revenueBox}>
             <Text style={styles.revenueLabel}>Faturamento</Text>
-            <Text style={styles.revenueValue}>{formatCurrency(resumo.faturamento_bruto)}</Text>
+            <Money value={resumo.faturamento_bruto} size={32} />
           </View>
 
           <View style={styles.metricsGrid}>
@@ -194,12 +194,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     fontFamily: fonts.bodyBold
-  },
-  revenueValue: {
-    color: colors.ink,
-    fontSize: 32,
-    fontFamily: fonts.display,
-    letterSpacing: -0.8
   },
   metricsGrid: {
     flexDirection: "row",

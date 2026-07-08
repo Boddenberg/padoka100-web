@@ -1,8 +1,9 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { Minus, Plus, X } from "lucide-react-native";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
+  Animated,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -13,11 +14,14 @@ import {
   Text,
   TextInput,
   View,
+  type DimensionValue,
   type StyleProp,
-  type TextInputProps,
-  type ViewStyle
+  type TextStyle,
+  type ViewStyle,
+  type TextInputProps
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { formatCurrency } from "@/lib/format";
 import { resolveMediaUrl } from "@/lib/settings";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 
@@ -156,7 +160,99 @@ export function StateText({ text, tone = "muted" }: { text: string; tone?: "mute
 }
 
 export function SectionTitle({ text }: { text: string }) {
-  return <Text style={styles.sectionTitle}>{text}</Text>;
+  return (
+    <View style={styles.sectionTitleRow}>
+      <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.sectionTick} />
+      <Text style={styles.sectionTitle}>{text}</Text>
+    </View>
+  );
+}
+
+// Bloco pulsante usado enquanto os dados chegam: app parece vivo, não travado.
+export function Skeleton({
+  height = 16,
+  width = "100%",
+  rounded = radius.md,
+  style
+}: {
+  height?: number;
+  width?: DimensionValue;
+  rounded?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const opacity = useRef(new Animated.Value(0.45)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 650, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.45, duration: 650, useNativeDriver: true })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={[{ height, width, borderRadius: rounded, backgroundColor: colors.border, opacity }, style]}
+    />
+  );
+}
+
+// Dinheiro com cara de app financeiro: "R$" pequeno e discreto,
+// número grande em destaque.
+export function Money({
+  value,
+  size = 36,
+  color = colors.ink,
+  prefixColor = colors.muted
+}: {
+  value: string | number | null | undefined;
+  size?: number;
+  color?: string;
+  prefixColor?: string;
+}) {
+  const formatted = formatCurrency(value);
+  // Intl separa "R$" do número com espaço comum ou não separável.
+  const [prefix, ...rest] = formatted.split(/[   ]/);
+  const amount = rest.join(" ") || formatted;
+
+  const prefixStyle: TextStyle = {
+    color: prefixColor,
+    fontSize: Math.round(size * 0.42),
+    fontFamily: fonts.bodyBold,
+    marginBottom: Math.round(size * 0.14)
+  };
+  const amountStyle: TextStyle = {
+    color,
+    fontSize: size,
+    fontFamily: fonts.display,
+    letterSpacing: -1,
+    lineHeight: Math.round(size * 1.08)
+  };
+
+  return (
+    <View style={styles.moneyRow}>
+      <Text style={prefixStyle}>{prefix}</Text>
+      <Text style={amountStyle} numberOfLines={1} adjustsFontSizeToFit>
+        {amount}
+      </Text>
+    </View>
+  );
+}
+
+// Estado vazio simpático e consistente: emoji num círculo quente + recado.
+export function EmptyState({ emoji = "🥖", title, hint }: { emoji?: string; title: string; hint?: string }) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyEmojiCircle}>
+        <Text style={styles.emptyEmoji}>{emoji}</Text>
+      </View>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      {hint ? <Text style={styles.emptyHint}>{hint}</Text> : null}
+    </View>
+  );
 }
 
 export function Badge({ text, tone = "neutral" }: { text: string; tone?: "neutral" | "good" | "warn" | "danger" | "agent" }) {
@@ -319,7 +415,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: 16,
     padding: 16,
-    paddingBottom: 132
+    // Espaço para o conteúdo respirar acima da tab bar flutuante.
+    paddingBottom: 172
   },
   greeting: {
     marginBottom: 2,
@@ -399,11 +496,56 @@ const styles = StyleSheet.create({
   successText: {
     color: colors.success
   },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  sectionTick: {
+    height: 18,
+    width: 4,
+    borderRadius: 2
+  },
   sectionTitle: {
     color: colors.ink,
     fontSize: 20,
     fontFamily: fonts.display,
     letterSpacing: -0.3
+  },
+  moneyRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 4
+  },
+  emptyState: {
+    alignItems: "center",
+    gap: 8,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceGlow,
+    padding: 24
+  },
+  emptyEmojiCircle: {
+    height: 60,
+    width: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 30,
+    backgroundColor: colors.surfaceWarm
+  },
+  emptyEmoji: {
+    fontSize: 28
+  },
+  emptyTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold,
+    textAlign: "center"
+  },
+  emptyHint: {
+    color: colors.muted,
+    fontSize: 13,
+    fontFamily: fonts.body,
+    textAlign: "center"
   },
   badge: {
     alignSelf: "flex-start",
