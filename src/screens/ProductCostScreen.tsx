@@ -187,6 +187,18 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     }
   });
 
+  // Formulários manuais também carregam a finalidade da etapa (receita/compras),
+  // como o contrato pede: o backend mescla por nome e não mistura receita com
+  // preço. Enviamos só os campos daquela etapa.
+  const sendForm = useMutation({
+    mutationFn: ({ dados, finalidade }: { dados: Record<string, unknown>; finalidade: "receita" | "compras" | "completo" }) =>
+      api.custos.assistente.enviarFormulario(sid || "", dados, finalidade),
+    onSuccess: (response) => {
+      applySession(response);
+      setSheet(null);
+    }
+  });
+
   const confirmSession = useMutation({
     mutationFn: (atualizarPreco: boolean) =>
       api.custos.assistente.confirmar(sid || "", {
@@ -287,15 +299,18 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   const ingredientes = rascunho.ingredientes || [];
   const custosAdicionais = rascunho.custos_adicionais || [];
 
+  // Receita e ingredientes vão pelo formulário com finalidade (o backend mescla
+  // por nome e preserva os campos da outra etapa).
   function saveReceita(receita: ReceitaRascunho) {
-    patchDraft.mutate({ rascunho: { receita }, observacao: "Usuário ajustou a receita pela tela" });
+    sendForm.mutate({ dados: { receita }, finalidade: "receita" });
   }
 
-  function saveIngrediente(index: number | null, item: IngredienteRascunho) {
-    const list = [...ingredientes];
-    if (index === null) list.push(item);
-    else list[index] = item;
-    patchDraft.mutate({ rascunho: { ingredientes: list }, observacao: "Usuário ajustou ingredientes pela tela" });
+  function saveIngredienteReceita(item: IngredienteRascunho) {
+    sendForm.mutate({ dados: { ingredientes: [item] }, finalidade: "receita" });
+  }
+
+  function saveIngredientePreco(item: IngredienteRascunho) {
+    sendForm.mutate({ dados: { ingredientes: [item] }, finalidade: "compras" });
   }
 
   function removeIngrediente(index: number) {
@@ -322,7 +337,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   const perguntas = guidedItems(session?.perguntas);
   const pendencias = guidedItems(session?.pendencias);
   const avisos = guidedItems(session?.avisos);
-  const thinking = sendText.isPending || sendFile.isPending || patchDraft.isPending;
+  const thinking = sendText.isPending || sendFile.isPending || patchDraft.isPending || sendForm.isPending;
   // Estado de envio por tipo: a foto mostra "Enviando" no botão de foto, não no
   // microfone (era o que confundia).
   const audioUploading = sendFile.isPending && sendFile.variables?.tipo === "audio";
@@ -331,6 +346,8 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   const rendimentoOk = toNumber(rascunho.receita?.rendimento) > 0;
   const recipeReadyCount = ingredientes.filter(hasRecipeData).length;
   const canAdvanceToPrecos = rendimentoOk && recipeReadyCount > 0;
+  // Receita "completa": rendimento + todos os ingredientes com quantidade usada.
+  const recipeComplete = rendimentoOk && ingredientes.length > 0 && ingredientes.every(hasRecipeData);
   const missingPrices = missingPurchaseCount(ingredientes);
   const incompleteHint =
     missingPrices > 0
@@ -412,6 +429,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 precoVenda={precoVenda}
                 incompleteHint={incompleteHint}
                 pendencias={pendencias}
+                avisos={avisos}
                 restartPending={restartSession.isPending}
                 restartError={restartSession.error instanceof Error ? restartSession.error.message : null}
                 onConfirm={() => setSheet({ kind: "confirmar" })}
@@ -422,10 +440,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
             ) : (
               <>
                 <PhaseHeader phase={phase} message={agentMessage} thinking={thinking && !sheet} />
-
-                {phase === "precos" && rascunho.receita ? (
-                  <RecipeRecap receita={rascunho.receita} onEdit={() => setSheet({ kind: "receita" })} />
-                ) : null}
 
                 <InputMethods
                   phase={phase}
@@ -442,13 +456,13 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 {perguntas.map((pergunta) => (
                   <QuestionCard key={pergunta} question={pergunta} onAnswer={() => setSheet({ kind: "texto", pergunta })} />
                 ))}
-                <NoticeStack items={pendencias} tone="danger" />
 
                 {phase === "receita" ? (
                   <RecipePhaseBody
                     rascunho={rascunho}
                     ingredientes={ingredientes}
                     canAdvance={canAdvanceToPrecos}
+                    recipeComplete={recipeComplete}
                     onEditReceita={() => setSheet({ kind: "receita" })}
                     onEditIngrediente={(index) => setSheet({ kind: "ingrediente-receita", index })}
                     onAddIngrediente={() => setSheet({ kind: "ingrediente-receita", index: null })}
@@ -458,7 +472,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                   <PricePhaseBody
                     ingredientes={ingredientes}
                     custosAdicionais={custosAdicionais}
-                    avisos={avisos}
                     custoSimulado={session?.custo_simulado || null}
                     precoVenda={precoVenda}
                     incompleteHint={incompleteHint}
@@ -503,8 +516,8 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
         receita={rascunho.receita || null}
         onClose={() => setSheet(null)}
         onSave={saveReceita}
-        pending={patchDraft.isPending}
-        errorText={patchDraft.error instanceof Error ? patchDraft.error.message : null}
+        pending={sendForm.isPending}
+        errorText={sendForm.error instanceof Error ? sendForm.error.message : null}
       />
       <IngredienteSheet
         visible={sheet?.kind === "ingrediente-receita" || sheet?.kind === "ingrediente-preco"}
@@ -515,17 +528,18 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
             : null
         }
         onClose={() => setSheet(null)}
-        onSave={(item) =>
-          saveIngrediente(
-            (sheet?.kind === "ingrediente-receita" || sheet?.kind === "ingrediente-preco") ? sheet.index : null,
-            item
-          )
-        }
+        onSave={(item) => (sheet?.kind === "ingrediente-preco" ? saveIngredientePreco(item) : saveIngredienteReceita(item))}
         onRemove={
           sheet?.kind === "ingrediente-receita" && sheet.index !== null ? () => removeIngrediente(sheet.index as number) : null
         }
-        pending={patchDraft.isPending}
-        errorText={patchDraft.error instanceof Error ? patchDraft.error.message : null}
+        pending={sendForm.isPending || patchDraft.isPending}
+        errorText={
+          sendForm.error instanceof Error
+            ? sendForm.error.message
+            : patchDraft.error instanceof Error
+              ? patchDraft.error.message
+              : null
+        }
       />
       <ExtraCostSheet
         visible={sheet?.kind === "extra"}
@@ -557,6 +571,7 @@ function RecipePhaseBody({
   rascunho,
   ingredientes,
   canAdvance,
+  recipeComplete,
   onEditReceita,
   onEditIngrediente,
   onAddIngrediente,
@@ -565,6 +580,7 @@ function RecipePhaseBody({
   rascunho: RascunhoCusteio;
   ingredientes: IngredienteRascunho[];
   canAdvance: boolean;
+  recipeComplete: boolean;
   onEditReceita: () => void;
   onEditIngrediente: (index: number) => void;
   onAddIngrediente: () => void;
@@ -595,15 +611,25 @@ function RecipePhaseBody({
       ))}
       <AddRowButton label="Adicionar ingrediente" onPress={onAddIngrediente} />
 
+      {/* Tudo pronto: chamada clara e verde para seguir. */}
+      {recipeComplete ? (
+        <View style={styles.readyCallout}>
+          <Text style={styles.readyEmoji}>✅</Text>
+          <Text style={styles.readyText}>Receita completa! Agora é só passar para os preços.</Text>
+        </View>
+      ) : null}
+
       <Button
         title="Avançar para os preços"
-        tone="agent"
+        tone={recipeComplete ? "success" : "agent"}
         icon={<ArrowRight size={18} color={canAdvance ? "#fff" : colors.muted} />}
         disabled={!canAdvance}
         onPress={onAdvance}
       />
       {!canAdvance ? (
         <Text style={styles.gateHint}>Informe o rendimento e ao menos um ingrediente para avançar.</Text>
+      ) : !recipeComplete ? (
+        <Text style={styles.gateHint}>Você pode completar os itens em laranja ou seguir para os preços.</Text>
       ) : null}
     </>
   );
@@ -613,28 +639,9 @@ function RecipePhaseBody({
 // Etapa 2 — Preços: quanto comprou e pagou de cada item + custos extras.
 // ---------------------------------------------------------------------------
 
-// Receita fixada no topo da etapa de preços: o usuário vê o que está precificando.
-function RecipeRecap({ receita, onEdit }: { receita: ReceitaRascunho; onEdit: () => void }) {
-  return (
-    <Pressable onPress={onEdit} style={({ pressed }) => [styles.recipeRecap, shadows.soft, pressed && styles.pressed]}>
-      <Text style={styles.recipeRecapEmoji}>🍞</Text>
-      <View style={styles.recipeRecapBody}>
-        <Text style={styles.recipeRecapText} numberOfLines={1}>
-          {receita.nome || "Receita"}
-        </Text>
-        <Text style={styles.recipeRecapSub}>
-          rende {receita.rendimento || "?"} {receita.unidade_rendimento || "un"}
-        </Text>
-      </View>
-      <Text style={styles.recipeRecapEdit}>editar</Text>
-    </Pressable>
-  );
-}
-
 function PricePhaseBody({
   ingredientes,
   custosAdicionais,
-  avisos,
   custoSimulado,
   precoVenda,
   incompleteHint,
@@ -646,7 +653,6 @@ function PricePhaseBody({
 }: {
   ingredientes: IngredienteRascunho[];
   custosAdicionais: CustoAdicionalRascunho[];
-  avisos: string[];
   custoSimulado: SessaoCusteio["custo_simulado"];
   precoVenda: number | null;
   incompleteHint?: string;
@@ -676,8 +682,6 @@ function PricePhaseBody({
       ))}
       <AddRowButton label="Adicionar embalagem, gás..." onPress={onAddExtra} />
 
-      <NoticeStack items={avisos} tone="warn" />
-
       {custoSimulado ? <CostSummaryCard custo={custoSimulado} precoVenda={precoVenda} incompleteHint={incompleteHint} /> : null}
 
       <Button title="Ver o resultado" tone="agent" icon={<ArrowRight size={18} color="#fff" />} onPress={onSeeResult} />
@@ -700,6 +704,7 @@ function ResultPhase({
   precoVenda,
   incompleteHint,
   pendencias,
+  avisos,
   restartPending,
   restartError,
   onConfirm,
@@ -713,6 +718,7 @@ function ResultPhase({
   precoVenda: number | null;
   incompleteHint?: string;
   pendencias: string[];
+  avisos: string[];
   restartPending: boolean;
   restartError: string | null;
   onConfirm: () => void;
@@ -746,6 +752,8 @@ function ResultPhase({
       {session?.custo_simulado ? (
         <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} incompleteHint={incompleteHint} />
       ) : null}
+
+      <NoticeStack items={avisos} tone="warn" />
 
       {podeConfirmar ? (
         <Button title="Confirmar custo" tone="success" icon={<BadgeCheck size={18} color="#fff" />} onPress={onConfirm} />
@@ -1218,36 +1226,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     textAlign: "center"
   },
-  recipeRecap: {
+  readyCallout: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.successSoft,
     paddingHorizontal: 14,
     paddingVertical: 12
   },
-  recipeRecapEmoji: {
-    fontSize: 24
+  readyEmoji: {
+    fontSize: 20
   },
-  recipeRecapBody: {
-    flex: 1
-  },
-  recipeRecapText: {
-    color: colors.ink,
-    fontSize: 15.5,
-    fontFamily: fonts.bodyBold
-  },
-  recipeRecapSub: {
-    color: colors.muted,
-    fontSize: 13,
-    fontFamily: fonts.body
-  },
-  recipeRecapEdit: {
-    color: colors.brandDeep,
-    fontSize: 13,
+  readyText: {
+    flex: 1,
+    color: colors.success,
+    fontSize: 14.5,
     fontFamily: fonts.bodyBold
   },
   backLinkRow: {

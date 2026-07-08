@@ -274,15 +274,22 @@ function IngredienteForm({
     ingrediente?.preco_total !== null && ingrediente?.preco_total !== undefined ? String(ingrediente.preco_total) : ""
   );
 
+  // Editando um item existente: o nome fica travado (o backend mescla por nome),
+  // então evitamos criar duplicata por digitação diferente.
+  const editing = Boolean(ingrediente?.nome);
+
   // Etapa RECEITA: só nome + quanto usa. Nada de preço, para não misturar.
   if (mode === "receita") {
     const usada = parseDecimalInput(quantidadeUsada);
-    const canSave = Boolean(nome.trim()) && usada !== null && usada > 0;
+    const effectiveNome = editing ? ingrediente?.nome || "" : nome.trim();
+    const canSave = Boolean(effectiveNome) && usada !== null && usada > 0;
     return (
       <>
-        <Field label="Ingrediente">
-          <Input value={nome} onChangeText={setNome} placeholder="Ex: Farinha de trigo" />
-        </Field>
+        {editing ? null : (
+          <Field label="Ingrediente">
+            <Input value={nome} onChangeText={setNome} placeholder="Ex: Farinha de trigo" />
+          </Field>
+        )}
         <Field label="Quantidade usada na receita">
           <Input value={quantidadeUsada} onChangeText={setQuantidadeUsada} keyboardType="decimal-pad" placeholder="Ex: 800" />
         </Field>
@@ -293,8 +300,7 @@ function IngredienteForm({
           disabled={pending || !canSave}
           onPress={() =>
             onSave({
-              ...ingrediente,
-              nome: nome.trim(),
+              nome: effectiveNome,
               quantidade_usada: usada,
               unidade_usada: unidadeUsada,
               status: "CONFIRMADO"
@@ -312,6 +318,7 @@ function IngredienteForm({
   }
 
   // Etapa PREÇOS: mostra o uso na receita como contexto e pede só a compra.
+  // Envia só os dados de compra (o nome casa com o item pela mescla do backend).
   const usadaContexto = recipeUsageText(ingrediente || {});
   const comprada = parseDecimalInput(quantidadeComprada);
   const preco = parseDecimalInput(precoTotal);
@@ -336,7 +343,7 @@ function IngredienteForm({
         disabled={pending || !canSave}
         onPress={() =>
           onSave({
-            ...ingrediente,
+            nome: ingrediente?.nome,
             quantidade_comprada: comprada,
             unidade_compra: unidadeCompra,
             preco_total: preco,
