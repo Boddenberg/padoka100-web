@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import { Camera, ChevronRight, Images, MapPin } from "lucide-react-native";
+import { Camera, ChevronRight, Images, MapPin, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -71,11 +71,32 @@ export function CatalogScreen() {
   const editingLocation = locationsQuery.data?.find((local) => local.id === editingLocal?.id) || editingLocal;
   const activeProducts = productsQuery.data?.filter((produto) => produto.situacao === "ativo") || [];
   const inactiveProducts = productsQuery.data?.filter((produto) => produto.situacao !== "ativo") || [];
+  const activeLocations = locationsQuery.data?.filter((local) => local.situacao === "ativo") || [];
+  const inactiveLocations = locationsQuery.data?.filter((local) => local.situacao !== "ativo") || [];
 
   const openProduct = (produto: Produto) => {
     setEditing(produto);
     setSheet("edit");
   };
+
+  const locationRow = (local: LocalVenda) => (
+    <Pressable
+      key={local.id}
+      onPress={() => {
+        setEditingLocal(local);
+        setSheet("edit-location");
+      }}
+      style={({ pressed }) => [styles.productRow, shadows.soft, pressed && styles.pressed]}
+    >
+      <LocationPhoto url={local.url_imagem_principal} size={62} />
+      <View style={styles.productInfo}>
+        <Text style={styles.productTitle}>{local.nome}</Text>
+        {local.endereco_texto ? <Text style={styles.locationAddress}>{local.endereco_texto}</Text> : null}
+        <Badge text={local.situacao} tone={local.situacao === "ativo" ? "good" : "warn"} />
+      </View>
+      <ChevronRight size={20} color={colors.muted} />
+    </Pressable>
+  );
 
   const productRow = (produto: Produto) => (
     <Pressable
@@ -112,30 +133,21 @@ export function CatalogScreen() {
 
         <SectionTitle text="Locais" />
         {locationsQuery.error instanceof Error ? <StateText tone="error" text={locationsQuery.error.message} /> : null}
-        {locationsQuery.data?.map((local) => (
-          <Pressable
-            key={local.id}
-            onPress={() => {
-              setEditingLocal(local);
-              setSheet("edit-location");
-            }}
-            style={({ pressed }) => [styles.productRow, shadows.soft, pressed && styles.pressed]}
-          >
-            <LocationPhoto url={local.url_imagem_principal} size={62} />
-            <View style={styles.productInfo}>
-              <Text style={styles.productTitle}>{local.nome}</Text>
-              {local.endereco_texto ? <Text style={styles.locationAddress}>{local.endereco_texto}</Text> : null}
-              <Badge text={local.situacao} tone={local.situacao === "ativo" ? "good" : "warn"} />
-            </View>
-            <ChevronRight size={20} color={colors.muted} />
-          </Pressable>
-        ))}
+        {activeLocations.map(locationRow)}
 
         {inactiveProducts.length > 0 ? (
           <>
             <SectionTitle text="Produtos inativos" />
             <StateText text="Excluídos do catálogo. Toque para reativar." />
             {inactiveProducts.map(productRow)}
+          </>
+        ) : null}
+
+        {inactiveLocations.length > 0 ? (
+          <>
+            <SectionTitle text="Locais inativos" />
+            <StateText text="Excluídos da lista. Toque para reativar." />
+            {inactiveLocations.map(locationRow)}
           </>
         ) : null}
       </Page>
@@ -282,6 +294,14 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
     }
   });
 
+  const removePhoto = useMutation({
+    mutationFn: () => api.produtos.update(product.id, { url_imagem_principal: null }),
+    onSuccess: () => {
+      setPhotoUrl(null);
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+    }
+  });
+
   return (
     <>
       <View style={styles.editHeader}>
@@ -293,9 +313,20 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
       </View>
 
       <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
+      {photoUrl ? (
+        <RemovePhotoLink
+          pending={removePhoto.isPending}
+          onPress={() =>
+            confirmDestructive("Remover foto", "O produto fica sem foto até você enviar outra.", "Remover", () =>
+              removePhoto.mutate()
+            )
+          }
+        />
+      ) : null}
       {uploadMedia.isPending ? <StateText text="Enviando foto..." /> : null}
       {uploadMedia.isSuccess && uploadMedia.data ? <StateText tone="success" text="Foto atualizada!" /> : null}
       {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
+      {removePhoto.error instanceof Error ? <StateText tone="error" text={removePhoto.error.message} /> : null}
 
       <Field label="Nome">
         <Input value={nome} onChangeText={setNome} />
@@ -361,6 +392,16 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
         />
       </View>
     </>
+  );
+}
+
+// Link discreto de tirar a foto atual, sempre logo abaixo dos botões de foto.
+function RemovePhotoLink({ onPress, pending }: { onPress: () => void; pending?: boolean }) {
+  return (
+    <Pressable onPress={pending ? undefined : onPress} style={({ pressed }) => [styles.removePhoto, pressed && styles.pressed]}>
+      <Trash2 size={16} color={colors.danger} />
+      <Text style={styles.removePhotoText}>{pending ? "Removendo foto..." : "Remover foto"}</Text>
+    </Pressable>
   );
 }
 
@@ -456,6 +497,7 @@ function LocationSheet({ visible, onClose }: { visible: boolean; onClose: () => 
         </View>
       </View>
       <PhotoPickerButtons onPick={choosePhoto} disabled={createLocation.isPending} />
+      {photo ? <RemovePhotoLink onPress={() => setPhoto(null)} /> : null}
       {photoError ? <StateText tone="error" text={photoError} /> : null}
 
       <Field label="Nome">
@@ -523,6 +565,23 @@ function EditLocationForm({ onClose, location }: { onClose: () => void; location
     }
   });
 
+  const removePhoto = useMutation({
+    mutationFn: () => api.locais.update(location.id, { url_imagem_principal: null }),
+    onSuccess: () => {
+      setPhotoUrl(null);
+      queryClient.invalidateQueries({ queryKey: ["locais"] });
+    }
+  });
+
+  // "Excluir" preserva o histórico dos dias de venda: o local vira inativo.
+  const removeLocation = useMutation({
+    mutationFn: () => api.locais.update(location.id, { situacao: "inativo" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["locais"] });
+      onClose();
+    }
+  });
+
   return (
     <>
       <View style={styles.editHeader}>
@@ -533,9 +592,20 @@ function EditLocationForm({ onClose, location }: { onClose: () => void; location
       </View>
 
       <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
+      {photoUrl ? (
+        <RemovePhotoLink
+          pending={removePhoto.isPending}
+          onPress={() =>
+            confirmDestructive("Remover foto", "O local fica sem foto até você enviar outra.", "Remover", () =>
+              removePhoto.mutate()
+            )
+          }
+        />
+      ) : null}
       {uploadMedia.isPending ? <StateText text="Enviando foto..." /> : null}
       {uploadMedia.isSuccess && uploadMedia.data ? <StateText tone="success" text="Foto atualizada!" /> : null}
       {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
+      {removePhoto.error instanceof Error ? <StateText tone="error" text={removePhoto.error.message} /> : null}
 
       <Field label="Nome">
         <Input value={nome} onChangeText={setNome} />
@@ -568,6 +638,23 @@ function EditLocationForm({ onClose, location }: { onClose: () => void; location
         disabled={!nome.trim() || updateLocation.isPending}
         onPress={() => updateLocation.mutate()}
       />
+
+      <View style={styles.dangerSection}>
+        {removeLocation.error instanceof Error ? <StateText tone="error" text={removeLocation.error.message} /> : null}
+        <Button
+          title={removeLocation.isPending ? "Excluindo..." : "Excluir local"}
+          tone="danger"
+          disabled={removeLocation.isPending}
+          onPress={() =>
+            confirmDestructive(
+              "Excluir local",
+              `"${location.nome}" sai da lista de locais, mas o histórico é mantido. Dá para reativar depois na seção "Locais inativos".`,
+              "Excluir",
+              () => removeLocation.mutate()
+            )
+          }
+        />
+      </View>
     </>
   );
 }
@@ -722,6 +809,20 @@ const styles = StyleSheet.create({
   },
   photoHint: {
     color: colors.muted,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
+  },
+  removePhoto: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    alignSelf: "center",
+    minHeight: 40,
+    paddingHorizontal: 16
+  },
+  removePhotoText: {
+    color: colors.danger,
     fontSize: 14,
     fontFamily: fonts.bodyBold
   }

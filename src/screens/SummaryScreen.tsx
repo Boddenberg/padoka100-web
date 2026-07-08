@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { RangeCalendar } from "@/components/calendar";
+import { RevenuePanorama } from "@/components/revenue-chart";
 import { Badge, Card, Page, SectionTitle, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, todayInputValue } from "@/lib/format";
@@ -37,6 +38,8 @@ export function SummaryScreen() {
 
   return (
     <Page title="Resumo" subtitle="Faturamento, restantes e histórico recente.">
+      <RevenuePanorama />
+
       <Card>
         <View style={styles.rangeHeader}>
           <Text style={styles.rangeLabel}>Período</Text>
