@@ -262,7 +262,9 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     const doPick = async (source: "camera" | "gallery") => {
       try {
         setMediaError(null);
-        const file = await pickImage(source, "custo");
+        // Nota/recibo/receita vão inteiros (sem recorte forçado) e com mais
+        // qualidade, para o assistente conseguir ler os valores.
+        const file = await pickImage(source, "custo", { allowsEditing: false, quality: 0.85 });
         if (file) sendFile.mutate({ file, tipo: "imagem" });
       } catch (error) {
         setMediaError(error instanceof Error ? error.message : "Não foi possível escolher a foto.");
