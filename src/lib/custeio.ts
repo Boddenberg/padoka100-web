@@ -6,6 +6,7 @@ import type {
   IngredienteRascunho,
   ItemGuiado,
   ProximaAcaoCusteio,
+  ReceitaRascunho,
   SessaoCusteio
 } from "@/types/custeio";
 
@@ -121,6 +122,31 @@ export function isDiscardedSession(sessao: SessaoCusteio | null | undefined) {
   return sessao?.proxima_acao === "sessao_descartada" || status.startsWith("descartad");
 }
 
+// Um campo do rascunho "pronto" é o que o backend marcou como CONFIRMADO.
+export function isConfirmedStatus(status?: string | null) {
+  return (status || "").toUpperCase() === "CONFIRMADO";
+}
+
+// Frase curta que explica por que um ingrediente ainda está em laranja:
+// falta o preço da compra ou a medida não fechou. Guia a próxima ação.
+export function ingredientPendingHint(ingrediente: IngredienteRascunho): string | null {
+  if (isConfirmedStatus(ingrediente.status)) return null;
+  const temPreco = toNumber(ingrediente.preco_total) > 0 && toNumber(ingrediente.quantidade_comprada) > 0;
+  if (!temPreco) return "Toque para informar quanto pagou";
+  return "Toque para revisar a medida";
+}
+
+export function receitaPendingHint(receita: ReceitaRascunho | null | undefined): string | null {
+  if (!receita || isConfirmedStatus(receita.status)) return null;
+  if (toNumber(receita.rendimento) <= 0) return "Toque para dizer quantas unidades rende";
+  return "Toque para revisar";
+}
+
+// Quantos itens do rascunho ainda precisam de retoque (para orientar o resumo).
+export function pendingIngredientCount(ingredientes: IngredienteRascunho[] | null | undefined) {
+  return (ingredientes || []).filter((item) => !isConfirmedStatus(item.status)).length;
+}
+
 // Entradas numéricas em pt-BR aceitam vírgula ("1,5" → 1.5).
 export function parseDecimalInput(text: string): number | null {
   const normalized = text.trim().replace(/\./g, ".").replace(",", ".");
@@ -141,7 +167,8 @@ const INGREDIENT_EMOJIS: [RegExp, string][] = [
   [/fermento/i, "🍞"],
   [/chocolate|cacau/i, "🍫"],
   [/queijo/i, "🧀"],
-  [/[óo]leo|azeite/i, "🫒"],
+  [/azeite|oliva|azeitona/i, "🫒"],
+  [/[óo]leo/i, "🫗"],
   [/[áa]gua/i, "💧"],
   [/coco/i, "🥥"],
   [/banana/i, "🍌"],

@@ -12,11 +12,10 @@ import {
   CostSummaryCard,
   ExtraCostRow,
   IngredientRow,
-  PendingRow,
+  NoticeStack,
   ProgressTrail,
   QuestionCard,
-  ReceitaCard,
-  WarningRow
+  ReceitaCard
 } from "@/components/custos/session-view";
 import {
   ConfirmSheet,
@@ -32,6 +31,7 @@ import {
   guidedItems,
   isConfirmedSession,
   isDiscardedSession,
+  pendingIngredientCount,
   readStoredSessionId,
   sessionId,
   stepForAction,
@@ -296,6 +296,11 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   const hasDraft = Boolean(rascunho.receita) || ingredientes.length > 0 || custosAdicionais.length > 0;
   const thinking = sendText.isPending || sendFile.isPending || patchDraft.isPending;
   const entryCount = session?.entradas?.length || 0;
+  const pendingCount = pendingIngredientCount(ingredientes);
+  const incompleteHint =
+    pendingCount > 0
+      ? `Faltam ${pendingCount} ${pendingCount === 1 ? "item" : "itens"} em laranja para eu fechar a conta.`
+      : undefined;
 
   const sendError =
     (sendFile.error instanceof Error ? sendFile.error.message : null) ||
@@ -389,9 +394,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 {perguntas.map((pergunta) => (
                   <QuestionCard key={pergunta} question={pergunta} onAnswer={() => setSheet({ kind: "texto", pergunta })} />
                 ))}
-                {pendencias.map((pendencia) => (
-                  <PendingRow key={pendencia} text={pendencia} />
-                ))}
+                <NoticeStack items={pendencias} tone="danger" />
 
                 <InputDock
                   recording={recorderState.isRecording}
@@ -411,6 +414,11 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 {hasDraft ? (
                   <>
                     <SectionTitle text="O que já anotei" />
+                    <Text style={styles.sectionHint}>
+                      {pendingCount > 0
+                        ? "Toque nos itens marcados como “revisar” para completar preço e medida."
+                        : "Tudo pronto! Confira os itens abaixo antes de confirmar."}
+                    </Text>
                     <ReceitaCard rascunho={rascunho} onEdit={() => setSheet({ kind: "receita" })} />
                     {ingredientes.map((ingrediente, index) => (
                       <IngredientRow
@@ -435,12 +443,10 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                   </Pressable>
                 )}
 
-                {avisos.map((aviso) => (
-                  <WarningRow key={aviso} text={aviso} />
-                ))}
+                <NoticeStack items={avisos} tone="warn" />
 
                 {session?.custo_simulado && hasDraft ? (
-                  <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} />
+                  <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} incompleteHint={incompleteHint} />
                 ) : null}
 
                 {session?.pode_confirmar ? (
@@ -808,6 +814,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.body,
     textAlign: "center"
+  },
+  sectionHint: {
+    marginTop: -6,
+    color: colors.muted,
+    fontSize: 13.5,
+    lineHeight: 19,
+    fontFamily: fonts.body
   },
   manualLink: {
     color: colors.agentDeep,

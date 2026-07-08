@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { Check, ChevronRight, CircleAlert, MessageCircleQuestion, Pencil, Plus, TriangleAlert } from "lucide-react-native";
-import { useEffect, useRef } from "react";
+import { Check, ChevronDown, ChevronRight, CircleAlert, MessageCircleQuestion, Pencil, Plus, TriangleAlert } from "lucide-react-native";
+import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { AgentAvatar } from "@/components/agent";
 import { Money } from "@/components/ui";
@@ -11,7 +11,10 @@ import {
   extraCostEmoji,
   extraCostSubtitle,
   ingredientEmoji,
-  ingredientSubtitle
+  ingredientPendingHint,
+  ingredientSubtitle,
+  isConfirmedStatus,
+  receitaPendingHint
 } from "@/lib/custeio";
 import { formatCurrency, toNumber } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -118,7 +121,7 @@ export function QuestionCard({ question, onAnswer }: { question: string; onAnswe
   );
 }
 
-export function PendingRow({ text }: { text: string }) {
+function PendingRow({ text }: { text: string }) {
   return (
     <View style={styles.noticeRow}>
       <CircleAlert size={17} color={colors.danger} />
@@ -127,7 +130,7 @@ export function PendingRow({ text }: { text: string }) {
   );
 }
 
-export function WarningRow({ text }: { text: string }) {
+function WarningRow({ text }: { text: string }) {
   return (
     <View style={[styles.noticeRow, { backgroundColor: colors.warningSoft }]}>
       <TriangleAlert size={17} color={colors.warning} />
@@ -136,45 +139,98 @@ export function WarningRow({ text }: { text: string }) {
   );
 }
 
+// Pilha de avisos que recolhe quando há muitos: a tela não vira um paredão
+// vermelho. Mostra os 3 primeiros e revela o resto sob demanda.
+export function NoticeStack({ items, tone }: { items: string[]; tone: "danger" | "warn" }) {
+  const [expanded, setExpanded] = useState(false);
+  if (items.length === 0) return null;
+
+  const Row = tone === "danger" ? PendingRow : WarningRow;
+  const limit = 3;
+  const visible = expanded ? items : items.slice(0, limit);
+  const hidden = items.length - limit;
+
+  return (
+    <View style={styles.noticeStack}>
+      {visible.map((text) => (
+        <Row key={text} text={text} />
+      ))}
+      {items.length > limit ? (
+        <Pressable onPress={() => setExpanded((value) => !value)} style={({ pressed }) => [styles.noticeToggle, pressed && styles.pressed]}>
+          <ChevronDown size={16} color={colors.muted} style={expanded ? styles.noticeChevronUp : undefined} />
+          <Text style={styles.noticeToggleText}>
+            {expanded ? "Mostrar menos" : `Ver mais ${hidden} ${hidden === 1 ? "detalhe" : "detalhes"}`}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Cards do rascunho: receita, ingredientes e outros custos.
 // ---------------------------------------------------------------------------
 
-function StatusDot({ status }: { status?: string | null }) {
-  const confirmed = (status || "").toUpperCase() === "CONFIRMADO";
-  return <View style={[styles.statusDot, { backgroundColor: confirmed ? colors.success : colors.warning }]} />;
+// Pílula de status legível (melhor que um pontinho para o público idoso):
+// "pronto" em verde, ou o motivo em laranja quando falta algo.
+function StatusPill({ confirmed }: { confirmed: boolean }) {
+  if (confirmed) {
+    return (
+      <View style={[styles.statusPill, { backgroundColor: colors.successSoft }]}>
+        <Check size={12} color={colors.success} strokeWidth={3} />
+        <Text style={[styles.statusPillText, { color: colors.success }]}>pronto</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.statusPill, { backgroundColor: colors.warningSoft }]}>
+      <Text style={[styles.statusPillText, { color: colors.warning }]}>revisar</Text>
+    </View>
+  );
 }
 
 export function ReceitaCard({ rascunho, onEdit }: { rascunho: RascunhoCusteio; onEdit: () => void }) {
   const receita = rascunho.receita;
   const rendimento = receita?.rendimento;
   const hasYield = rendimento !== null && rendimento !== undefined && rendimento !== "" && toNumber(rendimento) > 0;
+  const hint = receitaPendingHint(receita);
 
   return (
     <Pressable onPress={onEdit} style={({ pressed }) => [styles.draftCard, shadows.soft, pressed && styles.pressed]}>
       <Text style={styles.draftEmoji}>🍞</Text>
       <View style={styles.draftBody}>
-        <Text style={styles.draftTitle}>{receita?.nome || "Receita"}</Text>
-        <Text style={styles.draftSubtitle}>
-          {hasYield ? `Rende ${rendimento} ${receita?.unidade_rendimento || "unidades"}` : "Quantas unidades rende? Toque para informar"}
+        <Text style={styles.draftTitle} numberOfLines={2}>
+          {receita?.nome || "Receita"}
         </Text>
+        <Text style={styles.draftSubtitle}>
+          {hasYield ? `Rende ${rendimento} ${receita?.unidade_rendimento || "unidades"}` : "Toque para informar quanto rende"}
+        </Text>
+        {hint ? <Text style={styles.draftHint}>{hint}</Text> : null}
       </View>
-      <StatusDot status={receita?.status} />
-      <Pencil size={17} color={colors.muted} />
+      <View style={styles.draftMeta}>
+        <StatusPill confirmed={isConfirmedStatus(receita?.status)} />
+        <Pencil size={17} color={colors.muted} />
+      </View>
     </Pressable>
   );
 }
 
 export function IngredientRow({ ingrediente, onEdit }: { ingrediente: IngredienteRascunho; onEdit: () => void }) {
+  const hint = ingredientPendingHint(ingrediente);
   return (
     <Pressable onPress={onEdit} style={({ pressed }) => [styles.draftCard, shadows.soft, pressed && styles.pressed]}>
       <Text style={styles.draftEmoji}>{ingredientEmoji(ingrediente)}</Text>
       <View style={styles.draftBody}>
-        <Text style={styles.draftTitle}>{ingrediente.nome || "Ingrediente"}</Text>
+        <Text style={styles.draftTitle} numberOfLines={2}>
+          {ingrediente.nome || "Ingrediente"}
+        </Text>
         <Text style={styles.draftSubtitle}>{ingredientSubtitle(ingrediente, formatCurrency) || "Toque para completar os dados"}</Text>
+        {hint ? <Text style={styles.draftHint}>{hint}</Text> : null}
       </View>
-      <StatusDot status={ingrediente.status} />
-      <Pencil size={17} color={colors.muted} />
+      <View style={styles.draftMeta}>
+        <StatusPill confirmed={isConfirmedStatus(ingrediente.status)} />
+        <Pencil size={17} color={colors.muted} />
+      </View>
     </Pressable>
   );
 }
@@ -184,11 +240,15 @@ export function ExtraCostRow({ custo, onEdit }: { custo: CustoAdicionalRascunho;
     <Pressable onPress={onEdit} style={({ pressed }) => [styles.draftCard, shadows.soft, pressed && styles.pressed]}>
       <Text style={styles.draftEmoji}>{extraCostEmoji(custo)}</Text>
       <View style={styles.draftBody}>
-        <Text style={styles.draftTitle}>{custo.nome || custo.tipo || "Custo"}</Text>
+        <Text style={styles.draftTitle} numberOfLines={2}>
+          {custo.nome || custo.tipo || "Custo"}
+        </Text>
         <Text style={styles.draftSubtitle}>{extraCostSubtitle(custo, formatCurrency)}</Text>
       </View>
-      <StatusDot status={custo.status} />
-      <Pencil size={17} color={colors.muted} />
+      <View style={styles.draftMeta}>
+        <StatusPill confirmed={isConfirmedStatus(custo.status)} />
+        <Pencil size={17} color={colors.muted} />
+      </View>
     </Pressable>
   );
 }
@@ -209,22 +269,44 @@ export function AddRowButton({ label, onPress }: { label: string; onPress: () =>
 export function CostSummaryCard({
   custo,
   precoVenda,
-  confirmed
+  confirmed,
+  incompleteHint
 }: {
   custo: CustoSimulado;
   precoVenda: number | null;
   confirmed?: boolean;
+  incompleteHint?: string;
 }) {
   const unidade = custoPorUnidade(custo);
   const total = custoTotal(custo);
   const detalhes = custoDetalhes(custo);
   const scale = useRef(new Animated.Value(0.96)).current;
 
+  // Sem custo real ainda (faltam preços/medidas): mostramos um estado calmo
+  // em vez de "R$ 0,00" com festa de lucro, que fica esquisito.
+  const incomplete = !confirmed && (unidade === null || unidade <= 0) && (total === null || total <= 0);
+
   // Entrada suave sempre que o custo muda de valor.
   useEffect(() => {
     scale.setValue(0.96);
     Animated.spring(scale, { toValue: 1, friction: 6, useNativeDriver: true }).start();
   }, [unidade, total, scale]);
+
+  if (incomplete) {
+    return (
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <View style={[styles.costCard, styles.costCardDraft, shadows.soft]}>
+          <Text style={[styles.costLabel, { color: colors.muted }]}>Custo por unidade</Text>
+          <View style={styles.incompleteRow}>
+            <Text style={styles.incompleteEmoji}>🧮</Text>
+            <Text style={styles.incompleteText}>
+              {incompleteHint || "Assim que os preços e as medidas estiverem completos, mostro o custo e o lucro por aqui."}
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
 
   const lucro = precoVenda !== null && unidade !== null ? precoVenda - unidade : null;
   const margem = lucro !== null && precoVenda ? Math.round((lucro / precoVenda) * 100) : null;
@@ -271,7 +353,7 @@ function CostSummaryContent({
     <>
       <Text style={[styles.costLabel, { color: soft }]}>{light ? "Custo confirmado por unidade" : "Custo simulado por unidade"}</Text>
       <Money value={unidade ?? 0} size={44} color={ink} prefixColor={soft} />
-      {total !== null ? (
+      {total !== null && total > 0 ? (
         <Text style={[styles.costTotalText, { color: soft }]}>Receita completa: {formatCurrency(total)}</Text>
       ) : null}
 
@@ -428,6 +510,9 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontFamily: fonts.body
   },
+  noticeStack: {
+    gap: 8
+  },
   noticeRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -440,6 +525,23 @@ const styles = StyleSheet.create({
   noticeText: {
     flex: 1,
     fontSize: 14,
+    fontFamily: fonts.bodyBold
+  },
+  noticeToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    minHeight: 40,
+    alignSelf: "center",
+    paddingHorizontal: 14
+  },
+  noticeChevronUp: {
+    transform: [{ rotate: "180deg" }]
+  },
+  noticeToggleText: {
+    color: colors.muted,
+    fontSize: 13.5,
     fontFamily: fonts.bodyBold
   },
   draftCard: {
@@ -469,10 +571,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.body
   },
-  statusDot: {
-    height: 10,
-    width: 10,
-    borderRadius: 5
+  draftHint: {
+    marginTop: 2,
+    color: colors.warning,
+    fontSize: 12.5,
+    fontFamily: fonts.bodyBold
+  },
+  draftMeta: {
+    alignItems: "flex-end",
+    gap: 8
+  },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 4
+  },
+  statusPillText: {
+    fontSize: 11.5,
+    fontFamily: fonts.bodyBold
   },
   addRow: {
     flexDirection: "row",
@@ -499,6 +618,22 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.agentSoft,
     backgroundColor: colors.surface
+  },
+  incompleteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 2
+  },
+  incompleteEmoji: {
+    fontSize: 30
+  },
+  incompleteText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 14.5,
+    lineHeight: 21,
+    fontFamily: fonts.bodyBold
   },
   costLabel: {
     fontSize: 13,
