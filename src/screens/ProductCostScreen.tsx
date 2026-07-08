@@ -14,7 +14,6 @@ import {
   IngredientRow,
   NoticeStack,
   ProgressTrail,
-  QuestionCard,
   ReceitaCard
 } from "@/components/custos/session-view";
 import {
@@ -335,9 +334,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   // --- Estado derivado para a tela. -----------------------------------------
   const confirmed = isConfirmedSession(session);
   const step = confirmed ? 4 : phase === "receita" ? 1 : phase === "precos" ? 2 : 3;
-  const perguntas = guidedItems(session?.perguntas);
   const pendencias = guidedItems(session?.pendencias);
-  const avisos = guidedItems(session?.avisos);
   const thinking = sendText.isPending || sendFile.isPending || patchDraft.isPending || sendForm.isPending;
   // Estado de envio por tipo: a foto mostra "Enviando" no botão de foto, não no
   // microfone (era o que confundia).
@@ -430,7 +427,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 precoVenda={precoVenda}
                 incompleteHint={incompleteHint}
                 pendencias={pendencias}
-                avisos={avisos}
                 restartPending={restartSession.isPending}
                 restartError={restartSession.error instanceof Error ? restartSession.error.message : null}
                 onConfirm={() => setSheet({ kind: "confirmar" })}
@@ -454,10 +450,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 />
                 {sendError ? <StateText tone="error" text={sendError} /> : null}
 
-                {perguntas.map((pergunta) => (
-                  <QuestionCard key={pergunta} question={pergunta} onAnswer={() => setSheet({ kind: "texto", pergunta })} />
-                ))}
-
                 {phase === "receita" ? (
                   <RecipePhaseBody
                     rascunho={rascunho}
@@ -474,9 +466,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                   <PricePhaseBody
                     ingredientes={ingredientes}
                     custosAdicionais={custosAdicionais}
-                    custoSimulado={session?.custo_simulado || null}
-                    precoVenda={precoVenda}
-                    incompleteHint={incompleteHint}
                     onEditIngrediente={(index) => setSheet({ kind: "ingrediente-preco", index })}
                     onEditExtra={(index) => setSheet({ kind: "extra", index })}
                     onAddExtra={() => setSheet({ kind: "extra", index: null })}
@@ -647,9 +636,6 @@ function RecipePhaseBody({
 function PricePhaseBody({
   ingredientes,
   custosAdicionais,
-  custoSimulado,
-  precoVenda,
-  incompleteHint,
   onEditIngrediente,
   onEditExtra,
   onAddExtra,
@@ -658,9 +644,6 @@ function PricePhaseBody({
 }: {
   ingredientes: IngredienteRascunho[];
   custosAdicionais: CustoAdicionalRascunho[];
-  custoSimulado: SessaoCusteio["custo_simulado"];
-  precoVenda: number | null;
-  incompleteHint?: string;
   onEditIngrediente: (index: number) => void;
   onEditExtra: (index: number) => void;
   onAddExtra: () => void;
@@ -687,8 +670,6 @@ function PricePhaseBody({
       ))}
       <AddRowButton label="Adicionar embalagem, gás..." onPress={onAddExtra} />
 
-      {custoSimulado ? <CostSummaryCard custo={custoSimulado} precoVenda={precoVenda} incompleteHint={incompleteHint} /> : null}
-
       <Button title="Ver o resultado" tone="agent" icon={<ArrowRight size={18} color="#fff" />} onPress={onSeeResult} />
       <Pressable onPress={onBack} style={({ pressed }) => [styles.backLinkRow, pressed && styles.pressed]}>
         <ArrowLeft size={16} color={colors.muted} />
@@ -709,7 +690,6 @@ function ResultPhase({
   precoVenda,
   incompleteHint,
   pendencias,
-  avisos,
   restartPending,
   restartError,
   onConfirm,
@@ -723,7 +703,6 @@ function ResultPhase({
   precoVenda: number | null;
   incompleteHint?: string;
   pendencias: string[];
-  avisos: string[];
   restartPending: boolean;
   restartError: string | null;
   onConfirm: () => void;
@@ -757,8 +736,6 @@ function ResultPhase({
       {session?.custo_simulado ? (
         <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} incompleteHint={incompleteHint} />
       ) : null}
-
-      <NoticeStack items={avisos} tone="warn" />
 
       {podeConfirmar ? (
         <Button title="Confirmar custo" tone="success" icon={<BadgeCheck size={18} color="#fff" />} onPress={onConfirm} />
