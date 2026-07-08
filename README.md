@@ -810,21 +810,35 @@ A ideia principal é separar:
 
 ## 18. Tecnologias
 
-Este README deve ser atualizado com as tecnologias reais do projeto.
-
-Preencher conforme o projeto atual:
+Tecnologias reais do projeto:
 
 ```txt
-Framework:
-Linguagem:
-Gerenciador de pacotes:
-Biblioteca de navegação:
-Biblioteca de gráficos:
-Gerenciamento de estado:
-Cliente HTTP:
-Autenticação:
-Ambiente de build:
+Framework: Expo SDK 57 (React Native 0.86, React 19)
+Linguagem: TypeScript (strict)
+Gerenciador de pacotes: npm
+Biblioteca de navegação: expo-router (tabs + stack, rotas em app/)
+Biblioteca de gráficos: componente próprio (src/components/resumo/period-chart.tsx)
+Gerenciamento de estado: TanStack React Query (dados do servidor) + estado local do React; sessão em Context (src/contexts/auth.tsx)
+Cliente HTTP: fetch com wrapper próprio (src/lib/api.ts: X-API-Key, Bearer token, erros tipados)
+Autenticação: contexto de sessão + expo-secure-store para o token; proteção de rotas via AUTH_REQUIRED (src/constants/auth.ts) — endpoints /api/v1/auth/* aguardam o backend
+Ambiente de build: EAS (eas.json, canais preview/production via expo-updates)
 ```
+
+Organização atual das pastas (adaptação da estrutura sugerida na seção 17):
+
+```txt
+app/            rotas do expo-router (tabs: index=Venda, catalogo, resumo, perfil; login)
+src/
+  screens/      uma tela por arquivo (SalesScreen, CatalogScreen, SummaryScreen, ProfileScreen, LoginScreen)
+  components/   ui.tsx (base), agent.tsx, calendar.tsx e componentes por área (resumo/)
+  contexts/     auth.tsx (sessão e proteção de rotas)
+  lib/          api.ts, settings.ts, session.ts, profile.ts, format.ts, theme.ts
+  utils/        dates.ts, events.ts (histórico humano), text.ts (nomes), greeting.ts, media.ts
+  constants/    auth.ts (AUTH_REQUIRED)
+  types/        api.ts (tipos da API)
+```
+
+O que ainda depende do backend está listado em [docs/BACKEND-TODO.md](docs/BACKEND-TODO.md).
 
 ---
 
