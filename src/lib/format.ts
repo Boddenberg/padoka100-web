@@ -9,6 +9,16 @@ export function formatCurrency(value: DecimalString | number | null | undefined)
   }).format(Number.isFinite(amount) ? amount : 0);
 }
 
+// Valor redondo, sem centavos: bom para rótulos de gráfico.
+export function formatWholeCurrency(value: DecimalString | number | null | undefined) {
+  const amount = Number(value || 0);
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 0
+  }).format(Number.isFinite(amount) ? amount : 0);
+}
+
 export function formatDate(value: string | null | undefined) {
   if (!value) return "-";
   const [dateOnly] = value.split("T");

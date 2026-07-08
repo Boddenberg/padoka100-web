@@ -1,115 +1,221 @@
-import { CalendarDays, TrendingUp } from "lucide-react-native";
+import { ArrowDownRight, ArrowUpRight, CalendarDays, Minus, TrendingUp } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { RangeCalendar } from "@/components/calendar";
-import { RevenuePanorama } from "@/components/revenue-chart";
+import { DaySummarySheet } from "@/components/resumo/day-summary-sheet";
+import { PeriodChart } from "@/components/resumo/period-chart";
 import { Badge, Card, Page, SectionTitle, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
-import { formatCurrency, formatDate, todayInputValue } from "@/lib/format";
-import { colors, fonts, radius } from "@/lib/theme";
+import { formatCurrency, formatDate, formatWholeCurrency, toNumber, todayInputValue } from "@/lib/format";
+import { colors, fonts, radius, shadows } from "@/lib/theme";
+import { addDays, describePeriod, diffDays, startOfMonth } from "@/utils/dates";
 import { humanizeEventDetail, humanizeEventTitle } from "@/utils/events";
 
+// Ordem da tela (README): 1. Faturamento do período · 2. Período ·
+// 3. Gráfico · 4. Análise com IA · 5. Histórico.
 export function SummaryScreen() {
   const today = todayInputValue();
-  const [start, setStart] = useState(today);
+  const [start, setStart] = useState(addDays(today, -6));
   const [end, setEnd] = useState(today);
+  const [openDayId, setOpenDayId] = useState<string | null>(null);
+
   const periodQuery = useQuery({
     queryKey: ["relatorios", "periodo", start, end],
     queryFn: () => api.relatorios.period(start, end),
     enabled: Boolean(start && end)
   });
+
+  // Período anterior do mesmo tamanho, para a frase de comparação.
+  const span = diffDays(start, end) + 1;
+  const previousStart = addDays(start, -span);
+  const previousEnd = addDays(start, -1);
+  const previousQuery = useQuery({
+    queryKey: ["relatorios", "periodo", previousStart, previousEnd],
+    queryFn: () => api.relatorios.period(previousStart, previousEnd),
+    enabled: Boolean(start && end)
+  });
+
   const historyQuery = useQuery({
     queryKey: ["historico", "timeline"],
     queryFn: () => api.historico.timeline({ limite: 40 })
   });
-  // Todos os dias de venda já registrados: viram os pontinhos do calendário.
+  // Todos os dias de venda já registrados: pontinhos do calendário e
+  // mapa data → id para abrir o resumo do dia.
   const salesDaysQuery = useQuery({ queryKey: ["dias", "lista"], queryFn: () => api.dias.list() });
 
-  const markedDays = useMemo(() => {
-    const set = new Set<string>();
+  const dayIdByDate = useMemo(() => {
+    const map = new Map<string, string>();
     salesDaysQuery.data?.forEach((day) => {
-      if (day.data_venda) set.add(day.data_venda.slice(0, 10));
+      if (day.data_venda) map.set(day.data_venda.slice(0, 10), day.id);
     });
-    return set;
+    return map;
   }, [salesDaysQuery.data]);
 
+  const markedDays = useMemo(() => new Set(dayIdByDate.keys()), [dayIdByDate]);
+
   const totals = periodQuery.data;
-  const days = useMemo(() => totals?.dias || [], [totals]);
+  const periodLabel = describePeriod(start, end, today);
+
+  function setPeriod(nextStart: string, nextEnd: string) {
+    setStart(nextStart);
+    setEnd(nextEnd);
+  }
 
   return (
-    <Page title="Resumo" subtitle="Faturamento, restantes e histórico recente.">
-      <RevenuePanorama />
-
-      <Card>
-        <View style={styles.rangeHeader}>
-          <Text style={styles.rangeLabel}>Período</Text>
-          <Badge text={start === end ? formatDate(start) : `${formatDate(start)} – ${formatDate(end)}`} tone="good" />
-        </View>
-        <RangeCalendar
-          start={start}
-          end={end}
-          marked={markedDays}
-          onChange={(nextStart, nextEnd) => {
-            setStart(nextStart);
-            setEnd(nextEnd);
-          }}
-        />
-      </Card>
-
-      {periodQuery.isLoading ? <StateText text="Carregando resumo..." /> : null}
-      {periodQuery.error instanceof Error ? <StateText tone="error" text={periodQuery.error.message} /> : null}
-
-      {totals ? (
+    <>
+      <Page title="Resumo" subtitle="Faturamento, período, gráfico e histórico.">
+        {/* 1. Faturamento do período: o destaque principal da tela. */}
         <Card>
           <View style={styles.revenueHeader}>
             <TrendingUp size={20} color={colors.brandDeep} />
             <Text style={styles.revenueLabel}>Faturamento do período</Text>
           </View>
-          <Text style={styles.total}>{formatCurrency(totals.faturamento_bruto)}</Text>
-          <View style={styles.metricsGrid}>
-            <Metric label="Lucro" value={formatCurrency(totals.lucro_estimado)} highlight />
-            <Metric label="Vendido" value={String(totals.total_vendido ?? 0)} />
-            <Metric label="Restante" value={String(totals.total_sobra ?? 0)} />
-          </View>
+          {periodQuery.isLoading ? <StateText text="Somando as vendas..." /> : null}
+          {periodQuery.error instanceof Error ? <StateText tone="error" text={periodQuery.error.message} /> : null}
+          {totals ? (
+            <>
+              <Text style={styles.total}>{formatCurrency(totals.faturamento_bruto)}</Text>
+              <Badge text={periodLabel} tone="good" />
+              <ComparisonLine
+                total={toNumber(totals.faturamento_bruto)}
+                previousTotal={toNumber(previousQuery.data?.faturamento_bruto)}
+                hasPrevious={!previousQuery.error && !previousQuery.isLoading}
+              />
+              <View style={styles.metricsGrid}>
+                <Metric label="Lucro" value={formatCurrency(totals.lucro_estimado)} highlight />
+                <Metric label="Vendido" value={String(totals.total_vendido ?? 0)} />
+                <Metric label="Restante" value={String(totals.total_sobra ?? 0)} />
+              </View>
+            </>
+          ) : null}
         </Card>
-      ) : null}
 
-      {days.map((day) => (
-        <Card key={day.dia_de_venda_id}>
-          <View style={styles.dayHeader}>
-            <View style={styles.dayIcon}>
-              <CalendarDays size={18} color={colors.brandDeep} />
-            </View>
-            <View style={styles.dayInfo}>
-              <Text style={styles.dayTitle}>{formatDate(day.data_venda)}</Text>
-              <Text style={styles.muted}>{day.nome_local || "Sem local"}</Text>
-            </View>
-            <Badge text={day.situacao} tone={day.situacao === "aberto" ? "good" : "neutral"} />
+        {/* 2. Período: atalhos + calendário (sem datas futuras). */}
+        <Card>
+          <View style={styles.rangeHeader}>
+            <Text style={styles.rangeLabel}>Período</Text>
+            <Badge text={periodLabel} tone="neutral" />
           </View>
-          <View style={styles.dayNumbers}>
-            <Text style={styles.dayRevenue}>{formatCurrency(day.faturamento_bruto)}</Text>
-            <Text style={styles.muted}>lucro {formatCurrency(day.lucro_estimado)}</Text>
+          <View style={styles.presetRow}>
+            <PresetChip label="Hoje" active={start === today && end === today} onPress={() => setPeriod(today, today)} />
+            <PresetChip
+              label="7 dias"
+              active={start === addDays(today, -6) && end === today}
+              onPress={() => setPeriod(addDays(today, -6), today)}
+            />
+            <PresetChip
+              label="Mês"
+              active={start === startOfMonth(today) && end === today}
+              onPress={() => setPeriod(startOfMonth(today), today)}
+            />
           </View>
+          <RangeCalendar
+            start={start}
+            end={end}
+            marked={markedDays}
+            onChange={setPeriod}
+            onDayOpen={(day) => {
+              const dayId = dayIdByDate.get(day);
+              if (dayId) setOpenDayId(dayId);
+            }}
+          />
         </Card>
-      ))}
 
-      <SectionTitle text="Histórico" />
-      {historyQuery.isLoading ? <StateText text="Carregando histórico..." /> : null}
-      {historyQuery.error instanceof Error ? <StateText tone="error" text={historyQuery.error.message} /> : null}
-      {historyQuery.data?.map((event) => {
-        const detail = humanizeEventDetail(event);
-        return (
-          <View key={event.id} style={styles.eventRow}>
-            <View style={styles.eventDot} />
-            <View style={styles.eventInfo}>
-              <Text style={styles.eventTitle}>{humanizeEventTitle(event)}</Text>
-              <Text style={styles.muted}>{detail ? `${detail} · ${formatDate(event.criado_em)}` : formatDate(event.criado_em)}</Text>
+        {/* 3. Gráfico de vendas do período selecionado. */}
+        <PeriodChart dias={totals?.dias} start={start} end={end} today={today} />
+
+        {/* Dias do período, cada um abre o próprio resumo. */}
+        {(totals?.dias || []).map((day) => (
+          <Pressable
+            key={day.dia_de_venda_id}
+            onPress={() => setOpenDayId(day.dia_de_venda_id)}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <Card>
+              <View style={styles.dayHeader}>
+                <View style={styles.dayIcon}>
+                  <CalendarDays size={18} color={colors.brandDeep} />
+                </View>
+                <View style={styles.dayInfo}>
+                  <Text style={styles.dayTitle}>{formatDate(day.data_venda)}</Text>
+                  <Text style={styles.muted}>{day.nome_local || "Sem local"}</Text>
+                </View>
+                <Badge
+                  text={day.situacao === "aberto" ? "Aberto" : "Fechado"}
+                  tone={day.situacao === "aberto" ? "good" : "neutral"}
+                />
+              </View>
+              <View style={styles.dayNumbers}>
+                <Text style={styles.dayRevenue}>{formatCurrency(day.faturamento_bruto)}</Text>
+                <Text style={styles.muted}>lucro {formatCurrency(day.lucro_estimado)}</Text>
+              </View>
+            </Card>
+          </Pressable>
+        ))}
+
+        {/* 5. Histórico em linguagem humana. */}
+        <SectionTitle text="Histórico" />
+        {historyQuery.isLoading ? <StateText text="Carregando histórico..." /> : null}
+        {historyQuery.error instanceof Error ? <StateText tone="error" text={historyQuery.error.message} /> : null}
+        {historyQuery.data?.map((event) => {
+          const detail = humanizeEventDetail(event);
+          return (
+            <View key={event.id} style={styles.eventRow}>
+              <View style={styles.eventDot} />
+              <View style={styles.eventInfo}>
+                <Text style={styles.eventTitle}>{humanizeEventTitle(event)}</Text>
+                <Text style={styles.muted}>{detail ? `${detail} · ${formatDate(event.criado_em)}` : formatDate(event.criado_em)}</Text>
+              </View>
             </View>
-          </View>
-        );
-      })}
-    </Page>
+          );
+        })}
+      </Page>
+
+      <DaySummarySheet visible={Boolean(openDayId)} dayId={openDayId} onClose={() => setOpenDayId(null)} />
+    </>
+  );
+}
+
+// Frase de comparação com o período anterior, em linguagem do dia a dia.
+function ComparisonLine({
+  total,
+  previousTotal,
+  hasPrevious
+}: {
+  total: number;
+  previousTotal: number;
+  hasPrevious: boolean;
+}) {
+  if (!hasPrevious || (total === 0 && previousTotal === 0)) return null;
+
+  const difference = total - previousTotal;
+
+  if (Math.round(Math.abs(difference)) === 0) {
+    return (
+      <View style={styles.comparisonRow}>
+        <Minus size={18} color={colors.muted} />
+        <Text style={[styles.comparisonText, { color: colors.muted }]}>Igual ao período anterior</Text>
+      </View>
+    );
+  }
+
+  const up = difference > 0;
+  return (
+    <View style={styles.comparisonRow}>
+      {up ? <ArrowUpRight size={18} color={colors.success} /> : <ArrowDownRight size={18} color={colors.danger} />}
+      <Text style={[styles.comparisonText, { color: up ? colors.success : colors.danger }]}>
+        {formatWholeCurrency(Math.abs(difference))} a {up ? "mais" : "menos"} que o período anterior
+      </Text>
+    </View>
+  );
+}
+
+function PresetChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.presetChip, active && styles.presetChipActive]}>
+      <Text style={[styles.presetChipText, active && styles.presetChipTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -123,16 +229,9 @@ function Metric({ label, value, highlight }: { label: string; value: string; hig
 }
 
 const styles = StyleSheet.create({
-  rangeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10
-  },
-  rangeLabel: {
-    color: colors.ink,
-    fontSize: 18,
-    fontFamily: fonts.display
+  pressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.92
   },
   revenueHeader: {
     flexDirection: "row",
@@ -146,9 +245,18 @@ const styles = StyleSheet.create({
   },
   total: {
     color: colors.ink,
-    fontSize: 36,
+    fontSize: 40,
     fontFamily: fonts.display,
     letterSpacing: -1
+  },
+  comparisonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4
+  },
+  comparisonText: {
+    fontSize: 15,
+    fontFamily: fonts.bodyBold
   },
   metricsGrid: {
     flexDirection: "row",
@@ -174,6 +282,43 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: fonts.display,
     letterSpacing: -0.3
+  },
+  rangeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  rangeLabel: {
+    color: colors.ink,
+    fontSize: 18,
+    fontFamily: fonts.display
+  },
+  presetRow: {
+    flexDirection: "row",
+    gap: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceWarm,
+    padding: 5
+  },
+  presetChip: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 42,
+    borderRadius: radius.pill
+  },
+  presetChipActive: {
+    backgroundColor: colors.brand,
+    ...shadows.brand
+  },
+  presetChipText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
+  },
+  presetChipTextActive: {
+    color: "#fff"
   },
   dayHeader: {
     flexDirection: "row",
