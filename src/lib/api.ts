@@ -1,5 +1,7 @@
 import { getBaseUrl, readApiSettings, type ApiSettings } from "@/lib/settings";
 import type {
+  AlterarEmailRequest,
+  AlterarSenhaRequest,
   AnaliseIARequest,
   CorrigirDiaRequest,
   CriarDiaDeVendaRequest,
@@ -8,15 +10,18 @@ import type {
   EventoLinhaDoTempo,
   HealthStatus,
   LocalVenda,
+  LoginRequest,
   Midia,
   Produto,
   RegistrarVendaRequest,
+  RespostaLogin,
   RespostaAnaliseIA,
   RespostaConfirmarComando,
   RespostaInterpretarVenda,
   RespostaTranscreverAudio,
   ResumoDoDia,
   ResumoDoPeriodo,
+  UsuarioPerfil,
   UUID,
   Venda,
   VersaoDePreco
@@ -38,6 +43,19 @@ export interface NativeFile {
   uri: string;
   name: string;
   type: string;
+}
+
+// Token de sessão em cache: enviado como Bearer em toda chamada autenticada.
+let sessionToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setApiToken(token: string | null) {
+  sessionToken = token;
+}
+
+// Sessão expirada (401): quem cuida do estado de auth se registra aqui.
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
 }
 
 export class ApiError extends Error {
@@ -99,6 +117,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   headers.set("Accept", "application/json");
   if (options.body !== undefined && !options.formData) headers.set("Content-Type", "application/json");
   if (path.startsWith("/api/v1") && settings.apiKey.trim()) headers.set("X-API-Key", settings.apiKey.trim());
+  if (path.startsWith("/api/v1") && sessionToken) headers.set("Authorization", `Bearer ${sessionToken}`);
 
   const response = await fetch(buildUrl(path, options.query, settings), {
     method,
@@ -111,6 +130,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) {
     if (response.status === 404 && options.allowNotFound) return null as T;
+    if (response.status === 401 && sessionToken) unauthorizedHandler?.();
     throw new ApiError(extractErrorMessage(payload, `Erro HTTP ${response.status}`), response.status, payload);
   }
 
@@ -136,6 +156,17 @@ export function createAudioForm(file: NativeFile, diaDeVendaId?: UUID | null) {
 
 export const api = {
   health: (settings?: ApiSettings) => apiRequest<HealthStatus>("/health", { settings }),
+  // Autenticação. Contrato definido pelo app; o backend ainda precisa
+  // implementar estes endpoints.
+  auth: {
+    login: (body: LoginRequest) => apiRequest<RespostaLogin>("/api/v1/auth/login", { method: "POST", body }),
+    logout: () => apiRequest<null>("/api/v1/auth/logout", { method: "POST", body: {} }),
+    me: () => apiRequest<UsuarioPerfil>("/api/v1/auth/me"),
+    changePassword: (body: AlterarSenhaRequest) =>
+      apiRequest<null>("/api/v1/auth/alterar-senha", { method: "POST", body }),
+    changeEmail: (body: AlterarEmailRequest) =>
+      apiRequest<UsuarioPerfil>("/api/v1/auth/alterar-email", { method: "POST", body })
+  },
   produtos: {
     list: (somenteAtivos = true) =>
       apiRequest<Produto[]>("/api/v1/produtos", { query: { somente_ativos: somenteAtivos } }),

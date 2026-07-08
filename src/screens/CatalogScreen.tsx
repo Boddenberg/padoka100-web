@@ -1,4 +1,3 @@
-import * as ImagePicker from "expo-image-picker";
 import { Camera, ChevronRight, Images, MapPin, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -7,30 +6,9 @@ import { Badge, Button, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, S
 import { api, createMediaForm, type NativeFile } from "@/lib/api";
 import { cleanPayload, formatCurrency, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
+import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
 import type { LocalVenda, Produto } from "@/types/api";
-
-// Abre câmera ou galeria e devolve o arquivo escolhido (ou null se cancelou).
-async function pickImage(source: "camera" | "gallery", prefix: string): Promise<NativeFile | null> {
-  let result: ImagePicker.ImagePickerResult;
-  if (source === "camera") {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) throw new Error("Permissão de câmera negada.");
-    result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true, aspect: [4, 3] });
-  } else {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) throw new Error("Permissão de fotos negada.");
-    result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: true, aspect: [4, 3] });
-  }
-
-  if (result.canceled) return null;
-  const asset = result.assets[0];
-  return {
-    uri: asset.uri,
-    name: asset.fileName || `${prefix}-${Date.now()}.jpg`,
-    type: asset.mimeType || "image/jpeg"
-  };
-}
 
 // Alert.alert com botões não funciona no navegador; lá usamos o confirm nativo.
 function confirmDestructive(title: string, message: string, confirmLabel: string, onConfirm: () => void) {

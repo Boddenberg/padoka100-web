@@ -227,6 +227,34 @@ export interface CriarDiaDeVendaRequest {
   itens_producao?: CriarItemProducaoRequest[];
 }
 
+// Autenticação (backend ainda vai implementar).
+export interface UsuarioPerfil {
+  id: UUID;
+  usuario: string;
+  email?: string | null;
+  nome?: string | null;
+}
+
+export interface LoginRequest {
+  usuario: string;
+  senha: string;
+}
+
+export interface RespostaLogin {
+  token: string;
+  usuario: UsuarioPerfil;
+}
+
+export interface AlterarSenhaRequest {
+  senha_atual: string;
+  senha_nova: string;
+}
+
+export interface AlterarEmailRequest {
+  email: string;
+  senha: string;
+}
+
 // Análise de vendas com IA (backend ainda vai implementar).
 export interface AnaliseIARequest {
   data_inicio: string;
