@@ -34,6 +34,7 @@ export function ProfileScreen() {
   const [profile, setProfile] = useState<LocalProfile>(emptyProfile);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   // Carrega os dados locais e, se logado, mescla o que veio do servidor.
   useEffect(() => {
@@ -73,11 +74,27 @@ export function ProfileScreen() {
       setPhotoError(null);
       const file = await pickImage(source, "perfil");
       if (!file) return;
+      // Mostra a foto do aparelho na hora; sobe pro servidor se estiver logado.
       const next = { ...profile, fotoUri: file.uri };
       setProfile(next);
       await saveProfile(next);
+
+      if (status === "signed-in") {
+        setPhotoUploading(true);
+        const form = new FormData();
+        form.append("file", file as unknown as Blob);
+        const updated = await api.auth.uploadPhoto(form);
+        setUser(updated);
+        if (updated.foto_url) {
+          const synced = { ...next, fotoUri: updated.foto_url };
+          setProfile(synced);
+          await saveProfile(synced);
+        }
+      }
     } catch (error) {
-      setPhotoError(error instanceof Error ? error.message : "Não foi possível escolher a foto.");
+      setPhotoError(error instanceof Error ? error.message : "Não foi possível salvar a foto.");
+    } finally {
+      setPhotoUploading(false);
     }
   }
 
@@ -120,6 +137,7 @@ export function ProfileScreen() {
             <PhotoAction icon={<Camera size={18} color={colors.brandDeep} />} label="Fotografar" onPress={() => choosePhoto("camera")} />
             <PhotoAction icon={<Images size={18} color={colors.brandDeep} />} label="Galeria" onPress={() => choosePhoto("gallery")} />
           </View>
+          {photoUploading ? <StateText text="Enviando foto..." /> : null}
           {photoError ? <StateText tone="error" text={photoError} /> : null}
 
           <Field label="Nome">

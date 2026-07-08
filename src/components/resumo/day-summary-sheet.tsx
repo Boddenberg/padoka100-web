@@ -42,10 +42,12 @@ export function DaySummarySheet({
 
   const resumo = resumoQuery.data;
   const produtos = resumo?.produtos || [];
-  const soldOutCount = produtos.filter(
-    (produto) => (produto.quantidade_produzida ?? 0) > 0 && (produto.quantidade_sobra ?? 0) === 0
-  ).length;
+  const isSoldOut = (produto: (typeof produtos)[number]) =>
+    produto.esgotado ?? ((produto.quantidade_disponivel ?? produto.quantidade_produzida ?? 0) > 0 && (produto.quantidade_sobra ?? 0) === 0);
+  const soldOutCount = produtos.filter(isSoldOut).length;
   const leftoverCount = produtos.filter((produto) => (produto.quantidade_sobra ?? 0) > 0).length;
+  const soldTotal = resumo?.total_vendido ?? resumo?.itens_vendidos ?? 0;
+  const usedLeftover = resumo?.total_sobra_aproveitada ?? 0;
   const isOpen = resumo?.situacao === "aberto";
 
   return (
@@ -80,21 +82,27 @@ export function DaySummarySheet({
 
           <View style={styles.revenueBox}>
             <Text style={styles.revenueLabel}>Faturamento</Text>
-            <Money value={resumo.faturamento_bruto} size={32} />
+            <Money value={resumo.faturamento_bruto ?? resumo.faturamento_total} size={32} />
           </View>
 
           <View style={styles.metricsGrid}>
-            <Metric label="Itens vendidos" value={String(resumo.total_vendido ?? 0)} />
+            <Metric label="Itens vendidos" value={String(soldTotal)} />
             <Metric label="Com sobra" value={String(leftoverCount)} />
             <Metric label="Esgotados" value={String(soldOutCount)} />
           </View>
+          {usedLeftover > 0 ? (
+            <Text style={styles.leftoverLine}>
+              Aproveitou {usedLeftover} un. do dia anterior · disponível no dia: {resumo.total_disponivel ?? "-"}
+            </Text>
+          ) : null}
 
           {produtos.length ? <SectionTitle text="Produtos do dia" /> : null}
           {produtos.map((produto) => {
             const produced = produto.quantidade_produzida ?? 0;
+            const used = produto.quantidade_sobra_aproveitada ?? 0;
             const sold = produto.quantidade_vendida ?? 0;
-            const left = produto.quantidade_sobra ?? Math.max(0, produced - sold);
-            const soldOut = produced > 0 && left === 0;
+            const left = produto.quantidade_sobra ?? Math.max(0, produced + used - sold);
+            const soldOut = isSoldOut(produto);
 
             return (
               <View key={produto.produto_id} style={styles.productRow}>
@@ -102,7 +110,8 @@ export function DaySummarySheet({
                 <View style={styles.productInfo}>
                   <Text style={styles.productName}>{fixProductName(produto.nome_produto)}</Text>
                   <Text style={styles.productNumbers}>
-                    Produzido: {produced} · Vendido: {sold} · Sobrou: {left}
+                    Produzido: {produced}
+                    {used > 0 ? ` · Aproveitou: ${used}` : ""} · Vendido: {sold} · Sobrou: {left}
                   </Text>
                   {soldOut ? <Badge text="Esgotado" tone="warn" /> : null}
                 </View>
@@ -217,6 +226,11 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 18,
     fontFamily: fonts.display
+  },
+  leftoverLine: {
+    color: colors.muted,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold
   },
   productRow: {
     flexDirection: "row",

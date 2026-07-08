@@ -82,9 +82,12 @@ export function SalesScreen() {
       if (item.quantidade_produzida > 0) participating.add(item.produto_id);
     });
     resumoQuery.data?.produtos?.forEach((produto) => {
-      if ((produto.quantidade_produzida ?? 0) > 0 || (produto.quantidade_vendida ?? 0) > 0) {
-        participating.add(produto.produto_id);
-      }
+      const entered =
+        produto.participou_da_venda ??
+        ((produto.quantidade_produzida ?? 0) > 0 ||
+          (produto.quantidade_sobra_aproveitada ?? 0) > 0 ||
+          (produto.quantidade_vendida ?? 0) > 0);
+      if (entered) participating.add(produto.produto_id);
     });
     return products.filter((produto) => participating.has(produto.id));
   }, [currentDay, resumoQuery.data, products]);
@@ -213,8 +216,8 @@ export function SalesScreen() {
           <DayHero
             day={currentDay}
             sold={resumoQuery.data?.total_vendido}
-            produced={resumoQuery.data?.total_produzido}
-            revenue={resumoQuery.data?.faturamento_bruto}
+            produced={resumoQuery.data?.total_disponivel ?? resumoQuery.data?.total_produzido}
+            revenue={resumoQuery.data?.faturamento_bruto ?? resumoQuery.data?.faturamento_total}
             onProduction={() => setSheet("production")}
             onSales={() => setSheet("sales")}
             onClose={() => setSheet("close-day")}

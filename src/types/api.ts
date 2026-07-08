@@ -118,8 +118,12 @@ export interface ResumoProdutoNoDia {
   nome_produto: string;
   url_imagem_produto?: string | null;
   quantidade_produzida?: number;
+  quantidade_sobra_aproveitada?: number;
+  quantidade_disponivel?: number;
   quantidade_vendida?: number;
   quantidade_sobra?: number;
+  participou_da_venda?: boolean;
+  esgotado?: boolean;
   faturamento_bruto?: DecimalString;
   custo_estimado?: DecimalString;
   lucro_estimado?: DecimalString;
@@ -131,9 +135,13 @@ export interface ResumoDoDia {
   nome_local?: string | null;
   situacao: string;
   total_produzido?: number;
+  total_sobra_aproveitada?: number;
+  total_disponivel?: number;
   total_vendido?: number;
+  itens_vendidos?: number;
   total_sobra?: number;
   faturamento_bruto?: DecimalString;
+  faturamento_total?: DecimalString;
   custo_estimado?: DecimalString;
   lucro_estimado?: DecimalString;
   produtos?: ResumoProdutoNoDia[];

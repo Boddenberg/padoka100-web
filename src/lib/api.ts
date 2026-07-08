@@ -169,6 +169,8 @@ export const api = {
     me: () => apiRequest<UsuarioPerfil>("/api/v1/perfil/me"),
     updateProfile: (body: AtualizarPerfilRequest) =>
       apiRequest<UsuarioPerfil>("/api/v1/perfil/me", { method: "PATCH", body }),
+    uploadPhoto: (formData: FormData) =>
+      apiRequest<UsuarioPerfil>("/api/v1/perfil/me/foto", { method: "POST", formData }),
     changePassword: (body: TrocarSenhaRequest) =>
       apiRequest<null>("/api/v1/auth/trocar-senha", { method: "POST", body })
   },

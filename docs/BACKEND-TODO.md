@@ -33,23 +33,28 @@ Login é necessário só para perfil, análise IA e custos (papel dono).
 | Dados estruturados p/ IA | `GET /api/v1/ia/dados-estruturados/periodo` (`api.ia.structuredData`) | No client; sem uso direto na UI ainda. |
 | Gestão de usuários (dono) | `GET /auth/usuarios`, `PATCH /auth/usuarios/{id}/papel` | Sem UI. Falta tela de gestão de papéis. |
 
-## ⏳ Pontos a confirmar / pendências do backend
+## ✅ Pendências que foram resolvidas nesta leva
 
-- **Resposta da análise IA**: o guia não mostra o JSON de retorno de
-  `/analises/padrao` e `/especifica`. O app renderiza de forma flexível
-  (resumo + seções `principais_achados`, `mais_venderam`, `mais_sobraram`,
-  `sugestoes`, `pontos_atencao`) e cai para o texto corrido se vier em outro
-  formato. Se puder padronizar nesses campos, a renderização fica perfeita.
-- **Alterar e-mail**: não há endpoint dedicado; o app usa `PATCH /perfil/me`
-  com `{ email }`. Confirmar se o perfil aceita trocar e-mail por aí.
-- **Foto de perfil**: `PATCH /perfil/me` recebe `foto_url` (string). O app hoje
-  guarda a foto do aparelho localmente; falta um upload de foto de perfil
-  (como o de mídia de produto) para gerar uma URL.
+- **Resposta da análise IA**: formato confirmado. O app renderiza `resumo` +
+  seções `principais_achados`/`mais_venderam`/`mais_sobraram`/`sugestoes`/
+  `pontos_atencao`, tratando itens em objeto (`produto`, `quantidade_vendida`,
+  `quantidade_sobra`, `faturamento`) como linhas legíveis, e cai para `analise`
+  (texto) se preciso.
+- **Alterar e-mail**: confirmado via `PATCH /perfil/me { email }` (409 se em uso).
+- **Foto de perfil**: integrado o `POST /perfil/me/foto` — ao escolher a foto
+  no Perfil estando logado, o app sobe o arquivo e usa a `foto_url` retornada.
+- **Resumo do dia**: nomes exatos confirmados. O app exibe `total_sobra_aproveitada`
+  ("Aproveitou X do dia anterior"), `total_disponivel`, usa o flag `esgotado`
+  e `participou_da_venda` para a aba Venda, e `itens_vendidos`/`faturamento_total`
+  como reserva.
+
+## ⏳ Ainda pendente
+
 - **Refresh token**: ainda não existe (limite conhecido). O app trata 401
-  derrubando a sessão e pedindo login de novo.
-- **Resumo do dia**: campos `sobra aproveitada` e `disponivel` existem no
-  resumo; o app ainda não os exibe porque os nomes exatos do JSON não foram
-  confirmados. Com um exemplo da resposta, mostro rapidamente.
+  derrubando a sessão e pedindo login de novo. Ok assim por enquanto.
+- **Tela de custos** (README §15): client pronto (`api.custos.*`), UI a construir.
+- **Gestão de usuários/papéis** (dono): endpoints prontos, sem UI.
+- **Foto de nota fiscal + OCR** para custos: ainda não existe no backend.
 
 ## 🔜 Futuro (README §15)
 

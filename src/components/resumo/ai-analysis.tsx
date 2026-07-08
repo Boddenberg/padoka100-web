@@ -8,7 +8,9 @@ import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
 import { Button, Card, Input, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
 import { api, ApiError } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
+import { fixProductName } from "@/utils/text";
 import type { RespostaAnaliseIA } from "@/types/api";
 
 interface NormalizedAnalysis {
@@ -153,12 +155,26 @@ function toList(value: unknown): string[] {
     .filter((item): item is string => Boolean(item && item.trim()));
 }
 
+// Objetos das listas da análise (ex.: { produto, quantidade_vendida,
+// faturamento } ou { produto, quantidade_sobra }) viram uma linha legível.
 function summarizeObject(item: object) {
   const record = item as Record<string, unknown>;
-  const name = record["nome"] || record["produto"] || record["nome_produto"];
-  const qty = record["quantidade"] ?? record["total"] ?? record["valor"];
-  if (typeof name === "string") return qty != null ? `${name} (${qty})` : name;
-  return null;
+  const rawName = record["produto"] || record["nome_produto"] || record["nome"];
+  if (typeof rawName !== "string") return null;
+  const name = fixProductName(rawName);
+
+  const details: string[] = [];
+  const sold = record["quantidade_vendida"];
+  const leftover = record["quantidade_sobra"];
+  const revenue = record["faturamento"] ?? record["faturamento_bruto"];
+  const generic = record["quantidade"] ?? record["total"] ?? record["valor"];
+
+  if (typeof sold === "number") details.push(`${sold} vendidos`);
+  if (typeof leftover === "number") details.push(`${leftover} sobraram`);
+  if (revenue != null && revenue !== "") details.push(formatCurrency(revenue as string));
+  if (!details.length && generic != null) details.push(String(generic));
+
+  return details.length ? `${name} — ${details.join(" · ")}` : name;
 }
 
 function analysisErrorMessage(error: unknown) {
