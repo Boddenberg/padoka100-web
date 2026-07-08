@@ -151,8 +151,9 @@ function summarizeObject(item: object) {
   const name = fixProductName(rawName);
 
   const details: string[] = [];
-  const sold = record["quantidade_vendida"];
-  const leftover = record["quantidade_sobra"];
+  // O backend manda totalVendido/totalSobrando; aceitamos as duas convenções.
+  const sold = record["quantidade_vendida"] ?? record["totalVendido"];
+  const leftover = record["quantidade_sobra"] ?? record["totalSobrando"];
   const revenue = record["faturamento"] ?? record["faturamento_bruto"];
   const generic = record["quantidade"] ?? record["total"] ?? record["valor"];
 
