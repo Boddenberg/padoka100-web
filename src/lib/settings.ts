@@ -5,7 +5,7 @@ import { Platform } from "react-native";
 import type { ApiEnvironment } from "@/types/api";
 
 const ENV_KEY = "padoka100:api-environment";
-const API_KEY = "padoka100:api-key";
+const API_KEY = "padoka100.api_key";
 
 // SecureStore não existe no navegador; lá a API key vai para o AsyncStorage.
 const secureStorage = {
