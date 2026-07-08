@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Eye, EyeOff, LogIn } from "lucide-react-native";
+import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react-native";
 import { useState } from "react";
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,21 +12,31 @@ import { loginErrorMessage, useAuth } from "@/contexts/auth";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { getGreeting } from "@/utils/greeting";
 
+type Mode = "login" | "register";
+
 export function LoginScreen() {
   const router = useRouter();
-  const { signIn } = useAuth();
-  const [usuario, setUsuario] = useState("");
+  const { signIn, register } = useAuth();
+  const [mode, setMode] = useState<Mode>("login");
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const login = useMutation({
-    mutationFn: () => signIn(usuario, senha),
+  const submit = useMutation({
+    mutationFn: () =>
+      mode === "login" ? signIn(email, senha) : register({ nome, email, telefone, senha }),
     onSuccess: () => {
       router.replace("/");
     }
   });
 
-  const canSubmit = usuario.trim().length > 0 && senha.length > 0 && !login.isPending;
+  const canSubmit =
+    email.trim().length > 0 &&
+    senha.length > 0 &&
+    (mode === "login" || nome.trim().length > 0) &&
+    !submit.isPending;
 
   return (
     <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.background}>
@@ -42,18 +52,41 @@ export function LoginScreen() {
                 <Image source={require("../../Logo.png")} style={styles.logo} contentFit="contain" />
                 <Text style={styles.greeting}>{getGreeting()}</Text>
                 <Text style={styles.title}>Padoka 100</Text>
-                <Text style={styles.subtitle}>Entre para cuidar da sua padaria.</Text>
+                <Text style={styles.subtitle}>
+                  {mode === "login" ? "Entre para cuidar da sua padaria." : "Crie sua conta para começar."}
+                </Text>
               </View>
 
               <View style={[styles.card, shadows.floating]}>
-                <Field label="Usuário ou e-mail">
+                <View style={styles.modeRow}>
+                  <ModeChip label="Entrar" active={mode === "login"} onPress={() => setMode("login")} />
+                  <ModeChip label="Criar conta" active={mode === "register"} onPress={() => setMode("register")} />
+                </View>
+
+                {mode === "register" ? (
+                  <>
+                    <Field label="Seu nome">
+                      <Input value={nome} onChangeText={setNome} placeholder="Ex: Maria da Padoka" />
+                    </Field>
+                    <Field label="Telefone">
+                      <Input
+                        value={telefone}
+                        onChangeText={setTelefone}
+                        placeholder="(00) 00000-0000"
+                        keyboardType="phone-pad"
+                      />
+                    </Field>
+                  </>
+                ) : null}
+
+                <Field label="E-mail">
                   <Input
-                    value={usuario}
-                    onChangeText={setUsuario}
+                    value={email}
+                    onChangeText={setEmail}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
-                    placeholder="Ex: maria ou maria@email.com"
+                    placeholder="seu@email.com"
                   />
                 </Field>
                 <Field label="Senha">
@@ -64,7 +97,7 @@ export function LoginScreen() {
                       secureTextEntry={!showPassword}
                       placeholder="Sua senha"
                       style={styles.passwordInput}
-                      onSubmitEditing={() => canSubmit && login.mutate()}
+                      onSubmitEditing={() => canSubmit && submit.mutate()}
                     />
                     <Pressable
                       onPress={() => setShowPassword((current) => !current)}
@@ -75,13 +108,23 @@ export function LoginScreen() {
                   </View>
                 </Field>
 
-                {login.error ? <StateText tone="error" text={loginErrorMessage(login.error)} /> : null}
+                {submit.error ? <StateText tone="error" text={loginErrorMessage(submit.error)} /> : null}
 
                 <Button
-                  title={login.isPending ? "Entrando..." : "Entrar"}
-                  icon={<LogIn size={18} color="#fff" />}
+                  title={
+                    submit.isPending
+                      ? mode === "login"
+                        ? "Entrando..."
+                        : "Criando conta..."
+                      : mode === "login"
+                        ? "Entrar"
+                        : "Criar conta"
+                  }
+                  icon={
+                    mode === "login" ? <LogIn size={18} color="#fff" /> : <UserPlus size={18} color="#fff" />
+                  }
                   disabled={!canSubmit}
-                  onPress={() => login.mutate()}
+                  onPress={() => submit.mutate()}
                 />
 
                 {!AUTH_REQUIRED ? (
@@ -98,6 +141,14 @@ export function LoginScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
+  );
+}
+
+function ModeChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.modeChip, active && styles.modeChipActive]}>
+      <Text style={[styles.modeChipText, active && styles.modeChipTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -143,13 +194,40 @@ const styles = StyleSheet.create({
   subtitle: {
     color: "rgba(255,255,255,0.85)",
     fontSize: 15,
-    fontFamily: fonts.body
+    fontFamily: fonts.body,
+    textAlign: "center"
   },
   card: {
     gap: 14,
     borderRadius: radius.xl,
     backgroundColor: colors.surface,
     padding: 20
+  },
+  modeRow: {
+    flexDirection: "row",
+    gap: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceWarm,
+    padding: 5
+  },
+  modeChip: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 42,
+    borderRadius: radius.pill
+  },
+  modeChipActive: {
+    backgroundColor: colors.brand,
+    ...shadows.brand
+  },
+  modeChipText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
+  },
+  modeChipTextActive: {
+    color: "#fff"
   },
   passwordRow: {
     flexDirection: "row",

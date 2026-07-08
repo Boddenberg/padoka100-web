@@ -1,30 +1,41 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { AlertTriangle, Lightbulb, Sparkles, TrendingDown, TrendingUp } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { AlertTriangle, Lightbulb, Lock, LogIn, Sparkles, TrendingDown, TrendingUp } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
-import { Card, Input, StateText } from "@/components/ui";
+import { Button, Card, Input, StateText } from "@/components/ui";
+import { useAuth } from "@/contexts/auth";
 import { api, ApiError } from "@/lib/api";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import type { RespostaAnaliseIA } from "@/types/api";
 
-// Análise do período com IA: análise padrão do período selecionado +
-// campo opcional de contexto ("ignore os pudins", "analise só abril"...).
-// A resposta chega organizada em seções, nunca como bloco cru.
+interface NormalizedAnalysis {
+  summary: string | null;
+  sections: { title: string; icon: React.ReactNode; items: string[] }[];
+}
+
+// Análise do período com IA. Análise padrão do período selecionado, ou
+// específica quando a pessoa escreve uma pergunta. Exige login como dono.
 export function AiAnalysisCard({ start, end }: { start: string; end: string }) {
-  const [context, setContext] = useState("");
-  const [result, setResult] = useState<RespostaAnaliseIA | null>(null);
+  const router = useRouter();
+  const { status, user } = useAuth();
+  const [question, setQuestion] = useState("");
+  const [result, setResult] = useState<NormalizedAnalysis | null>(null);
 
   const analyze = useMutation({
-    mutationFn: () =>
-      api.ia.analyzePeriod({
-        data_inicio: start,
-        data_fim: end,
-        contexto: context.trim() || null
-      }),
+    mutationFn: async () => {
+      const pergunta = question.trim();
+      const response = pergunta
+        ? await api.ia.analyzeSpecific({ data_inicio: start, data_fim: end, pergunta })
+        : await api.ia.analyzeDefault({ data_inicio: start, data_fim: end });
+      return normalizeAnalysis(response);
+    },
     onSuccess: setResult
   });
+
+  const isDono = user?.papel === "dono";
 
   return (
     <Card style={styles.card}>
@@ -37,64 +48,58 @@ export function AiAnalysisCard({ start, end }: { start: string; end: string }) {
         </View>
       </View>
 
-      <Input
-        value={context}
-        onChangeText={setContext}
-        placeholder="Contexto opcional. Ex: ignore os pudins"
-        multiline
-      />
-
-      <Pressable
-        onPress={() => analyze.mutate()}
-        disabled={analyze.isPending}
-        style={({ pressed }) => pressed && styles.pressed}
-      >
-        <LinearGradient
-          colors={gradients.agent}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.button, shadows.agent]}
-        >
-          <Sparkles size={18} color="#fff" />
-          <Text style={styles.buttonText}>{analyze.isPending ? "Analisando as vendas..." : "Gerar análise"}</Text>
-        </LinearGradient>
-      </Pressable>
-
-      {analyze.error ? <StateText tone="error" text={analysisErrorMessage(analyze.error)} /> : null}
-
-      {result ? (
-        <View style={styles.result}>
-          <View style={styles.summaryBubble}>
-            <Text style={styles.summaryText}>{result.resumo}</Text>
-          </View>
-
-          <AnalysisSection
-            title="Principais achados"
-            icon={<Sparkles size={16} color={colors.agentDeep} />}
-            items={result.principais_achados}
-          />
-          <AnalysisSection
-            title="Mais venderam"
-            icon={<TrendingUp size={16} color={colors.success} />}
-            items={result.mais_venderam}
-          />
-          <AnalysisSection
-            title="Mais sobraram"
-            icon={<TrendingDown size={16} color={colors.warning} />}
-            items={result.mais_sobraram}
-          />
-          <AnalysisSection
-            title="Sugestões"
-            icon={<Lightbulb size={16} color={colors.brandDeep} />}
-            items={result.sugestoes}
-          />
-          <AnalysisSection
-            title="Pontos de atenção"
-            icon={<AlertTriangle size={16} color={colors.danger} />}
-            items={result.pontos_atencao}
-          />
+      {status !== "signed-in" ? (
+        <View style={styles.gate}>
+          <Lock size={18} color={colors.muted} />
+          <Text style={styles.gateText}>Entre como dono da padaria para gerar análises.</Text>
+          <Button title="Entrar" tone="agent" icon={<LogIn size={18} color="#fff" />} onPress={() => router.push("/login")} />
         </View>
-      ) : null}
+      ) : !isDono ? (
+        <View style={styles.gate}>
+          <Lock size={18} color={colors.muted} />
+          <Text style={styles.gateText}>As análises com IA são exclusivas do dono da padaria.</Text>
+        </View>
+      ) : (
+        <>
+          <Input
+            value={question}
+            onChangeText={setQuestion}
+            placeholder="Pergunta opcional. Ex: o que devo produzir menos?"
+            multiline
+          />
+
+          <Pressable
+            onPress={() => analyze.mutate()}
+            disabled={analyze.isPending}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <LinearGradient
+              colors={gradients.agent}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.button, shadows.agent]}
+            >
+              <Sparkles size={18} color="#fff" />
+              <Text style={styles.buttonText}>{analyze.isPending ? "Analisando as vendas..." : "Gerar análise"}</Text>
+            </LinearGradient>
+          </Pressable>
+
+          {analyze.error ? <StateText tone="error" text={analysisErrorMessage(analyze.error)} /> : null}
+
+          {result ? (
+            <View style={styles.result}>
+              {result.summary ? (
+                <View style={styles.summaryBubble}>
+                  <Text style={styles.summaryText}>{result.summary}</Text>
+                </View>
+              ) : null}
+              {result.sections.map((section) => (
+                <AnalysisSection key={section.title} title={section.title} icon={section.icon} items={section.items} />
+              ))}
+            </View>
+          ) : null}
+        </>
+      )}
     </Card>
   );
 }
@@ -117,10 +122,49 @@ function AnalysisSection({ title, icon, items }: { title: string; icon: React.Re
   );
 }
 
-// O endpoint de análise ainda não existe no backend: recado honesto.
+// A forma exata da resposta não está documentada; aproveita os campos
+// estruturados quando existem e cai para o texto corrido quando não.
+function normalizeAnalysis(response: RespostaAnaliseIA): NormalizedAnalysis {
+  const summary =
+    firstString(response.resumo, response.analise, response.texto, response.resposta, response.mensagem) || null;
+
+  const sections = [
+    { title: "Principais achados", icon: <Sparkles size={16} color={colors.agentDeep} />, items: toList(response.principais_achados) },
+    { title: "Mais venderam", icon: <TrendingUp size={16} color={colors.success} />, items: toList(response.mais_venderam) },
+    { title: "Mais sobraram", icon: <TrendingDown size={16} color={colors.warning} />, items: toList(response.mais_sobraram) },
+    { title: "Sugestões", icon: <Lightbulb size={16} color={colors.brandDeep} />, items: toList(response.sugestoes) },
+    { title: "Pontos de atenção", icon: <AlertTriangle size={16} color={colors.danger} />, items: toList(response.pontos_atencao) }
+  ].filter((section) => section.items.length > 0);
+
+  return { summary, sections };
+}
+
+function firstString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function toList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === "string" ? item : item && typeof item === "object" ? summarizeObject(item) : String(item)))
+    .filter((item): item is string => Boolean(item && item.trim()));
+}
+
+function summarizeObject(item: object) {
+  const record = item as Record<string, unknown>;
+  const name = record["nome"] || record["produto"] || record["nome_produto"];
+  const qty = record["quantidade"] ?? record["total"] ?? record["valor"];
+  if (typeof name === "string") return qty != null ? `${name} (${qty})` : name;
+  return null;
+}
+
 function analysisErrorMessage(error: unknown) {
-  if (error instanceof ApiError && [404, 405, 501].includes(error.status)) {
-    return "O servidor ainda não gera análises com IA. Essa parte do sistema está em construção.";
+  if (error instanceof ApiError) {
+    if ([401, 403].includes(error.status)) return "Sua sessão expirou. Entre de novo como dono para gerar a análise.";
+    if ([404, 405, 501].includes(error.status)) return "O servidor não tem esse recurso de análise ainda.";
   }
   return error instanceof Error ? error.message : "Não foi possível gerar a análise.";
 }
@@ -152,6 +196,19 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12.5,
     fontFamily: fonts.body
+  },
+  gate: {
+    alignItems: "center",
+    gap: 10,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceGlow,
+    padding: 18
+  },
+  gateText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold,
+    textAlign: "center"
   },
   button: {
     minHeight: 52,

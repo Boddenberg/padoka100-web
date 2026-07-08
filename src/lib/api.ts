@@ -1,15 +1,17 @@
 import { getBaseUrl, readApiSettings, type ApiSettings } from "@/lib/settings";
 import type {
-  AlterarEmailRequest,
-  AlterarSenhaRequest,
-  AnaliseIARequest,
+  AnaliseEspecificaRequest,
+  AnalisePadraoRequest,
+  AtualizarPerfilRequest,
   CorrigirDiaFechadoRequest,
   CriarDiaDeVendaRequest,
   CriarItemProducaoRequest,
   DiaDeVenda,
   IniciarHojeRequest,
   ProdutoDaVenda,
+  RegistrarRequest,
   RespostaIniciarHoje,
+  TrocarSenhaRequest,
   EventoLinhaDoTempo,
   HealthStatus,
   LocalVenda,
@@ -159,16 +161,16 @@ export function createAudioForm(file: NativeFile, diaDeVendaId?: UUID | null) {
 
 export const api = {
   health: (settings?: ApiSettings) => apiRequest<HealthStatus>("/health", { settings }),
-  // Autenticação. Contrato definido pelo app; o backend ainda precisa
-  // implementar estes endpoints.
+  // Autenticação e perfil. O primeiro usuário registrado vira "dono".
   auth: {
+    register: (body: RegistrarRequest) => apiRequest<RespostaLogin>("/api/v1/auth/registrar", { method: "POST", body }),
     login: (body: LoginRequest) => apiRequest<RespostaLogin>("/api/v1/auth/login", { method: "POST", body }),
     logout: () => apiRequest<null>("/api/v1/auth/logout", { method: "POST", body: {} }),
-    me: () => apiRequest<UsuarioPerfil>("/api/v1/auth/me"),
-    changePassword: (body: AlterarSenhaRequest) =>
-      apiRequest<null>("/api/v1/auth/alterar-senha", { method: "POST", body }),
-    changeEmail: (body: AlterarEmailRequest) =>
-      apiRequest<UsuarioPerfil>("/api/v1/auth/alterar-email", { method: "POST", body })
+    me: () => apiRequest<UsuarioPerfil>("/api/v1/perfil/me"),
+    updateProfile: (body: AtualizarPerfilRequest) =>
+      apiRequest<UsuarioPerfil>("/api/v1/perfil/me", { method: "PATCH", body }),
+    changePassword: (body: TrocarSenhaRequest) =>
+      apiRequest<null>("/api/v1/auth/trocar-senha", { method: "POST", body })
   },
   produtos: {
     list: (somenteAtivos = true) =>
@@ -240,9 +242,27 @@ export const api = {
       apiRequest<RespostaTranscreverAudio>("/api/v1/ia/transcrever-audio", { method: "POST", formData }),
     confirmCommand: (interacaoId: UUID) =>
       apiRequest<RespostaConfirmarComando>(`/api/v1/ia/interacoes/${interacaoId}/confirmar`, { method: "POST" }),
-    // Análise do período com IA. Contrato definido pelo app;
-    // o backend ainda precisa implementar este endpoint.
-    analyzePeriod: (body: AnaliseIARequest) =>
-      apiRequest<RespostaAnaliseIA>("/api/v1/ia/analises", { method: "POST", body })
+    // Análises do período (exigem Bearer token e papel "dono").
+    analyzeDefault: (body: AnalisePadraoRequest) =>
+      apiRequest<RespostaAnaliseIA>("/api/v1/ia/analises/padrao", { method: "POST", body }),
+    analyzeSpecific: (body: AnaliseEspecificaRequest) =>
+      apiRequest<RespostaAnaliseIA>("/api/v1/ia/analises/especifica", { method: "POST", body }),
+    structuredData: (dataInicio: string, dataFim: string) =>
+      apiRequest<Record<string, unknown>>("/api/v1/ia/dados-estruturados/periodo", {
+        query: { data_inicio: dataInicio, data_fim: dataFim }
+      })
+  },
+  // Custos, insumos e receitas (exigem Bearer token e papel "dono").
+  // Cliente pronto; a UI guiada de custos (README §15) ainda será construída.
+  custos: {
+    listInsumos: () => apiRequest<Record<string, unknown>[]>("/api/v1/custos/insumos"),
+    createInsumo: (body: Record<string, unknown>) => apiRequest("/api/v1/custos/insumos", { method: "POST", body }),
+    updateInsumo: (insumoId: UUID, body: Record<string, unknown>) =>
+      apiRequest(`/api/v1/custos/insumos/${insumoId}`, { method: "PATCH", body }),
+    createReceita: (produtoId: UUID, body: Record<string, unknown>) =>
+      apiRequest(`/api/v1/custos/produtos/${produtoId}/receitas`, { method: "POST", body }),
+    addCustoAdicional: (produtoId: UUID, body: Record<string, unknown>) =>
+      apiRequest(`/api/v1/custos/produtos/${produtoId}/custos-adicionais`, { method: "POST", body }),
+    calcular: (produtoId: UUID) => apiRequest<Record<string, unknown>>(`/api/v1/custos/produtos/${produtoId}/calculo`)
   }
 };

@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Camera, Images, KeyRound, LogIn, LogOut, Mail, UserRound } from "lucide-react-native";
+import { Camera, Images, KeyRound, LogIn, LogOut, Mail, ShieldCheck, UserRound } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
@@ -17,27 +17,55 @@ import type { ApiEnvironment } from "@/types/api";
 
 type ActiveSheet = "password" | "email" | null;
 
+const PAPEL_LABEL: Record<string, string> = {
+  dono: "Dono",
+  administrador: "Administrador",
+  usuario: "Usuário"
+};
+
 // Perfil substitui a antiga tela Ajustes: dados da pessoa, conta e
-// segurança, e a conexão com o servidor no fim.
+// segurança, e a conexão com o servidor no fim. Quando logado, os dados
+// pessoais sincronizam com o servidor; senão, ficam no aparelho.
 export function ProfileScreen() {
   const router = useRouter();
-  const { status, user, signOut } = useAuth();
+  const { status, user, signOut, setUser } = useAuth();
   const [sheet, setSheet] = useState<ActiveSheet>(null);
 
-  // Dados pessoais guardados no aparelho (backend de perfil ainda não existe).
   const [profile, setProfile] = useState<LocalProfile>(emptyProfile);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
+  // Carrega os dados locais e, se logado, mescla o que veio do servidor.
   useEffect(() => {
     readProfile()
-      .then(setProfile)
+      .then((local) => {
+        setProfile({
+          ...local,
+          nome: user?.nome || local.nome,
+          telefone: user?.telefone || local.telefone,
+          email: user?.email || local.email,
+          nascimento: user?.data_nascimento || local.nascimento,
+          fotoUri: local.fotoUri || user?.foto_url || null
+        });
+      })
       .catch(() => undefined)
       .finally(() => setProfileLoaded(true));
-  }, []);
+  }, [user]);
 
   const saveData = useMutation({
-    mutationFn: () => saveProfile(profile)
+    mutationFn: async () => {
+      await saveProfile(profile);
+      // Logado: espelha os campos textuais no servidor.
+      if (status === "signed-in") {
+        const updated = await api.auth.updateProfile({
+          nome: profile.nome || null,
+          telefone: profile.telefone || null,
+          data_nascimento: profile.nascimento || null,
+          email: profile.email || null
+        });
+        setUser(updated);
+      }
+    }
   });
 
   async function choosePhoto(source: "camera" | "gallery") {
@@ -66,6 +94,8 @@ export function ProfileScreen() {
     ]);
   }
 
+  const papel = user?.papel ? PAPEL_LABEL[user.papel] || user.papel : null;
+
   return (
     <>
       <Page greeting={getGreeting()} title="Perfil" subtitle="Seus dados, sua conta e a conexão do app.">
@@ -75,7 +105,14 @@ export function ProfileScreen() {
             <ProfilePhoto uri={profile.fotoUri} />
             <View style={styles.headerInfo}>
               <Text style={styles.headerName}>{profile.nome.trim() || "Seu nome"}</Text>
-              {user ? <Badge text={`@${user.usuario}`} tone="good" /> : <Badge text="Conta não conectada" tone="neutral" />}
+              {user ? (
+                <View style={styles.headerBadges}>
+                  <Badge text={user.email} tone="good" />
+                  {papel ? <Badge text={papel} tone="agent" /> : null}
+                </View>
+              ) : (
+                <Badge text="Conta não conectada" tone="neutral" />
+              )}
             </View>
           </View>
 
@@ -114,8 +151,10 @@ export function ProfileScreen() {
             />
           </Field>
 
-          {saveData.isSuccess ? <StateText tone="success" text="Dados salvos neste aparelho." /> : null}
-          {saveData.error instanceof Error ? <StateText tone="error" text={saveData.error.message} /> : null}
+          {saveData.isSuccess ? (
+            <StateText tone="success" text={status === "signed-in" ? "Dados salvos na sua conta." : "Dados salvos neste aparelho."} />
+          ) : null}
+          {saveData.error ? <StateText tone="error" text={profileErrorMessage(saveData.error)} /> : null}
           <Button
             title={saveData.isPending ? "Salvando..." : "Salvar dados"}
             disabled={!profileLoaded || saveData.isPending}
@@ -129,8 +168,11 @@ export function ProfileScreen() {
 
           {status === "signed-in" && user ? (
             <>
-              <InfoRow icon={<UserRound size={18} color={colors.brandDeep} />} label="Usuário" value={user.usuario} />
-              <InfoRow icon={<Mail size={18} color={colors.brandDeep} />} label="E-mail de acesso" value={user.email || "não informado"} />
+              <InfoRow icon={<UserRound size={18} color={colors.brandDeep} />} label="Nome" value={user.nome || "não informado"} />
+              <InfoRow icon={<Mail size={18} color={colors.brandDeep} />} label="E-mail de acesso" value={user.email} />
+              {papel ? (
+                <InfoRow icon={<ShieldCheck size={18} color={colors.brandDeep} />} label="Papel" value={papel} />
+              ) : null}
               <Button
                 title="Alterar senha"
                 tone="soft"
@@ -150,10 +192,10 @@ export function ProfileScreen() {
               <Text style={styles.muted}>
                 {AUTH_REQUIRED
                   ? "Sua sessão terminou. Entre de novo para continuar."
-                  : "Você ainda não entrou com uma conta. O login protege seus dados quando o servidor estiver pronto."}
+                  : "Entre com uma conta para análises com IA, gestão de custos e para proteger seus dados."}
               </Text>
               <Button
-                title="Fazer login"
+                title="Entrar ou criar conta"
                 icon={<LogIn size={18} color="#fff" />}
                 onPress={() => router.push("/login")}
               />
@@ -166,7 +208,14 @@ export function ProfileScreen() {
       </Page>
 
       <ChangePasswordSheet visible={sheet === "password"} onClose={() => setSheet(null)} />
-      <ChangeEmailSheet visible={sheet === "email"} onClose={() => setSheet(null)} />
+      <ChangeEmailSheet
+        visible={sheet === "email"}
+        currentEmail={user?.email || ""}
+        onClose={() => setSheet(null)}
+        onChanged={(updatedEmail) => {
+          if (user) setUser({ ...user, email: updatedEmail });
+        }}
+      />
     </>
   );
 }
@@ -211,7 +260,7 @@ function ChangePasswordSheet({ visible, onClose }: { visible: boolean; onClose: 
   const [validation, setValidation] = useState<string | null>(null);
 
   const change = useMutation({
-    mutationFn: () => api.auth.changePassword({ senha_atual: current, senha_nova: next }),
+    mutationFn: () => api.auth.changePassword({ senha_atual: current, nova_senha: next }),
     onSuccess: () => {
       setCurrent("");
       setNext("");
@@ -245,6 +294,7 @@ function ChangePasswordSheet({ visible, onClose }: { visible: boolean; onClose: 
         <Input value={confirm} onChangeText={setConfirm} secureTextEntry />
       </Field>
       {validation ? <StateText tone="error" text={validation} /> : null}
+      {change.isSuccess ? <StateText tone="success" text="Senha alterada!" /> : null}
       {change.error ? <StateText tone="error" text={securityErrorMessage(change.error)} /> : null}
       <Button
         title={change.isPending ? "Salvando..." : "Salvar nova senha"}
@@ -255,31 +305,38 @@ function ChangePasswordSheet({ visible, onClose }: { visible: boolean; onClose: 
   );
 }
 
-function ChangeEmailSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+// Troca de e-mail via atualização de perfil.
+function ChangeEmailSheet({
+  visible,
+  currentEmail,
+  onClose,
+  onChanged
+}: {
+  visible: boolean;
+  currentEmail: string;
+  onClose: () => void;
+  onChanged: (email: string) => void;
+}) {
   const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
 
   const change = useMutation({
-    mutationFn: () => api.auth.changeEmail({ email: email.trim(), senha }),
-    onSuccess: () => {
+    mutationFn: () => api.auth.updateProfile({ email: email.trim() }),
+    onSuccess: (updated) => {
+      onChanged(updated.email || email.trim());
       setEmail("");
-      setSenha("");
       onClose();
     }
   });
 
   return (
-    <Sheet visible={visible} title="Alterar e-mail" subtitle="Confirme com a sua senha." onClose={onClose}>
+    <Sheet visible={visible} title="Alterar e-mail" subtitle={currentEmail ? `Atual: ${currentEmail}` : undefined} onClose={onClose}>
       <Field label="Novo e-mail">
         <Input value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="novo@email.com" />
-      </Field>
-      <Field label="Senha">
-        <Input value={senha} onChangeText={setSenha} secureTextEntry />
       </Field>
       {change.error ? <StateText tone="error" text={securityErrorMessage(change.error)} /> : null}
       <Button
         title={change.isPending ? "Salvando..." : "Salvar novo e-mail"}
-        disabled={!email.trim() || !senha || change.isPending}
+        disabled={!email.trim() || change.isPending}
         onPress={() => change.mutate()}
       />
     </Sheet>
@@ -288,10 +345,16 @@ function ChangeEmailSheet({ visible, onClose }: { visible: boolean; onClose: () 
 
 function securityErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
-    if ([401, 403].includes(error.status)) return "Senha atual incorreta.";
-    if ([404, 405, 501].includes(error.status)) {
-      return "O servidor ainda não tem esse recurso. Essa parte do sistema está em construção.";
-    }
+    if ([401, 403].includes(error.status)) return "Senha atual incorreta ou sessão expirada.";
+    if (error.status === 409) return "Já existe uma conta com esse e-mail.";
+    if (error.status === 422) return "Confira os dados informados.";
+  }
+  return error instanceof Error ? error.message : "Não foi possível salvar.";
+}
+
+function profileErrorMessage(error: unknown) {
+  if (error instanceof ApiError && [401, 403].includes(error.status)) {
+    return "Sua sessão expirou. Entre de novo para salvar na conta.";
   }
   return error instanceof Error ? error.message : "Não foi possível salvar.";
 }
@@ -382,6 +445,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: fonts.display,
     letterSpacing: -0.3
+  },
+  headerBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
   },
   avatar: {
     height: 84,

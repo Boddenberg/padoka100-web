@@ -231,49 +231,78 @@ export interface CriarDiaDeVendaRequest {
   itens_producao?: CriarItemProducaoRequest[];
 }
 
-// Autenticação (backend ainda vai implementar).
+// Autenticação e perfil (/auth/* e /perfil/me).
+export type PapelUsuario = "usuario" | "administrador" | "dono";
+
 export interface UsuarioPerfil {
   id: UUID;
-  usuario: string;
-  email?: string | null;
+  email: string;
   nome?: string | null;
+  telefone?: string | null;
+  foto_url?: string | null;
+  data_nascimento?: string | null;
+  papel?: PapelUsuario | string;
 }
 
 export interface LoginRequest {
-  usuario: string;
-  senha: string;
-}
-
-export interface RespostaLogin {
-  token: string;
-  usuario: UsuarioPerfil;
-}
-
-export interface AlterarSenhaRequest {
-  senha_atual: string;
-  senha_nova: string;
-}
-
-export interface AlterarEmailRequest {
   email: string;
   senha: string;
 }
 
-// Análise de vendas com IA (backend ainda vai implementar).
-export interface AnaliseIARequest {
-  data_inicio: string;
-  data_fim: string;
-  contexto?: string | null;
+export interface RegistrarRequest {
+  email: string;
+  senha: string;
+  nome: string;
+  telefone?: string | null;
 }
 
+// O login devolve o token; o usuário é buscado depois em /perfil/me.
+export interface RespostaLogin {
+  access_token: string;
+  token_type?: string;
+  usuario?: UsuarioPerfil;
+}
+
+export interface TrocarSenhaRequest {
+  senha_atual: string;
+  nova_senha: string;
+}
+
+export interface AtualizarPerfilRequest {
+  nome?: string | null;
+  telefone?: string | null;
+  foto_url?: string | null;
+  data_nascimento?: string | null;
+  email?: string | null;
+}
+
+// Análise de vendas com IA (/ia/analises/padrao e /especifica, papel dono).
+export interface AnalisePadraoRequest {
+  data_inicio: string;
+  data_fim: string;
+  contexto_usuario?: string | null;
+}
+
+export interface AnaliseEspecificaRequest {
+  data_inicio: string;
+  data_fim: string;
+  pergunta: string;
+}
+
+// A forma exata da resposta não está no guia; tratamos de forma flexível.
 export interface RespostaAnaliseIA {
-  resumo: string;
+  resumo?: string;
+  analise?: string;
+  texto?: string;
+  resposta?: string;
+  mensagem?: string;
   principais_achados?: string[];
   mais_venderam?: string[];
   mais_sobraram?: string[];
   sugestoes?: string[];
   pontos_atencao?: string[];
   modelo_usado?: string;
+  [key: string]: unknown;
 }
 
 // Correção retroativa de um dia fechado (POST /dias-de-venda/{id}/correcoes).

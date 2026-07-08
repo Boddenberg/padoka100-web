@@ -8,8 +8,11 @@ type AuthStatus = "loading" | "signed-in" | "signed-out";
 interface AuthContextValue {
   status: AuthStatus;
   user: UsuarioPerfil | null;
-  signIn: (usuario: string, senha: string) => Promise<void>;
+  signIn: (email: string, senha: string) => Promise<void>;
+  register: (data: { nome: string; email: string; telefone: string; senha: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  setUser: (user: UsuarioPerfil) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -57,15 +60,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, [signOut]);
 
-  const signIn = useCallback(async (usuario: string, senha: string) => {
-    const response = await api.auth.login({ usuario: usuario.trim(), senha });
-    setApiToken(response.token);
-    setUser(response.usuario);
+  // Aplica o token e resolve o perfil (o login só devolve o access_token).
+  const establishSession = useCallback(async (accessToken: string, fallback?: UsuarioPerfil) => {
+    setApiToken(accessToken);
+    let profile = fallback;
+    try {
+      profile = await api.auth.me();
+    } catch {
+      // Sem /perfil/me acessível, segue com o que veio do login (se veio).
+    }
+    if (!profile) throw new Error("Não foi possível carregar o perfil da conta.");
+    setUser(profile);
     setStatus("signed-in");
-    await saveSession({ token: response.token, usuario: response.usuario });
+    await saveSession({ token: accessToken, usuario: profile });
   }, []);
 
-  const value = useMemo(() => ({ status, user, signIn, signOut }), [status, user, signIn, signOut]);
+  const signIn = useCallback(
+    async (email: string, senha: string) => {
+      const response = await api.auth.login({ email: email.trim(), senha });
+      await establishSession(response.access_token, response.usuario);
+    },
+    [establishSession]
+  );
+
+  const register = useCallback(
+    async (data: { nome: string; email: string; telefone: string; senha: string }) => {
+      const response = await api.auth.register({
+        nome: data.nome.trim(),
+        email: data.email.trim(),
+        telefone: data.telefone.trim() || null,
+        senha: data.senha
+      });
+      // Alguns backends já devolvem token no registro; se não, faz login.
+      if (response?.access_token) {
+        await establishSession(response.access_token, response.usuario);
+      } else {
+        await signIn(data.email, data.senha);
+      }
+    },
+    [establishSession, signIn]
+  );
+
+  const refreshUser = useCallback(async () => {
+    const profile = await api.auth.me();
+    setUser(profile);
+  }, []);
+
+  const value = useMemo(
+    () => ({ status, user, signIn, register, signOut, refreshUser, setUser }),
+    [status, user, signIn, register, signOut, refreshUser]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -76,13 +120,12 @@ export function useAuth() {
   return context;
 }
 
-// Erro de login em linguagem humana.
+// Erro de login/registro em linguagem humana.
 export function loginErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
-    if ([401, 403].includes(error.status)) return "Usuário ou senha inválidos. Confira e tente de novo.";
-    if ([404, 405, 501].includes(error.status)) {
-      return "O servidor ainda não tem login. Essa parte do sistema está em construção.";
-    }
+    if ([401, 403].includes(error.status)) return "E-mail ou senha inválidos. Confira e tente de novo.";
+    if (error.status === 409) return "Já existe uma conta com esse e-mail.";
+    if (error.status === 422) return "Confira os dados: e-mail válido e senha com pelo menos 6 caracteres.";
   }
-  return error instanceof Error ? error.message : "Não foi possível entrar. Tente novamente.";
+  return error instanceof Error ? error.message : "Não foi possível continuar. Tente novamente.";
 }

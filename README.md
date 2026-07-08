@@ -820,7 +820,7 @@ Biblioteca de navegação: expo-router (tabs + stack, rotas em app/)
 Biblioteca de gráficos: componente próprio (src/components/resumo/period-chart.tsx)
 Gerenciamento de estado: TanStack React Query (dados do servidor) + estado local do React; sessão em Context (src/contexts/auth.tsx)
 Cliente HTTP: fetch com wrapper próprio (src/lib/api.ts: X-API-Key, Bearer token, erros tipados)
-Autenticação: contexto de sessão + expo-secure-store para o token; proteção de rotas via AUTH_REQUIRED (src/constants/auth.ts) — endpoints /api/v1/auth/* aguardam o backend
+Autenticação: /api/v1/auth/* (registrar/login/logout/trocar-senha) + /perfil/me; token Bearer em expo-secure-store; login opcional (AUTH_REQUIRED em src/constants/auth.ts) pois só perfil, análise IA e custos exigem sessão de dono
 Ambiente de build: EAS (eas.json, canais preview/production via expo-updates)
 ```
 

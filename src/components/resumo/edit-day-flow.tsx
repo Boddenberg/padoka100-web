@@ -144,7 +144,7 @@ export function EditDayFlow({ resumo, onCancel, onSaved }: { resumo: ResumoDoDia
       }
 
       return api.dias.corrections(resumo.dia_de_venda_id, {
-        usuario_id: user?.usuario || "app",
+        usuario_id: user?.id || "app",
         motivo: reason.trim() || null,
         ...(producoes.length ? { producoes } : {}),
         ...(itensVenda.length ? { itens_venda: itensVenda } : {}),
