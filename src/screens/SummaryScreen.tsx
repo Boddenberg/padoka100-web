@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { RangeCalendar } from "@/components/calendar";
+import { AiAnalysisCard } from "@/components/resumo/ai-analysis";
 import { DaySummarySheet } from "@/components/resumo/day-summary-sheet";
 import { PeriodChart } from "@/components/resumo/period-chart";
 import { Badge, Card, Page, SectionTitle, StateText } from "@/components/ui";
@@ -125,7 +126,11 @@ export function SummaryScreen() {
         {/* 3. Gráfico de vendas do período selecionado. */}
         <PeriodChart dias={totals?.dias} start={start} end={end} today={today} />
 
+        {/* 4. Análise com IA do período selecionado. */}
+        <AiAnalysisCard start={start} end={end} />
+
         {/* Dias do período, cada um abre o próprio resumo. */}
+        {totals?.dias?.length ? <SectionTitle text="Dias do período" /> : null}
         {(totals?.dias || []).map((day) => (
           <Pressable
             key={day.dia_de_venda_id}

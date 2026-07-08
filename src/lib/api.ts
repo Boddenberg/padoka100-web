@@ -1,5 +1,6 @@
 import { getBaseUrl, readApiSettings, type ApiSettings } from "@/lib/settings";
 import type {
+  AnaliseIARequest,
   CorrigirDiaRequest,
   CriarDiaDeVendaRequest,
   CriarItemProducaoRequest,
@@ -10,6 +11,7 @@ import type {
   Midia,
   Produto,
   RegistrarVendaRequest,
+  RespostaAnaliseIA,
   RespostaConfirmarComando,
   RespostaInterpretarVenda,
   RespostaTranscreverAudio,
@@ -197,6 +199,10 @@ export const api = {
     transcribeAudio: (formData: FormData) =>
       apiRequest<RespostaTranscreverAudio>("/api/v1/ia/transcrever-audio", { method: "POST", formData }),
     confirmCommand: (interacaoId: UUID) =>
-      apiRequest<RespostaConfirmarComando>(`/api/v1/ia/interacoes/${interacaoId}/confirmar`, { method: "POST" })
+      apiRequest<RespostaConfirmarComando>(`/api/v1/ia/interacoes/${interacaoId}/confirmar`, { method: "POST" }),
+    // Análise do período com IA. Contrato definido pelo app;
+    // o backend ainda precisa implementar este endpoint.
+    analyzePeriod: (body: AnaliseIARequest) =>
+      apiRequest<RespostaAnaliseIA>("/api/v1/ia/analises", { method: "POST", body })
   }
 };

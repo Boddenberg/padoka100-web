@@ -227,6 +227,23 @@ export interface CriarDiaDeVendaRequest {
   itens_producao?: CriarItemProducaoRequest[];
 }
 
+// Análise de vendas com IA (backend ainda vai implementar).
+export interface AnaliseIARequest {
+  data_inicio: string;
+  data_fim: string;
+  contexto?: string | null;
+}
+
+export interface RespostaAnaliseIA {
+  resumo: string;
+  principais_achados?: string[];
+  mais_venderam?: string[];
+  mais_sobraram?: string[];
+  sugestoes?: string[];
+  pontos_atencao?: string[];
+  modelo_usado?: string;
+}
+
 // Correção retroativa de um dia fechado (backend ainda vai implementar).
 export interface CorrecaoItemRequest {
   produto_id: UUID;
