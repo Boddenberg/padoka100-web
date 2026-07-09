@@ -13,9 +13,9 @@ export default function TabsLayout() {
         // redondos e sombra suave — o conteúdo passa por baixo.
         tabBarStyle: {
           position: "absolute",
-          left: 14,
-          right: 14,
-          bottom: 12,
+          left: 12,
+          right: 12,
+          bottom: 6,
           minHeight: 68,
           paddingTop: 8,
           paddingBottom: 8,
