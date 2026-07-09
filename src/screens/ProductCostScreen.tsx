@@ -347,9 +347,13 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   const canAdvanceToPrecos = rendimentoOk && recipeReadyCount > 0;
   // Receita "completa": rendimento + todos os ingredientes com quantidade usada.
   const recipeComplete = rendimentoOk && ingredientes.length > 0 && ingredientes.every(hasRecipeData);
+  // O custo pode estar completo mesmo sem preço no rascunho: o backend reusa o
+  // preço salvo do insumo (compras anteriores). Se ele já libera a confirmação,
+  // não pedimos preço de novo.
+  const custoResolvido = Boolean(session?.pode_confirmar);
   const missingPrices = missingPurchaseCount(ingredientes);
   const incompleteHint =
-    missingPrices > 0
+    !custoResolvido && missingPrices > 0
       ? `Faltam ${missingPrices} ${missingPrices === 1 ? "preço" : "preços"} para eu fechar a conta.`
       : undefined;
 
@@ -485,6 +489,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                   <PricePhaseBody
                     ingredientes={ingredientes}
                     custosAdicionais={custosAdicionais}
+                    priceResolved={custoResolvido}
                     onEditIngrediente={(index) => setSheet({ kind: "ingrediente-preco", index })}
                     onEditExtra={(index) => setSheet({ kind: "extra", index })}
                     onAddExtra={() => setSheet({ kind: "extra", index: null })}
@@ -645,6 +650,7 @@ function RecipePhaseBody({
 function PricePhaseBody({
   ingredientes,
   custosAdicionais,
+  priceResolved,
   onEditIngrediente,
   onEditExtra,
   onAddExtra,
@@ -652,6 +658,7 @@ function PricePhaseBody({
 }: {
   ingredientes: IngredienteRascunho[];
   custosAdicionais: CustoAdicionalRascunho[];
+  priceResolved: boolean;
   onEditIngrediente: (index: number) => void;
   onEditExtra: (index: number) => void;
   onAddExtra: () => void;
@@ -660,12 +667,17 @@ function PricePhaseBody({
   return (
     <>
       <SectionTitle text="Preço de cada item" />
-      <Text style={styles.sectionHint}>Toque em cada ingrediente e diga quanto comprou e quanto pagou.</Text>
+      <Text style={styles.sectionHint}>
+        {priceResolved
+          ? "Já aproveitei os preços que você salvou em compras anteriores. Toque num item só se quiser atualizar o preço."
+          : "Toque em cada ingrediente e diga quanto comprou e quanto pagou."}
+      </Text>
       {ingredientes.map((ingrediente, index) => (
         <IngredientRow
           key={`${ingrediente.nome || "ingrediente"}-${index}`}
           ingrediente={ingrediente}
           phase="precos"
+          priceResolved={priceResolved}
           onEdit={() => onEditIngrediente(index)}
         />
       ))}

@@ -222,18 +222,30 @@ export function ReceitaCard({ rascunho, title, onEdit }: { rascunho: RascunhoCus
 export function IngredientRow({
   ingrediente,
   phase,
+  priceResolved,
   onEdit
 }: {
   ingrediente: IngredienteRascunho;
   phase: CusteioPhase;
+  // Nos preços: o backend já fechou o custo (ex.: preço salvo de uma compra
+  // anterior no catálogo)? Se sim, não pedimos o preço de novo.
+  priceResolved?: boolean;
   onEdit: () => void;
 }) {
   const recipePhase = phase === "receita";
-  const ready = recipePhase ? hasRecipeData(ingrediente) : hasPurchaseData(ingrediente);
+  const priced = hasPurchaseData(ingrediente);
+  const ready = recipePhase ? hasRecipeData(ingrediente) : priced || Boolean(priceResolved);
 
-  const subtitle = recipePhase
-    ? recipeUsageText(ingrediente) || "Toque para informar a quantidade usada"
-    : purchaseText(ingrediente, formatCurrency) || recipeUsageText(ingrediente) || "Toque para informar o preço";
+  let subtitle: string;
+  if (recipePhase) {
+    subtitle = recipeUsageText(ingrediente) || "Toque para informar a quantidade usada";
+  } else if (priced) {
+    subtitle = purchaseText(ingrediente, formatCurrency);
+  } else if (priceResolved) {
+    subtitle = "Usando o preço salvo de uma compra anterior";
+  } else {
+    subtitle = recipeUsageText(ingrediente) || "Toque para informar o preço";
+  }
   const hint = ready ? null : recipePhase ? "Toque para informar a quantidade usada" : "Toque para informar quanto pagou";
 
   return (
