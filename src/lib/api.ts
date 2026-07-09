@@ -5,6 +5,8 @@ import type {
   CriarSessaoCusteioRequest,
   EntradaTextoCusteioRequest,
   FinalidadeCusteio,
+  GerarListaCompraRequest,
+  ListaCompra,
   SessaoCusteio
 } from "@/types/custeio";
 import type {
@@ -322,6 +324,15 @@ export const api = {
         }),
       descartar: (sessaoId: UUID) =>
         apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/descartar`, { method: "POST" })
+    },
+    // Lista de compras por produção planejada (salvar=false simula; true grava).
+    listaCompras: {
+      gerar: (body: GerarListaCompraRequest) =>
+        apiRequest<ListaCompra>("/api/v1/custos/lista-compras", { method: "POST", body }),
+      historico: () =>
+        apiRequest<unknown>("/api/v1/custos/listas-compras", { query: { limite: 50 }, allowNotFound: true }),
+      obter: (listaId: UUID) =>
+        apiRequest<ListaCompra | null>(`/api/v1/custos/listas-compras/${listaId}`, { allowNotFound: true })
     },
     listInsumos: () => apiRequest<Record<string, unknown>[]>("/api/v1/custos/insumos"),
     createInsumo: (body: Record<string, unknown>) => apiRequest("/api/v1/custos/insumos", { method: "POST", body }),

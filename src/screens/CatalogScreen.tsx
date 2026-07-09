@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Calculator, Camera, ChevronRight, Images, MapPin, Sparkles, Trash2 } from "lucide-react-native";
+import { Calculator, Camera, ChevronRight, Images, MapPin, ShoppingCart, Sparkles, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -47,6 +47,7 @@ const emptyProduct: ProductDraft = {
 };
 
 export function CatalogScreen() {
+  const router = useRouter();
   const [sheet, setSheet] = useState<"product" | "location" | "edit" | "edit-location" | null>(null);
   const [editing, setEditing] = useState<Produto | null>(null);
   const [editingLocal, setEditingLocal] = useState<LocalVenda | null>(null);
@@ -109,6 +110,20 @@ export function CatalogScreen() {
   return (
     <>
       <Page title="Catálogo" subtitle="Produtos, preços, fotos e locais de venda." onRefresh={onRefresh} refreshing={refreshing}>
+        {/* Porta de entrada da lista de compras por produção planejada. */}
+        <Pressable onPress={() => router.push("/lista-compras")} style={({ pressed }) => pressed && styles.pressed}>
+          <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.shopCard, shadows.floating]}>
+            <View style={styles.shopIcon}>
+              <ShoppingCart size={22} color="#fff" />
+            </View>
+            <View style={styles.shopInfo}>
+              <Text style={styles.shopTitle}>Lista de compras</Text>
+              <Text style={styles.shopSubtitle}>Planeje a produção e veja o que comprar, com o custo estimado</Text>
+            </View>
+            <ChevronRight size={20} color="#fff" />
+          </LinearGradient>
+        </Pressable>
+
         <View style={styles.actions}>
           <View style={styles.actionButton}>
             <Button title="Novo produto" onPress={() => setSheet("product")} />
@@ -702,6 +717,36 @@ const styles = StyleSheet.create({
   pressed: {
     transform: [{ scale: 0.98 }],
     opacity: 0.92
+  },
+  shopCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: radius.xl,
+    padding: 16
+  },
+  shopIcon: {
+    height: 44,
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.22)"
+  },
+  shopInfo: {
+    flex: 1,
+    gap: 2
+  },
+  shopTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontFamily: fonts.bodyBold
+  },
+  shopSubtitle: {
+    color: "rgba(255,255,255,0.88)",
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontFamily: fonts.body
   },
   actions: {
     flexDirection: "row",

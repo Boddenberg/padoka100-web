@@ -115,3 +115,50 @@ export interface ConfirmarCusteioRequest {
   vigente_desde?: string;
   motivo_preco?: string;
 }
+
+// --- Lista de compras por produção planejada. -----------------------------
+
+export interface ListaCompraContribuicao {
+  produto_id?: string;
+  produto?: string | null;
+  receita_id?: string | null;
+  quantidade_produto?: number | string;
+  quantidade_base?: number | string;
+  [key: string]: unknown;
+}
+
+export interface ListaCompraItem {
+  insumo_id?: string;
+  nome?: string | null;
+  categoria?: string | null;
+  quantidade_base?: number | string;
+  unidade_base?: string | null;
+  quantidade_sugerida?: number | string;
+  unidade_sugerida?: string | null;
+  custo_unitario_base?: number | string;
+  custo_estimado?: number | string;
+  status?: string | null;
+  observacoes?: string | null;
+  contribuicoes?: ListaCompraContribuicao[] | null;
+  [key: string]: unknown;
+}
+
+export interface ListaCompra {
+  id?: string;
+  nome?: string | null;
+  data_referencia?: string | null;
+  margem_percentual?: number;
+  total_estimado?: number | string;
+  pendencias?: ItemGuiado[] | null;
+  itens?: ListaCompraItem[] | null;
+  criado_em?: string | null;
+  [key: string]: unknown;
+}
+
+export interface GerarListaCompraRequest {
+  nome?: string;
+  data_referencia?: string;
+  margem_percentual?: number;
+  salvar?: boolean;
+  itens: { produto_id: string; quantidade: number; receita_id?: string }[];
+}
