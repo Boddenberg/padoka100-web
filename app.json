@@ -6,9 +6,7 @@
     "orientation": "portrait",
     "scheme": "padoka100",
     "userInterfaceStyle": "light",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "exposdk:54.0.0",
     "updates": {
       "url": "https://u.expo.dev/ed7d0538-750b-4f69-87c3-ebba96be1538"
     },
