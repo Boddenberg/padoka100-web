@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
+import { NotificationsButton } from "@/components/notifications";
+import { SettingsButton } from "@/components/settings-menu";
 import {
   Badge,
   Button,
@@ -199,7 +201,17 @@ export function SalesScreen() {
 
   return (
     <>
-      <Page greeting={getGreeting(user?.nome)} title="Venda" subtitle="Toque nos produtos ou fale com o agente.">
+      <Page
+        greeting={getGreeting(user?.nome)}
+        title="Venda"
+        subtitle="Toque nos produtos ou fale com o agente."
+        headerRight={
+          <>
+            <NotificationsButton />
+            <SettingsButton />
+          </>
+        }
+      >
         {loading ? (
           <View style={styles.skeletonStack}>
             <Skeleton height={210} rounded={radius.xl} />
@@ -232,8 +244,8 @@ export function SalesScreen() {
             <View pointerEvents="none" style={styles.heroGlowOne} />
             <View pointerEvents="none" style={styles.heroGlowTwo} />
             <Text style={styles.heroTitle}>Bora começar o dia de venda?</Text>
-            <Text style={styles.heroMuted}>Registre a produção de hoje e venda com um toque.</Text>
-            <Button title="Abrir dia de venda" onPress={() => setSheet("open-day")} />
+            <Text style={styles.heroMuted}>Registre a produção de hoje e venda com um toque. Dá para produzir mais depois.</Text>
+            <Button title="Começar o dia" onPress={() => setSheet("open-day")} />
           </LinearGradient>
         ) : null}
 
@@ -552,7 +564,7 @@ function ProductionEditor({
 
 function OpenDaySheet({ visible, onClose, products }: { visible: boolean; onClose: () => void; products: Produto[] }) {
   return (
-    <Sheet visible={visible} title="Abrir dia" subtitle="Quantos itens você preparou hoje?" onClose={onClose}>
+    <Sheet visible={visible} title="Começar o dia" subtitle="Quantos itens você preparou hoje?" onClose={onClose}>
       {visible ? <OpenDayForm onClose={onClose} products={products} /> : null}
     </Sheet>
   );
@@ -631,7 +643,7 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
         })}
         {startDay.error instanceof Error ? <StateText tone="error" text={startDay.error.message} /> : null}
         <Button
-          title={startDay.isPending ? "Abrindo..." : "Usar sobras e abrir o dia"}
+          title={startDay.isPending ? "Começando..." : "Usar sobras e começar o dia"}
           disabled={startDay.isPending}
           onPress={() =>
             startDay.mutate(
@@ -655,7 +667,7 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
         onChange={(produtoId, value) => setQuantities((current) => ({ ...current, [produtoId]: value }))}
       />
       {startDay.error instanceof Error ? <StateText tone="error" text={startDay.error.message} /> : null}
-      <Button title={startDay.isPending ? "Abrindo..." : "Abrir dia"} disabled={startDay.isPending} onPress={() => startDay.mutate(undefined)} />
+      <Button title={startDay.isPending ? "Começando..." : "Começar o dia"} disabled={startDay.isPending} onPress={() => startDay.mutate(undefined)} />
     </>
   );
 }

@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { formatCurrency } from "@/lib/format";
+import { useFontMultiplier } from "@/lib/font-scale";
 import { haptics } from "@/lib/haptics";
 import { resolveMediaUrl } from "@/lib/settings";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -38,13 +39,17 @@ export function Page({
   title,
   subtitle,
   greeting,
+  headerRight,
   children
 }: {
   title: string;
   subtitle?: string;
   greeting?: string;
+  // Ações no topo direito (engrenagem de config, cartinha de avisos...).
+  headerRight?: ReactNode;
   children: ReactNode;
 }) {
+  const scale = useFontMultiplier();
   return (
     <Screen>
       <ScrollView
@@ -55,10 +60,13 @@ export function Page({
       >
         {/* Tocar em qualquer área vazia fecha o teclado. */}
         <Pressable style={styles.page} onPress={Keyboard.dismiss} accessible={false}>
-          <View>
-            {greeting ? <Text style={styles.greeting}>{greeting}</Text> : null}
-            <Text style={styles.title}>{title}</Text>
-            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          <View style={styles.pageHeaderRow}>
+            <View style={styles.pageHeaderText}>
+              {greeting ? <Text style={[styles.greeting, { fontSize: 17 * scale }]}>{greeting}</Text> : null}
+              <Text style={[styles.title, { fontSize: 30 * scale }]}>{title}</Text>
+              {subtitle ? <Text style={[styles.subtitle, { fontSize: 15 * scale }]}>{subtitle}</Text> : null}
+            </View>
+            {headerRight ? <View style={styles.pageHeaderActions}>{headerRight}</View> : null}
           </View>
           {children}
         </Pressable>
@@ -95,10 +103,11 @@ export function Button({
     tone === "soft" ? colors.surfaceWarm : tone === "danger" ? colors.danger : tone === "success" ? colors.success : "transparent";
   const textColor = tone === "soft" ? colors.ink : tone === "outline" ? colors.brandDeep : "#fff";
 
+  const scale = useFontMultiplier();
   const content = (
     <>
       {icon}
-      <Text style={[styles.buttonText, { color: disabled ? colors.muted : textColor }]}>{title}</Text>
+      <Text style={[styles.buttonText, { color: disabled ? colors.muted : textColor, fontSize: 15 * scale }]}>{title}</Text>
     </>
   );
 
@@ -132,39 +141,45 @@ export function Button({
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
+  const scale = useFontMultiplier();
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { fontSize: 13 * scale }]}>{label}</Text>
       {children}
     </View>
   );
 }
 
 export function Input(props: TextInputProps) {
+  const scale = useFontMultiplier();
   return (
     <TextInput
       placeholderTextColor={colors.muted}
       // "OK/Concluído" no teclado fecha em vez de quebrar linha.
       returnKeyType={props.multiline ? undefined : "done"}
       {...props}
-      style={[styles.input, props.style]}
+      style={[styles.input, props.style, { fontSize: 16 * scale }]}
     />
   );
 }
 
 export function StateText({ text, tone = "muted" }: { text: string; tone?: "muted" | "error" | "success" }) {
+  const scale = useFontMultiplier();
   return (
-    <Text style={[styles.stateText, tone === "error" && styles.errorText, tone === "success" && styles.successText]}>
+    <Text
+      style={[styles.stateText, tone === "error" && styles.errorText, tone === "success" && styles.successText, { fontSize: 14 * scale }]}
+    >
       {text}
     </Text>
   );
 }
 
 export function SectionTitle({ text }: { text: string }) {
+  const scale = useFontMultiplier();
   return (
     <View style={styles.sectionTitleRow}>
       <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.sectionTick} />
-      <Text style={styles.sectionTitle}>{text}</Text>
+      <Text style={[styles.sectionTitle, { fontSize: 20 * scale }]}>{text}</Text>
     </View>
   );
 }
@@ -214,6 +229,8 @@ export function Money({
   color?: string;
   prefixColor?: string;
 }) {
+  const scale = useFontMultiplier();
+  size = Math.round(size * scale);
   const formatted = formatCurrency(value);
   // Intl separa "R$" do número com espaço comum ou não separável.
   const [prefix, ...rest] = formatted.split(/[   ]/);
@@ -429,6 +446,20 @@ const styles = StyleSheet.create({
     padding: 16,
     // Espaço para o conteúdo respirar acima da tab bar flutuante.
     paddingBottom: 172
+  },
+  pageHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12
+  },
+  pageHeaderText: {
+    flex: 1
+  },
+  pageHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 2
   },
   greeting: {
     marginBottom: 2,

@@ -174,6 +174,29 @@ export interface EventoLinhaDoTempo {
   dados?: Record<string, unknown>;
 }
 
+// Avisos in-app publicados pelo backend (admin → todos os usuários).
+// A forma exata pode variar; tratamos de modo tolerante.
+export interface NotificacaoMidia {
+  tipo?: string;
+  url?: string | null;
+  descricao?: string | null;
+  [key: string]: unknown;
+}
+
+export interface Notificacao {
+  id: UUID;
+  titulo?: string | null;
+  corpo?: string | null;
+  prioridade?: string | null;
+  publico?: string | null;
+  midias?: NotificacaoMidia[] | null;
+  lida?: boolean;
+  lida_em?: string | null;
+  criado_em?: string | null;
+  publicado_em?: string | null;
+  [key: string]: unknown;
+}
+
 export interface Midia {
   id: UUID;
   tipo_entidade: string;

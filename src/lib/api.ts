@@ -25,6 +25,7 @@ import type {
   LocalVenda,
   LoginRequest,
   Midia,
+  Notificacao,
   Produto,
   RegistrarVendaRequest,
   RespostaLogin,
@@ -258,6 +259,13 @@ export const api = {
   historico: {
     timeline: (query?: { dia_de_venda_id?: string; tipo_entidade?: string; entidade_id?: string; limite?: number }) =>
       apiRequest<EventoLinhaDoTempo[]>("/api/v1/historico/linha-do-tempo", { query: { limite: 100, ...query } })
+  },
+  // Avisos in-app que o backend publica para os usuários. `list` tolera 404
+  // (endpoint pode não existir ainda) para nunca quebrar a tela.
+  notificacoes: {
+    list: () => apiRequest<unknown>("/api/v1/notificacoes", { allowNotFound: true }),
+    marcarLida: (id: UUID) =>
+      apiRequest<Notificacao | null>(`/api/v1/notificacoes/${id}/lida`, { method: "POST", body: {}, allowNotFound: true })
   },
   ia: {
     // Endpoints genéricos: interpretam qualquer comando (venda, abrir dia com

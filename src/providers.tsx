@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { AuthProvider } from "@/contexts/auth";
 import { ApiError } from "@/lib/api";
+import { FontScaleProvider } from "@/lib/font-scale";
 
 // Erro que vale a pena repetir: queda de rede, timeout ou instabilidade do
 // servidor (5xx). Erros do cliente (login, não encontrado, validação) não.
@@ -34,7 +35,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <FontScaleProvider>
+        <AuthProvider>{children}</AuthProvider>
+      </FontScaleProvider>
     </QueryClientProvider>
   );
 }
