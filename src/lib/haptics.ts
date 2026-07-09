@@ -1,25 +1,28 @@
 import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
 
-// Feedback tátil discreto. No-op no navegador (não há vibração) e nunca lança:
-// haptics é enfeite, não pode quebrar um fluxo.
+// Feedback tátil discreto. É só enfeite: nunca pode quebrar um fluxo.
+// - No-op no navegador (não há vibração).
+// - Protegido contra o módulo nativo ausente: um build OTA antigo (sem
+//   expo-haptics linkado) simplesmente não vibra, em vez de lançar erro.
 const enabled = Platform.OS === "ios" || Platform.OS === "android";
+
+function safe(run: () => Promise<unknown>) {
+  if (!enabled) return;
+  try {
+    run().catch(() => undefined);
+  } catch {
+    // Módulo nativo indisponível (build sem expo-haptics) — ignora.
+  }
+}
 
 export const haptics = {
   // Toque leve em +/− e seleções.
-  tap: () => {
-    if (enabled) Haptics.selectionAsync().catch(() => undefined);
-  },
+  tap: () => safe(() => Haptics.selectionAsync()),
   // Toque um pouco mais firme (começar a gravar, ações principais).
-  light: () => {
-    if (enabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
-  },
+  light: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
   // Confirmação de sucesso (venda registrada, custo aceito).
-  success: () => {
-    if (enabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-  },
+  success: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
   // Aviso de erro.
-  error: () => {
-    if (enabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
-  }
+  error: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error))
 };
