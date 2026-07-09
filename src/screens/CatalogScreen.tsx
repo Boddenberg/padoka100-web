@@ -343,10 +343,10 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
       {removePhoto.error instanceof Error ? <StateText tone="error" text={removePhoto.error.message} /> : null}
 
       <Field label="Nome">
-        <Input value={nome} onChangeText={setNome} />
+        <Input value={nome} onChangeText={setNome} maxLength={60} />
       </Field>
       <Field label="Descrição">
-        <Input value={descricao} onChangeText={setDescricao} />
+        <Input value={descricao} onChangeText={setDescricao} maxLength={160} />
       </Field>
       <Field label="Situação">
         <View style={styles.statusRow}>
@@ -677,10 +677,10 @@ function ProductFields({ draft, setDraft }: { draft: ProductDraft; setDraft: (dr
   return (
     <>
       <Field label="Nome">
-        <Input value={draft.nome} onChangeText={(nome) => setDraft({ ...draft, nome })} />
+        <Input value={draft.nome} onChangeText={(nome) => setDraft({ ...draft, nome })} maxLength={60} />
       </Field>
       <Field label="Descrição">
-        <Input value={draft.descricao} onChangeText={(descricao) => setDraft({ ...draft, descricao })} />
+        <Input value={draft.descricao} onChangeText={(descricao) => setDraft({ ...draft, descricao })} maxLength={160} />
       </Field>
       <Field label="Preço de venda">
         <Input value={draft.preco_venda} onChangeText={(preco_venda) => setDraft({ ...draft, preco_venda })} keyboardType="decimal-pad" />

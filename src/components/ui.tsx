@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { formatCurrency } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
 import { resolveMediaUrl } from "@/lib/settings";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 
@@ -287,10 +288,21 @@ export function Stepper({
 }) {
   const buttonSize = size === "sm" ? 34 : 42;
 
+  const handleDecrement = () => {
+    if (value <= 0) return;
+    haptics.tap();
+    onDecrement();
+  };
+  const handleIncrement = () => {
+    if (!canAdd) return;
+    haptics.tap();
+    onIncrement();
+  };
+
   return (
     <View style={styles.stepper}>
       <Pressable
-        onPress={value > 0 ? onDecrement : undefined}
+        onPress={value > 0 ? handleDecrement : undefined}
         style={({ pressed }) => [
           styles.stepperButton,
           { height: buttonSize, width: buttonSize, opacity: value > 0 ? (pressed ? 0.7 : 1) : 0.35 }
@@ -299,7 +311,7 @@ export function Stepper({
         <Minus size={size === "sm" ? 16 : 20} color={colors.brandDeep} strokeWidth={3} />
       </Pressable>
       <Text style={[styles.stepperValue, size === "sm" && { fontSize: 16 }]}>{value}</Text>
-      <Pressable onPress={canAdd ? onIncrement : undefined} style={({ pressed }) => [pressed && canAdd ? styles.pressed : null]}>
+      <Pressable onPress={canAdd ? handleIncrement : undefined} style={({ pressed }) => [pressed && canAdd ? styles.pressed : null]}>
         <LinearGradient
           colors={canAdd ? gradients.brand : ([colors.border, colors.border] as const)}
           start={{ x: 0, y: 0 }}

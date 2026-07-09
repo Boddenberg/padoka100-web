@@ -42,6 +42,7 @@ import {
   type CusteioPhase
 } from "@/lib/custeio";
 import { formatCurrency, todayInputValue, toNumber } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
@@ -205,6 +206,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
         motivo_preco: "Custo calculado pelo assistente"
       }),
     onSuccess: (response) => {
+      haptics.success();
       applySession(response);
       setSheet(null);
       goToPhase("resultado");
@@ -251,6 +253,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
       await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
+      haptics.light();
     } catch (error) {
       Alert.alert("Áudio", error instanceof Error ? error.message : "Não foi possível gravar.");
     }

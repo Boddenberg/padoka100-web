@@ -20,11 +20,16 @@ export function SummaryScreen() {
   const [start, setStart] = useState(addDays(today, -6));
   const [end, setEnd] = useState(today);
   const [openDayId, setOpenDayId] = useState<string | null>(null);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const HISTORY_PREVIEW = 6;
 
   const periodQuery = useQuery({
     queryKey: ["relatorios", "periodo", start, end],
     queryFn: () => api.relatorios.period(start, end),
-    enabled: Boolean(start && end)
+    enabled: Boolean(start && end),
+    // Se o servidor ainda não respondeu (ex.: endpoint indisponível/404),
+    // segue tentando sozinho a cada 6s em vez de travar num erro seco.
+    refetchInterval: (query) => (query.state.status === "error" ? 6000 : false)
   });
 
   // Período anterior do mesmo tamanho, para a frase de comparação.
@@ -82,7 +87,14 @@ export function SummaryScreen() {
               </View>
             </>
           ) : null}
-          {periodQuery.error instanceof Error ? <StateText tone="error" text={periodQuery.error.message} /> : null}
+          {periodQuery.error && !totals ? (
+            <View style={styles.retryBox}>
+              <Text style={styles.retryEmoji}>⏳</Text>
+              <Text style={styles.retryText}>
+                Estamos buscando o faturamento do período. Assim que o servidor responder, os números aparecem aqui sozinhos.
+              </Text>
+            </View>
+          ) : null}
           {totals ? (
             <>
               <Money value={totals.faturamento_bruto} size={40} />
@@ -168,11 +180,11 @@ export function SummaryScreen() {
           </Pressable>
         ))}
 
-        {/* 5. Histórico em linguagem humana. */}
+        {/* 5. Histórico em linguagem humana: começa curto, expande sob demanda. */}
         <SectionTitle text="Histórico" />
         {historyQuery.isLoading ? <StateText text="Carregando histórico..." /> : null}
         {historyQuery.error instanceof Error ? <StateText tone="error" text={historyQuery.error.message} /> : null}
-        {historyQuery.data?.map((event) => {
+        {(showAllHistory ? historyQuery.data : historyQuery.data?.slice(0, HISTORY_PREVIEW))?.map((event) => {
           const detail = humanizeEventDetail(event);
           return (
             <View key={event.id} style={styles.eventRow}>
@@ -186,6 +198,13 @@ export function SummaryScreen() {
             </View>
           );
         })}
+        {(historyQuery.data?.length || 0) > HISTORY_PREVIEW ? (
+          <Pressable onPress={() => setShowAllHistory((value) => !value)} style={({ pressed }) => [styles.historyToggle, pressed && styles.pressed]}>
+            <Text style={styles.historyToggleText}>
+              {showAllHistory ? "Mostrar menos" : `Ver mais ${(historyQuery.data?.length || 0) - HISTORY_PREVIEW} do histórico`}
+            </Text>
+          </Pressable>
+        ) : null}
       </Page>
 
       <DaySummarySheet visible={Boolean(openDayId)} dayId={openDayId} onClose={() => setOpenDayId(null)} />
@@ -393,6 +412,36 @@ const styles = StyleSheet.create({
   eventTitle: {
     color: colors.ink,
     fontSize: 15,
+    fontFamily: fonts.bodyBold
+  },
+  retryBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceGlow,
+    padding: 14
+  },
+  retryEmoji: {
+    fontSize: 24
+  },
+  retryText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: fonts.body
+  },
+  historyToggle: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceWarm
+  },
+  historyToggleText: {
+    color: colors.brandDeep,
+    fontSize: 14,
     fontFamily: fonts.bodyBold
   }
 });

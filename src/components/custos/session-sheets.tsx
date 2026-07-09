@@ -111,6 +111,7 @@ function TextComposerForm({
         value={text}
         onChangeText={setText}
         multiline
+        maxLength={500}
         placeholder={
           pergunta
             ? "Ex: rendeu 12 unidades"

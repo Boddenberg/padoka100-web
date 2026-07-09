@@ -9,9 +9,8 @@ import { AUTH_REQUIRED } from "@/constants/auth";
 import { useAuth } from "@/contexts/auth";
 import { api, ApiError } from "@/lib/api";
 import { emptyProfile, readProfile, saveProfile, type LocalProfile } from "@/lib/profile";
-import { apiUrls, getBaseUrl, readApiSettings, saveApiSettings, type ApiSettings } from "@/lib/settings";
+import { getBaseUrl, readApiSettings, saveApiSettings, type ApiSettings } from "@/lib/settings";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
-import { getGreeting } from "@/utils/greeting";
 import { pickImage } from "@/utils/media";
 import type { ApiEnvironment } from "@/types/api";
 
@@ -115,7 +114,7 @@ export function ProfileScreen() {
 
   return (
     <>
-      <Page greeting={getGreeting()} title="Perfil" subtitle="Seus dados, sua conta e a conexão do app.">
+      <Page title="Perfil" subtitle="Seus dados, sua conta e a conexão do app.">
         {/* Foto e dados pessoais */}
         <Card>
           <View style={styles.header}>
@@ -141,7 +140,12 @@ export function ProfileScreen() {
           {photoError ? <StateText tone="error" text={photoError} /> : null}
 
           <Field label="Nome">
-            <Input value={profile.nome} onChangeText={(nome) => setProfile({ ...profile, nome })} placeholder="Como você quer ser chamado" />
+            <Input
+              value={profile.nome}
+              onChangeText={(nome) => setProfile({ ...profile, nome })}
+              placeholder="Como você quer ser chamado"
+              maxLength={60}
+            />
           </Field>
           <Field label="Data de nascimento">
             <Input
@@ -393,10 +397,6 @@ function ConnectionCard() {
       setTimeout(() => setSaved(false), 2200);
     }
   });
-  const health = useMutation({
-    mutationFn: () => api.health(settings)
-  });
-
   function setEnvironment(environment: ApiEnvironment) {
     setSettings((currentSettings) => ({ ...currentSettings, environment }));
   }
@@ -421,18 +421,6 @@ function ConnectionCard() {
       <Button title={save.isPending ? "Salvando..." : "Salvar conexão"} tone="soft" disabled={save.isPending} onPress={() => save.mutate()} />
       {saved ? <StateText tone="success" text="Conexão salva neste dispositivo." /> : null}
       {save.error instanceof Error ? <StateText tone="error" text={save.error.message} /> : null}
-
-      <Button
-        title={health.isPending ? "Testando..." : "Testar conexão"}
-        tone="outline"
-        disabled={health.isPending}
-        onPress={() => health.mutate()}
-      />
-      {health.data ? <StateText tone="success" text={`Conectado: ${health.data.status || "ok"}`} /> : null}
-      {health.error instanceof Error ? <StateText tone="error" text={health.error.message} /> : null}
-
-      <Text style={styles.muted}>Produção: {apiUrls.production}</Text>
-      <Text style={styles.muted}>Local: {apiUrls.local}</Text>
     </Card>
   );
 }

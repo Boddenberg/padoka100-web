@@ -23,6 +23,8 @@ import {
 import { api, ApiError, createAudioForm, type NativeFile } from "@/lib/api";
 import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
+import { useAuth } from "@/contexts/auth";
+import { haptics } from "@/lib/haptics";
 import { getGreeting } from "@/utils/greeting";
 import { fixProductName } from "@/utils/text";
 import type {
@@ -42,6 +44,7 @@ const EMPTY_PRODUCTS: Produto[] = [];
 
 export function SalesScreen() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [cart, setCart] = useState<Cart>({});
   const [sheet, setSheet] = useState<ActiveSheet>(null);
   const [search, setSearch] = useState("");
@@ -130,10 +133,12 @@ export function SalesScreen() {
       });
     },
     onSuccess: (sale) => {
+      haptics.success();
       setCart({});
       setMessage(`Venda registrada: ${sale.itens?.length || itemCount} item(ns).`);
       invalidateDay(queryClient);
-    }
+    },
+    onError: () => haptics.error()
   });
 
   // A barra Registrar surge embaixo do dedo no primeiro "+": segura os
@@ -194,7 +199,7 @@ export function SalesScreen() {
 
   return (
     <>
-      <Page greeting={getGreeting()} title="Venda" subtitle="Toque nos produtos ou fale com o agente.">
+      <Page greeting={getGreeting(user?.nome)} title="Venda" subtitle="Toque nos produtos ou fale com o agente.">
         {loading ? (
           <View style={styles.skeletonStack}>
             <Skeleton height={210} rounded={radius.xl} />
@@ -1298,7 +1303,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display
   },
   soldOutOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(51, 35, 26, 0.45)"
@@ -1384,7 +1393,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
     borderRadius: radius.pill,
-    backgroundColor: "#2a1a10",
+    // "Ilha" clara como a tab bar, no lugar do marrom escuro que destoava.
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 10,
     paddingLeft: 18
   },
@@ -1411,7 +1423,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display
   },
   cartTotal: {
-    color: "#fff",
+    color: colors.ink,
     fontSize: 22,
     fontFamily: fonts.display,
     letterSpacing: -0.4
