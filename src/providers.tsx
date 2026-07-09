@@ -1,5 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useState, type ReactNode } from "react";
+import { AppState } from "react-native";
 import { AuthProvider } from "@/contexts/auth";
 import { ApiError } from "@/lib/api";
 import { FontScaleProvider } from "@/lib/font-scale";
@@ -32,6 +33,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
         }
       })
   );
+
+  // Ao voltar para o app (foreground), o react-query re-busca o que está velho
+  // — assim uma tela que ficou em erro se recupera sozinha ao reabrir.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      focusManager.setFocused(state === "active");
+    });
+    return () => subscription.remove();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

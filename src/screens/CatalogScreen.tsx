@@ -52,6 +52,12 @@ export function CatalogScreen() {
   const [editingLocal, setEditingLocal] = useState<LocalVenda | null>(null);
   const productsQuery = useQuery({ queryKey: ["produtos", "todos"], queryFn: () => api.produtos.list(false) });
   const locationsQuery = useQuery({ queryKey: ["locais", "todos"], queryFn: () => api.locais.list(false) });
+  // Puxar-para-recarregar: refaz as buscas, mesmo se estavam em erro.
+  const refreshing = productsQuery.isRefetching || locationsQuery.isRefetching;
+  const onRefresh = () => {
+    productsQuery.refetch();
+    locationsQuery.refetch();
+  };
   // Sempre a versão mais fresca do produto em edição (após salvar/foto).
   const editingProduct = productsQuery.data?.find((produto) => produto.id === editing?.id) || editing;
   const editingLocation = locationsQuery.data?.find((local) => local.id === editingLocal?.id) || editingLocal;
@@ -102,7 +108,7 @@ export function CatalogScreen() {
 
   return (
     <>
-      <Page title="Catálogo" subtitle="Produtos, preços, fotos e locais de venda.">
+      <Page title="Catálogo" subtitle="Produtos, preços, fotos e locais de venda." onRefresh={onRefresh} refreshing={refreshing}>
         <View style={styles.actions}>
           <View style={styles.actionButton}>
             <Button title="Novo produto" onPress={() => setSheet("product")} />

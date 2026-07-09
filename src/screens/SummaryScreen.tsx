@@ -63,6 +63,15 @@ export function SummaryScreen() {
   const totals = periodQuery.data;
   const periodLabel = describePeriod(start, end, today);
 
+  // Puxar-para-recarregar: refaz todas as buscas do resumo (recupera de erro).
+  const refreshing = periodQuery.isRefetching || historyQuery.isRefetching || salesDaysQuery.isRefetching;
+  const onRefresh = () => {
+    periodQuery.refetch();
+    previousQuery.refetch();
+    historyQuery.refetch();
+    salesDaysQuery.refetch();
+  };
+
   function setPeriod(nextStart: string, nextEnd: string) {
     setStart(nextStart);
     setEnd(nextEnd);
@@ -70,7 +79,7 @@ export function SummaryScreen() {
 
   return (
     <>
-      <Page title="Resumo" subtitle="Faturamento, período, gráfico e histórico.">
+      <Page title="Resumo" subtitle="Faturamento, período, gráfico e histórico." onRefresh={onRefresh} refreshing={refreshing}>
         {/* 1. Faturamento do período: o destaque principal da tela. */}
         <Card>
           <View style={styles.revenueHeader}>

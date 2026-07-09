@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -40,6 +41,8 @@ export function Page({
   subtitle,
   greeting,
   headerRight,
+  onRefresh,
+  refreshing,
   children
 }: {
   title: string;
@@ -47,6 +50,9 @@ export function Page({
   greeting?: string;
   // Ações no topo direito (engrenagem de config, cartinha de avisos...).
   headerRight?: ReactNode;
+  // Puxar-para-recarregar: quando fornecido, ativa o gesto de refresh.
+  onRefresh?: () => void;
+  refreshing?: boolean;
   children: ReactNode;
 }) {
   const scale = useFontMultiplier();
@@ -57,6 +63,11 @@ export function Page({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />
+          ) : undefined
+        }
       >
         {/* Tocar em qualquer área vazia fecha o teclado. */}
         <Pressable style={styles.page} onPress={Keyboard.dismiss} accessible={false}>

@@ -66,6 +66,14 @@ export function SalesScreen() {
   const currentDay = currentDayQuery.data || null;
   const stockReady = !currentDay || resumoQuery.isSuccess;
 
+  // Puxar-para-recarregar: refaz dia atual, produtos e resumo (recupera de erro).
+  const refreshing = currentDayQuery.isRefetching || productsQuery.isRefetching || resumoQuery.isRefetching;
+  const onRefresh = () => {
+    currentDayQuery.refetch();
+    productsQuery.refetch();
+    resumoQuery.refetch();
+  };
+
   const availableByProduct = useMemo(() => {
     const map: Cart = {};
     currentDay?.itens_producao?.forEach((item) => {
@@ -205,6 +213,8 @@ export function SalesScreen() {
         greeting={getGreeting(user?.nome)}
         title="Venda"
         subtitle="Toque nos produtos ou fale com o agente."
+        onRefresh={onRefresh}
+        refreshing={refreshing}
         headerRight={
           <>
             <NotificationsButton />
