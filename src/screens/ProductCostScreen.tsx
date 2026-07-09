@@ -203,7 +203,9 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
         permitir_pendencias: false,
         atualizar_preco_custo_produto: atualizarPreco,
         vigente_desde: todayInputValue(),
-        motivo_preco: "Custo calculado pelo assistente"
+        motivo_preco: "Custo calculado pelo assistente",
+        // Selo estruturado de IA — o catálogo lê VersaoDePreco.origem pra mostrar o pill.
+        origem: "ia"
       }),
     onSuccess: (response) => {
       haptics.success();

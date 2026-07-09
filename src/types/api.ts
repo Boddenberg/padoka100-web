@@ -13,6 +13,10 @@ export interface HealthStatus {
   [key: string]: unknown;
 }
 
+// Origem do custo/preço gravado. O assistente marca "ia"; edição na mão, "manual".
+// União tolerante (como os outros contratos) pra o backend poder ampliar depois.
+export type OrigemPreco = "ia" | "manual" | string;
+
 export interface VersaoDePreco {
   id: UUID;
   produto_id: UUID;
@@ -22,6 +26,7 @@ export interface VersaoDePreco {
   vigente_desde: string;
   vigente_ate?: string | null;
   motivo?: string | null;
+  origem?: OrigemPreco | null;
   criado_em: string;
 }
 
@@ -157,6 +162,19 @@ export interface ResumoDoPeriodo {
   custo_estimado?: DecimalString;
   lucro_estimado?: DecimalString;
   dias?: ResumoDoDia[];
+}
+
+// Versão enxuta do resumo do período: só o que o 1º card da tela Resumo precisa,
+// servida por uma rota agregada leve. `periodo_anterior` chega com comparar=true.
+// Valores podem vir número ou string decimal — os formatadores aceitam os dois.
+export interface ResumoPeriodoLeve {
+  data_inicio: string;
+  data_fim: string;
+  faturamento_bruto?: DecimalString | number;
+  lucro_estimado?: DecimalString | number;
+  total_vendido?: number;
+  total_sobra?: number;
+  periodo_anterior?: { faturamento_bruto?: DecimalString | number } | null;
 }
 
 export interface EventoLinhaDoTempo {

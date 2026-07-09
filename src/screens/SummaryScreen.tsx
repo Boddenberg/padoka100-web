@@ -23,6 +23,17 @@ export function SummaryScreen() {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const HISTORY_PREVIEW = 6;
 
+  // 1º card (faturamento + comparação): rota agregada leve e rápida. Enquanto o
+  // backend não publica /periodo/resumo, ela devolve null (404 tolerado) e o card
+  // cai nos totais da rota pesada abaixo — mesma experiência de hoje, sem quebrar.
+  const cardQuery = useQuery({
+    queryKey: ["relatorios", "periodo-resumo", start, end],
+    queryFn: () => api.relatorios.periodResumo(start, end),
+    enabled: Boolean(start && end),
+    refetchInterval: (query) => (query.state.status === "error" ? 6000 : false)
+  });
+
+  // Rota pesada: ainda necessária para o gráfico e a lista de dias (usa `dias`).
   const periodQuery = useQuery({
     queryKey: ["relatorios", "periodo", start, end],
     queryFn: () => api.relatorios.period(start, end),
@@ -32,14 +43,16 @@ export function SummaryScreen() {
     refetchInterval: (query) => (query.state.status === "error" ? 6000 : false)
   });
 
-  // Período anterior do mesmo tamanho, para a frase de comparação.
+  // Período anterior do mesmo tamanho, para a frase de comparação. Só busca no
+  // pesado se a rota leve NÃO trouxe `periodo_anterior` (fica inerte quando ela
+  // estiver no ar); espera a leve responder antes, pra não disparar à toa.
   const span = diffDays(start, end) + 1;
   const previousStart = addDays(start, -span);
   const previousEnd = addDays(start, -1);
   const previousQuery = useQuery({
     queryKey: ["relatorios", "periodo", previousStart, previousEnd],
     queryFn: () => api.relatorios.period(previousStart, previousEnd),
-    enabled: Boolean(start && end)
+    enabled: Boolean(start && end) && cardQuery.isFetched && !cardQuery.data?.periodo_anterior
   });
 
   const historyQuery = useQuery({
@@ -62,12 +75,23 @@ export function SummaryScreen() {
   // Dia único selecionado que teve venda: habilita o botão de resumo do dia.
   const selectedDayId = start === end ? dayIdByDate.get(start) : undefined;
 
-  const totals = periodQuery.data;
+  const totals = periodQuery.data; // pesado: alimenta gráfico e lista de dias
+  // 1º card: prioriza a rota leve; sem ela (404), usa os totais do pesado.
+  const cardTotals = cardQuery.data ?? totals;
+  const cardLoading = !cardTotals && (cardQuery.isLoading || periodQuery.isLoading);
+  const cardError = !cardTotals && Boolean(cardQuery.error || periodQuery.error);
+  // Comparação: faturamento anterior vem da rota leve ou, no fallback, do pesado.
+  const previousFaturamento = cardQuery.data?.periodo_anterior
+    ? toNumber(cardQuery.data.periodo_anterior.faturamento_bruto)
+    : toNumber(previousQuery.data?.faturamento_bruto);
+  const hasPrevious = Boolean(cardQuery.data?.periodo_anterior) || (!previousQuery.error && !previousQuery.isLoading);
   const periodLabel = describePeriod(start, end, today);
 
   // Puxar-para-recarregar: refaz todas as buscas do resumo (recupera de erro).
-  const refreshing = periodQuery.isRefetching || historyQuery.isRefetching || salesDaysQuery.isRefetching;
+  const refreshing =
+    cardQuery.isRefetching || periodQuery.isRefetching || historyQuery.isRefetching || salesDaysQuery.isRefetching;
   const onRefresh = () => {
+    cardQuery.refetch();
     periodQuery.refetch();
     previousQuery.refetch();
     historyQuery.refetch();
@@ -88,7 +112,7 @@ export function SummaryScreen() {
             <TrendingUp size={20} color={colors.brandDeep} />
             <Text style={styles.revenueLabel}>Faturamento do período</Text>
           </View>
-          {periodQuery.isLoading ? (
+          {cardLoading ? (
             <>
               <Skeleton height={44} width="65%" rounded={radius.md} />
               <View style={styles.metricsGrid}>
@@ -98,7 +122,7 @@ export function SummaryScreen() {
               </View>
             </>
           ) : null}
-          {periodQuery.error && !totals ? (
+          {cardError ? (
             <View style={styles.retryBox}>
               <Text style={styles.retryEmoji}>⏳</Text>
               <Text style={styles.retryText}>
@@ -106,19 +130,19 @@ export function SummaryScreen() {
               </Text>
             </View>
           ) : null}
-          {totals ? (
+          {cardTotals ? (
             <>
-              <Money value={totals.faturamento_bruto} size={40} />
+              <Money value={cardTotals.faturamento_bruto} size={40} />
               <Badge text={periodLabel} tone="good" />
               <ComparisonLine
-                total={toNumber(totals.faturamento_bruto)}
-                previousTotal={toNumber(previousQuery.data?.faturamento_bruto)}
-                hasPrevious={!previousQuery.error && !previousQuery.isLoading}
+                total={toNumber(cardTotals.faturamento_bruto)}
+                previousTotal={previousFaturamento}
+                hasPrevious={hasPrevious}
               />
               <View style={styles.metricsGrid}>
-                <Metric label="Lucro" value={formatCurrency(totals.lucro_estimado)} highlight />
-                <Metric label="Vendido" value={String(totals.total_vendido ?? 0)} />
-                <Metric label="Restante" value={String(totals.total_sobra ?? 0)} />
+                <Metric label="Lucro" value={formatCurrency(cardTotals.lucro_estimado)} highlight />
+                <Metric label="Vendido" value={String(cardTotals.total_vendido ?? 0)} />
+                <Metric label="Restante" value={String(cardTotals.total_sobra ?? 0)} />
               </View>
             </>
           ) : null}

@@ -10,11 +10,15 @@ import { cleanPayload, formatCurrency, toNumber, todayInputValue } from "@/lib/f
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
-import type { LocalVenda, Produto } from "@/types/api";
+import type { LocalVenda, Produto, VersaoDePreco } from "@/types/api";
 
-// O assistente grava o preço com este motivo; usamos para marcar "calculado com IA".
-function isCostFromAI(motivo?: string | null) {
-  return /assistente|calculad[oa]\s+com\s+ia|\bia\b/i.test(motivo || "");
+// O assistente marca o custo com origem "ia". Versões antigas (gravadas antes do
+// campo existir) só têm o texto do motivo, então caímos nele como fallback.
+function isCostFromAI(preco?: VersaoDePreco | null) {
+  if (!preco) return false;
+  if (preco.origem === "ia") return true;
+  if (preco.origem === "manual") return false;
+  return /assistente|calculad[oa]\s+com\s+ia|\bia\b/i.test(preco.motivo || "");
 }
 
 // Alert.alert com botões não funciona no navegador; lá usamos o confirm nativo.
@@ -336,7 +340,7 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
                 ? `Custo atual: ${formatCurrency(product.preco_atual?.preco_custo)} — recalcule com o assistente`
                 : "Descubra o custo e o lucro de cada unidade com o assistente"}
             </Text>
-            {isCostFromAI(product.preco_atual?.motivo) ? (
+            {isCostFromAI(product.preco_atual) ? (
               <View style={styles.aiPill}>
                 <Sparkles size={11} color="#fff" />
                 <Text style={styles.aiPillText}>Calculado com IA</Text>

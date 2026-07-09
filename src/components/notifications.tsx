@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { EmptyState, Sheet } from "@/components/ui";
-import { useAuth } from "@/contexts/auth";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { resolveMediaUrl } from "@/lib/settings";
@@ -16,13 +15,12 @@ function normalizeNotifications(raw: unknown): Notificacao[] {
   if (Array.isArray(raw)) {
     list = raw;
   } else if (raw && typeof raw === "object") {
-    for (const key of ["notificacoes", "items", "dados", "results", "data"]) {
-      const value = (raw as Record<string, unknown>)[key];
-      if (Array.isArray(value)) {
-        list = value;
-        break;
-      }
-    }
+    const obj = raw as Record<string, unknown>;
+    // Tenta as chaves conhecidas ("itens" em pt incluído) e, se nada bater, pega
+    // o primeiro valor-array do objeto — assim não quebra por nome de envelope.
+    const known = ["itens", "notificacoes", "items", "dados", "results", "data"];
+    const value = known.map((key) => obj[key]).find(Array.isArray) || Object.values(obj).find(Array.isArray);
+    if (Array.isArray(value)) list = value;
   }
   return list
     .filter((item): item is Notificacao => Boolean(item) && typeof item === "object" && "id" in (item as object))
@@ -35,14 +33,13 @@ function isUnread(item: Notificacao) {
 
 // Botão de "cartinha" no topo: badge com quantos avisos não lidos; abre a caixa.
 export function NotificationsButton() {
-  const { status } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
+  // Listagem pública de avisos: carrega mesmo deslogado (não exige login/token).
   const query = useQuery({
     queryKey: ["notificacoes"],
     queryFn: api.notificacoes.list,
-    enabled: status === "signed-in",
     // Busca de tempos em tempos para pegar avisos novos publicados no backend.
     refetchInterval: 60_000,
     staleTime: 30_000

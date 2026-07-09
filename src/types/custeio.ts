@@ -1,4 +1,4 @@
-import type { UUID } from "@/types/api";
+import type { OrigemPreco, UUID } from "@/types/api";
 
 // Custeio assistido (/api/v1/custos/assistente): o backend devolve sempre a
 // sessão completa. Os campos centrais estão no contrato; o resto é tolerante,
@@ -114,6 +114,8 @@ export interface ConfirmarCusteioRequest {
   atualizar_preco_custo_produto?: boolean;
   vigente_desde?: string;
   motivo_preco?: string;
+  // Marca o custo como calculado pela IA (o backend grava em VersaoDePreco.origem).
+  origem?: OrigemPreco;
 }
 
 // --- Lista de compras por produção planejada. -----------------------------

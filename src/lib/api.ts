@@ -37,6 +37,7 @@ import type {
   RespostaTranscreverAudio,
   ResumoDoDia,
   ResumoDoPeriodo,
+  ResumoPeriodoLeve,
   UsuarioPerfil,
   UUID,
   Venda,
@@ -256,6 +257,14 @@ export const api = {
     period: (dataInicio: string, dataFim: string, produtoId?: UUID) =>
       apiRequest<ResumoDoPeriodo>("/api/v1/relatorios/periodo", {
         query: { data_inicio: dataInicio, data_fim: dataFim, produto_id: produtoId }
+      }),
+    // Rota agregada leve só para o 1º card da tela Resumo (faturamento + comparação).
+    // Tolera 404: enquanto o backend não publica /periodo/resumo, a tela cai no
+    // `period` pesado sem quebrar (ver SummaryScreen).
+    periodResumo: (dataInicio: string, dataFim: string, comparar = true) =>
+      apiRequest<ResumoPeriodoLeve | null>("/api/v1/relatorios/periodo/resumo", {
+        query: { data_inicio: dataInicio, data_fim: dataFim, comparar },
+        allowNotFound: true
       })
   },
   historico: {
@@ -265,7 +274,7 @@ export const api = {
   // Avisos in-app que o backend publica para os usuários. `list` tolera 404
   // (endpoint pode não existir ainda) para nunca quebrar a tela.
   notificacoes: {
-    list: () => apiRequest<unknown>("/api/v1/notificacoes", { allowNotFound: true }),
+    list: () => apiRequest<unknown>("/api/v1/notificacoes", { query: { limite: 50 }, allowNotFound: true }),
     marcarLida: (id: UUID) =>
       apiRequest<Notificacao | null>(`/api/v1/notificacoes/${id}/lida`, { method: "POST", body: {}, allowNotFound: true })
   },
