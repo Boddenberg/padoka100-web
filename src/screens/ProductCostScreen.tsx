@@ -17,7 +17,6 @@ import {
   ReceitaCard
 } from "@/components/custos/session-view";
 import {
-  ConfirmSheet,
   ExtraCostSheet,
   IngredienteSheet,
   ReceitaSheet,
@@ -56,7 +55,6 @@ type ActiveSheet =
   | { kind: "ingrediente-receita"; index: number | null }
   | { kind: "ingrediente-preco"; index: number | null }
   | { kind: "extra"; index: number | null }
-  | { kind: "confirmar" }
   | null;
 
 // Alert.alert com botões não funciona no navegador; lá usamos o confirm nativo.
@@ -369,12 +367,22 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
           ? "Agora me diga quanto você comprou e pagou de cada item. 💰"
           : "Me conta os ingredientes, quanto de cada um você usa e quantas unidades rende. Os preços ficam pra próxima etapa.";
 
+  // A seta do topo volta UMA etapa por vez; só sai para o catálogo a partir da
+  // primeira etapa (ou quando já confirmou / fora do fluxo).
+  function handleBack() {
+    if (boot === "ready" && !confirmed) {
+      if (phase === "resultado") return goToPhase("precos");
+      if (phase === "precos") return goToPhase("receita");
+    }
+    router.back();
+  }
+
   // --- Render. ----------------------------------------------------------------
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+          <Pressable onPress={handleBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
             <ArrowLeft size={22} color={colors.ink} />
           </Pressable>
           <ProductPhoto url={product?.url_imagem_principal} name={product?.nome || "Produto"} size={52} rounded={radius.lg} />
@@ -414,10 +422,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
         ) : (
           <>
             <ProgressTrail step={step} />
-
-            {phase === "resultado" ? (
-              <AgentBubble message={agentMessage} thinking={thinking && !sheet} />
-            ) : null}
+            <AgentBubble message={agentMessage} thinking={thinking && !sheet} />
 
             {phase === "resultado" ? (
               <ResultPhase
@@ -427,17 +432,23 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 precoVenda={precoVenda}
                 incompleteHint={incompleteHint}
                 pendencias={pendencias}
-                restartPending={restartSession.isPending}
-                restartError={restartSession.error instanceof Error ? restartSession.error.message : null}
-                onConfirm={() => setSheet({ kind: "confirmar" })}
-                onRestart={() => restartSession.mutate()}
-                onBackToPrecos={() => goToPhase("precos")}
+                acceptPending={confirmSession.isPending}
+                acceptError={confirmSession.error instanceof Error ? confirmSession.error.message : null}
+                redoPending={restartSession.isPending}
+                redoError={restartSession.error instanceof Error ? restartSession.error.message : null}
+                onAccept={() => confirmSession.mutate(true)}
+                onRedo={() =>
+                  confirmDestructive(
+                    "Refazer o cálculo",
+                    "Você vai perder todo o custo calculado até agora e recomeçar do zero.",
+                    "Refazer",
+                    () => restartSession.mutate()
+                  )
+                }
                 onBackToCatalog={() => router.back()}
               />
             ) : (
               <>
-                <PhaseHeader phase={phase} message={agentMessage} thinking={thinking && !sheet} />
-
                 <InputMethods
                   phase={phase}
                   recording={recorderState.isRecording}
@@ -469,7 +480,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                     onEditIngrediente={(index) => setSheet({ kind: "ingrediente-preco", index })}
                     onEditExtra={(index) => setSheet({ kind: "extra", index })}
                     onAddExtra={() => setSheet({ kind: "extra", index: null })}
-                    onBack={() => goToPhase("receita")}
                     onSeeResult={() => goToPhase("resultado")}
                   />
                 )}
@@ -541,15 +551,6 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
         onRemove={sheet?.kind === "extra" && sheet.index !== null ? () => removeExtra(sheet.index as number) : null}
         pending={patchDraft.isPending}
         errorText={patchDraft.error instanceof Error ? patchDraft.error.message : null}
-      />
-      <ConfirmSheet
-        visible={sheet?.kind === "confirmar"}
-        custo={session?.custo_simulado || null}
-        precoVenda={precoVenda}
-        onClose={() => setSheet(null)}
-        onConfirm={(atualizarPreco) => confirmSession.mutate(atualizarPreco)}
-        pending={confirmSession.isPending}
-        errorText={confirmSession.error instanceof Error ? confirmSession.error.message : null}
       />
     </Screen>
   );
@@ -639,7 +640,6 @@ function PricePhaseBody({
   onEditIngrediente,
   onEditExtra,
   onAddExtra,
-  onBack,
   onSeeResult
 }: {
   ingredientes: IngredienteRascunho[];
@@ -647,7 +647,6 @@ function PricePhaseBody({
   onEditIngrediente: (index: number) => void;
   onEditExtra: (index: number) => void;
   onAddExtra: () => void;
-  onBack: () => void;
   onSeeResult: () => void;
 }) {
   return (
@@ -671,10 +670,6 @@ function PricePhaseBody({
       <AddRowButton label="Adicionar embalagem, gás..." onPress={onAddExtra} />
 
       <Button title="Ver o resultado" tone="agent" icon={<ArrowRight size={18} color="#fff" />} onPress={onSeeResult} />
-      <Pressable onPress={onBack} style={({ pressed }) => [styles.backLinkRow, pressed && styles.pressed]}>
-        <ArrowLeft size={16} color={colors.muted} />
-        <Text style={styles.backLinkText}>Voltar à receita</Text>
-      </Pressable>
     </>
   );
 }
@@ -690,11 +685,12 @@ function ResultPhase({
   precoVenda,
   incompleteHint,
   pendencias,
-  restartPending,
-  restartError,
-  onConfirm,
-  onRestart,
-  onBackToPrecos,
+  acceptPending,
+  acceptError,
+  redoPending,
+  redoError,
+  onAccept,
+  onRedo,
   onBackToCatalog
 }: {
   confirmed: boolean;
@@ -703,11 +699,12 @@ function ResultPhase({
   precoVenda: number | null;
   incompleteHint?: string;
   pendencias: string[];
-  restartPending: boolean;
-  restartError: string | null;
-  onConfirm: () => void;
-  onRestart: () => void;
-  onBackToPrecos: () => void;
+  acceptPending: boolean;
+  acceptError: string | null;
+  redoPending: boolean;
+  redoError: string | null;
+  onAccept: () => void;
+  onRedo: () => void;
   onBackToCatalog: () => void;
 }) {
   if (confirmed) {
@@ -717,12 +714,14 @@ function ResultPhase({
           <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.celebrationBadge}>
             <PartyPopper size={26} color="#fff" />
           </LinearGradient>
-          <Text style={styles.celebrationTitle}>Custo confirmado!</Text>
-          <Text style={styles.celebrationHint}>Agora cada venda de {productName} já sabe quanto custou para ser feita.</Text>
+          <Text style={styles.celebrationTitle}>Custo aceito!</Text>
+          <Text style={styles.celebrationHint}>
+            Guardei o custo em {productName} com a marca “calculado com IA”. Agora cada venda já sabe quanto custou.
+          </Text>
         </View>
         {session?.custo_simulado ? <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} confirmed /> : null}
-        {restartError ? <StateText tone="error" text={restartError} /> : null}
-        <Button title={restartPending ? "Preparando..." : "Calcular de novo"} tone="outline" disabled={restartPending} onPress={onRestart} />
+        {redoError ? <StateText tone="error" text={redoError} /> : null}
+        <Button title={redoPending ? "Preparando..." : "Refazer o cálculo"} tone="outline" disabled={redoPending} onPress={onRedo} />
         <Button title="Voltar ao catálogo" tone="soft" onPress={onBackToCatalog} />
       </>
     );
@@ -737,19 +736,27 @@ function ResultPhase({
         <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} incompleteHint={incompleteHint} />
       ) : null}
 
+      {acceptError ? <StateText tone="error" text={acceptError} /> : null}
+
       {podeConfirmar ? (
-        <Button title="Confirmar custo" tone="success" icon={<BadgeCheck size={18} color="#fff" />} onPress={onConfirm} />
+        <>
+          <Button
+            title={acceptPending ? "Salvando..." : "Aceitar este custo"}
+            tone="success"
+            icon={<BadgeCheck size={18} color="#fff" />}
+            disabled={acceptPending}
+            onPress={onAccept}
+          />
+          <Text style={styles.gateHint}>Ao aceitar, o custo entra em {productName} marcado como “calculado com IA”.</Text>
+        </>
       ) : (
         <>
           <NoticeStack items={pendencias} tone="danger" />
-          <Text style={styles.gateHint}>Ainda faltam dados para fechar o custo. Volte aos preços e complete os itens em laranja.</Text>
+          <Text style={styles.gateHint}>Ainda faltam dados para fechar o custo. Use a seta ↑ para voltar aos preços e completar os itens em laranja.</Text>
         </>
       )}
 
-      <Pressable onPress={onBackToPrecos} style={({ pressed }) => [styles.backLinkRow, pressed && styles.pressed]}>
-        <ArrowLeft size={16} color={colors.muted} />
-        <Text style={styles.backLinkText}>Voltar aos preços</Text>
-      </Pressable>
+      <Button title={redoPending ? "Preparando..." : "Refazer do zero"} tone="outline" disabled={redoPending} onPress={onRedo} />
     </>
   );
 }
@@ -808,26 +815,6 @@ function WelcomeStep({ number, emoji, title, text }: { number: string; emoji: st
         <Text style={styles.welcomeStepTitle}>{title}</Text>
         <Text style={styles.welcomeStepText}>{text}</Text>
       </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Cabeçalho da etapa: deixa claríssimo em que passo o usuário está.
-// ---------------------------------------------------------------------------
-
-function PhaseHeader({ phase, message, thinking }: { phase: CusteioPhase; message: string; thinking: boolean }) {
-  const step = phase === "receita" ? 1 : phase === "precos" ? 2 : 3;
-  const title = phase === "receita" ? "A receita" : phase === "precos" ? "Os preços" : "Resultado";
-
-  return (
-    <View style={styles.phaseHeader}>
-      <View style={styles.phaseChip}>
-        <Text style={styles.phaseChipStep}>ETAPA {step} DE 3</Text>
-        <View style={styles.phaseChipDot} />
-        <Text style={styles.phaseChipTitle}>{title}</Text>
-      </View>
-      <AgentBubble message={message} thinking={thinking} />
     </View>
   );
 }
@@ -1079,36 +1066,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: fonts.body
   },
-  phaseHeader: {
-    gap: 10
-  },
-  phaseChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    alignSelf: "flex-start",
-    borderRadius: radius.pill,
-    backgroundColor: colors.agentSoft,
-    paddingHorizontal: 13,
-    paddingVertical: 6
-  },
-  phaseChipStep: {
-    color: colors.agentDeep,
-    fontSize: 11,
-    fontFamily: fonts.bodyBold,
-    letterSpacing: 0.7
-  },
-  phaseChipDot: {
-    height: 4,
-    width: 4,
-    borderRadius: 2,
-    backgroundColor: colors.agentDeep
-  },
-  phaseChipTitle: {
-    color: colors.ink,
-    fontSize: 14.5,
-    fontFamily: fonts.bodyBold
-  },
   methods: {
     gap: 10,
     borderRadius: radius.lg,
@@ -1224,18 +1181,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.success,
     fontSize: 14.5,
-    fontFamily: fonts.bodyBold
-  },
-  backLinkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: 42
-  },
-  backLinkText: {
-    color: colors.muted,
-    fontSize: 14,
     fontFamily: fonts.bodyBold
   },
   manualLink: {

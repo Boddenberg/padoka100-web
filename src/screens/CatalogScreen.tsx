@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { Calculator, Camera, ChevronRight, Images, MapPin, Trash2 } from "lucide-react-native";
+import { Calculator, Camera, ChevronRight, Images, MapPin, Sparkles, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,11 @@ import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
 import type { LocalVenda, Produto } from "@/types/api";
+
+// O assistente grava o preço com este motivo; usamos para marcar "calculado com IA".
+function isCostFromAI(motivo?: string | null) {
+  return /assistente|calculad[oa]\s+com\s+ia|\bia\b/i.test(motivo || "");
+}
 
 // Alert.alert com botões não funciona no navegador; lá usamos o confirm nativo.
 function confirmDestructive(title: string, message: string, confirmLabel: string, onConfirm: () => void) {
@@ -310,6 +315,12 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
                 ? `Custo atual: ${formatCurrency(product.preco_atual?.preco_custo)} — recalcule com o assistente`
                 : "Descubra o custo e o lucro de cada unidade com o assistente"}
             </Text>
+            {isCostFromAI(product.preco_atual?.motivo) ? (
+              <View style={styles.aiPill}>
+                <Sparkles size={11} color="#fff" />
+                <Text style={styles.aiPillText}>Calculado com IA</Text>
+              </View>
+            ) : null}
           </View>
           <ChevronRight size={20} color="#fff" />
         </LinearGradient>
@@ -774,6 +785,22 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 17,
     fontFamily: fonts.body
+  },
+  aiPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    marginTop: 6,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    paddingHorizontal: 9,
+    paddingVertical: 3
+  },
+  aiPillText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: fonts.bodyBold
   },
   photoActions: {
     flexDirection: "row",
