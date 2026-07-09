@@ -369,6 +369,7 @@ export interface DecisaoSobraRequest {
 }
 
 export interface IniciarHojeRequest {
+  data_venda?: string;
   itens_producao?: CriarItemProducaoRequest[];
   decisoes_sobra?: DecisaoSobraRequest[];
 }
@@ -387,7 +388,16 @@ export interface RespostaDecidirSobras {
   sobras_pendentes: SobraPendente[];
 }
 
-export type RespostaIniciarHoje = DiaDeVenda | RespostaDecidirSobras;
+// Dia iniciado agora ou já aberto: o dia vem em `dia_de_venda`.
+export interface RespostaDiaIniciado {
+  acao: "dia_iniciado" | "dia_atual_aberto";
+  mensagem?: string | null;
+  dia_de_venda: DiaDeVenda;
+}
+
+// Toda resposta traz `acao`; o formato "cru" (DiaDeVenda) fica para o fallback
+// do endpoint clássico e compatibilidade com backend antigo.
+export type RespostaIniciarHoje = DiaDeVenda | RespostaDecidirSobras | RespostaDiaIniciado;
 
 // Produtos que participam do dia (GET /relatorios/dias/{id}/produtos-venda).
 export interface ProdutoDaVenda {

@@ -595,7 +595,11 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
         .map((produto) => ({ produto_id: produto.id, quantidade_produzida: Number(quantities[produto.id] || 0) }))
         .filter((item) => item.quantidade_produzida > 0);
       try {
-        return await api.dias.startToday({ itens_producao, ...(decisoes ? { decisoes_sobra: decisoes } : {}) });
+        return await api.dias.startToday({
+          data_venda: todayInputValue(),
+          itens_producao,
+          ...(decisoes ? { decisoes_sobra: decisoes } : {})
+        });
       } catch (error) {
         // Backend antigo (produção) ainda não tem "iniciar-hoje": abre o dia
         // pelo endpoint clássico para não travar a venda.
@@ -606,8 +610,9 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
       }
     },
     onSuccess: (response) => {
-      if ("acao" in response) {
-        // Sobrou produto de ontem: o dia só abre depois da escolha.
+      // Só a ação "decidir_sobras" abre a etapa de sobras. As demais
+      // (dia_iniciado / dia_atual_aberto) já iniciaram o dia — fecha e recarrega.
+      if ("acao" in response && response.acao === "decidir_sobras") {
         setPendingLeftovers(response);
         const initial: Cart = {};
         response.sobras_pendentes.forEach((sobra) => {
