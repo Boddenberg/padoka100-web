@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ban, CalendarDays, CheckCircle2, ChevronRight, Mic, ReceiptText, Search, Send, Sparkles } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
 import { NotificationsButton } from "@/components/notifications";
@@ -47,6 +48,7 @@ const EMPTY_PRODUCTS: Produto[] = [];
 export function SalesScreen() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [cart, setCart] = useState<Cart>({});
   const [sheet, setSheet] = useState<ActiveSheet>(null);
   const [search, setSearch] = useState("");
@@ -311,7 +313,7 @@ export function SalesScreen() {
       {itemCount ? (
         <View
           pointerEvents={cartBarGuard ? "none" : "auto"}
-          style={[styles.cartBar, shadows.floating, cartBarGuard && styles.cartBarGuarded]}
+          style={[styles.cartBar, shadows.floating, { bottom: 76 + insets.bottom }, cartBarGuard && styles.cartBarGuarded]}
         >
           <View style={styles.cartInfo}>
             <View style={styles.cartCountBubble}>
@@ -625,6 +627,9 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
         <View style={styles.leftoverNotice}>
           <Text style={styles.leftoverNoticeText}>{pendingLeftovers.mensagem}</Text>
         </View>
+        <Text style={styles.leftoverGuide}>
+          Escolha quais sobras de ontem quer reaproveitar e quanto usar de cada uma. Deixe em 0 as que não quiser aproveitar.
+        </Text>
         {pendingLeftovers.sobras_pendentes.map((sobra) => {
           const use = leftoverUse[sobra.produto_id] ?? 0;
           return (
@@ -633,7 +638,9 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
                 <Text style={styles.productionName} numberOfLines={2}>
                   {fixProductName(sobra.nome_produto)}
                 </Text>
-                <Text style={styles.leftoverHint}>Sobraram {sobra.quantidade_sobra} · quantos usar hoje?</Text>
+                <Text style={[styles.leftoverHint, use === 0 && styles.leftoverHintOff]}>
+                  {use === 0 ? `Sobraram ${sobra.quantidade_sobra} · não vou reaproveitar` : `Reaproveitar ${use} de ${sobra.quantidade_sobra}`}
+                </Text>
               </View>
               <Stepper
                 value={use}
@@ -653,7 +660,7 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
         })}
         {startDay.error instanceof Error ? <StateText tone="error" text={startDay.error.message} /> : null}
         <Button
-          title={startDay.isPending ? "Começando..." : "Usar sobras e começar o dia"}
+          title={startDay.isPending ? "Começando..." : "Confirmar sobras e começar o dia"}
           disabled={startDay.isPending}
           onPress={() =>
             startDay.mutate(
@@ -1395,13 +1402,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     lineHeight: 21
   },
+  leftoverGuide: {
+    color: colors.muted,
+    fontSize: 13.5,
+    lineHeight: 19,
+    fontFamily: fonts.body
+  },
   leftoverInfo: {
     flex: 1,
     gap: 2
   },
   leftoverHint: {
-    color: colors.muted,
+    color: colors.success,
     fontSize: 12.5,
+    fontFamily: fonts.bodyBold
+  },
+  leftoverHintOff: {
+    color: colors.muted,
     fontFamily: fonts.body
   },
   cartBar: {

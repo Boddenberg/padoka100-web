@@ -23,22 +23,20 @@ function toKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-// Calendário de período: escolhe início/fim tocando nos dias e mostra um
-// pontinho nos dias que tiveram dia de venda — um panorama do mês.
+// Calendário de período: o toque serve só para escolher o intervalo (toque no
+// dia inicial e depois no final). Abrir o resumo de um dia é uma ação separada
+// (botão na tela), para não brigar com a seleção do período.
 // Datas futuras não existem aqui: nem seleção, nem navegação de mês.
 export function RangeCalendar({
   start,
   end,
   onChange,
-  marked,
-  onDayOpen
+  marked
 }: {
   start: string;
   end: string;
   onChange: (start: string, end: string) => void;
   marked: Set<string>;
-  // Toque que seleciona um único dia com venda registrada abre o resumo dele.
-  onDayOpen?: (day: string) => void;
 }) {
   const now = new Date();
   const todayKey = toKey(now.getFullYear(), now.getMonth(), now.getDate());
@@ -70,22 +68,17 @@ export function RangeCalendar({
   function pick(key: string) {
     if (key > todayKey) return;
 
-    // Toque que inicia uma seleção nova (ou repete o dia já escolhido)
-    // conta como "quero ver esse dia".
-    const freshSelection = !start || (Boolean(start && end) && start !== end);
-    const reTap = Boolean(start) && start === end && key === start;
+    const hasRange = Boolean(start) && Boolean(end) && start !== end;
 
-    if (start && end && start !== end) {
+    // Sem seleção, ou já com um intervalo fechado → recomeça em 1 dia.
+    if (!start || hasRange) {
       onChange(key, key);
-    } else if (start && key < start) {
-      onChange(key, end || start);
-    } else if (start) {
-      onChange(start, key);
-    } else {
-      onChange(key, key);
+      return;
     }
 
-    if ((freshSelection || reTap) && marked.has(key)) onDayOpen?.(key);
+    // Já tem 1 dia escolhido (start === end) → o segundo toque fecha o intervalo.
+    if (key < start) onChange(key, start);
+    else onChange(start, key);
   }
 
   const cells: ({ day: number; key: string } | null)[] = [
@@ -165,8 +158,9 @@ export function RangeCalendar({
 
       <View style={styles.legend}>
         <View style={[styles.dot, styles.dotVisible, styles.legendDot]} />
-        <Text style={styles.legendText}>dia com venda · toque para ver o resumo</Text>
+        <Text style={styles.legendText}>dia com venda</Text>
       </View>
+      <Text style={styles.legendHint}>Toque no primeiro dia e depois no último para escolher o período.</Text>
     </View>
   );
 }
@@ -275,5 +269,12 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     fontFamily: fonts.body
+  },
+  legendHint: {
+    color: colors.muted,
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontFamily: fonts.body,
+    textAlign: "center"
   }
 });

@@ -9,10 +9,8 @@ import { AUTH_REQUIRED } from "@/constants/auth";
 import { useAuth } from "@/contexts/auth";
 import { api, ApiError } from "@/lib/api";
 import { emptyProfile, readProfile, saveProfile, type LocalProfile } from "@/lib/profile";
-import { getBaseUrl, readApiSettings, saveApiSettings, type ApiSettings } from "@/lib/settings";
-import { colors, fonts, radius, shadows } from "@/lib/theme";
+import { colors, fonts, radius } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
-import type { ApiEnvironment } from "@/types/api";
 
 type ActiveSheet = "password" | "email" | null;
 
@@ -114,7 +112,7 @@ export function ProfileScreen() {
 
   return (
     <>
-      <Page title="Perfil" subtitle="Seus dados, sua conta e a conexão do app.">
+      <Page title="Perfil" subtitle="Seus dados e sua conta.">
         {/* Foto e dados pessoais */}
         <Card>
           <View style={styles.header}>
@@ -224,9 +222,6 @@ export function ProfileScreen() {
             </>
           )}
         </Card>
-
-        {/* Conexão com o servidor (antiga tela Ajustes) */}
-        <ConnectionCard />
       </Page>
 
       <ChangePasswordSheet visible={sheet === "password"} onClose={() => setSheet(null)} />
@@ -381,58 +376,6 @@ function profileErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Não foi possível salvar.";
 }
 
-// Ambiente, API key e teste de conexão: conteúdo herdado da tela Ajustes.
-function ConnectionCard() {
-  const [settings, setSettings] = useState<ApiSettings>({ environment: "production", apiKey: "" });
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    readApiSettings().then(setSettings).catch(() => undefined);
-  }, []);
-
-  const save = useMutation({
-    mutationFn: () => saveApiSettings(settings),
-    onSuccess: () => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2200);
-    }
-  });
-  function setEnvironment(environment: ApiEnvironment) {
-    setSettings((currentSettings) => ({ ...currentSettings, environment }));
-  }
-
-  return (
-    <Card>
-      <Text style={styles.sectionTitle}>Conexão com o servidor</Text>
-      <View style={styles.segment}>
-        <SegmentButton
-          label="Railway"
-          active={settings.environment === "production"}
-          onPress={() => setEnvironment("production")}
-        />
-        <SegmentButton label="Local" active={settings.environment === "local"} onPress={() => setEnvironment("local")} />
-      </View>
-      <Text style={styles.muted}>Backend atual: {getBaseUrl(settings.environment)}</Text>
-      <Text style={styles.hint}>Local no celular geralmente precisa ser o IP da máquina na rede, não localhost.</Text>
-
-      <Field label="API key">
-        <Input value={settings.apiKey} onChangeText={(apiKey) => setSettings({ ...settings, apiKey })} secureTextEntry />
-      </Field>
-      <Button title={save.isPending ? "Salvando..." : "Salvar conexão"} tone="soft" disabled={save.isPending} onPress={() => save.mutate()} />
-      {saved ? <StateText tone="success" text="Conexão salva neste dispositivo." /> : null}
-      {save.error instanceof Error ? <StateText tone="error" text={save.error.message} /> : null}
-    </Card>
-  );
-}
-
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.segmentButton, active && styles.segmentButtonActive]}>
-      <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   pressed: {
     opacity: 0.8
@@ -527,35 +470,5 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     fontFamily: fonts.body
-  },
-  hint: {
-    color: colors.warning,
-    fontSize: 13,
-    fontFamily: fonts.body
-  },
-  segment: {
-    flexDirection: "row",
-    gap: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceWarm,
-    padding: 5
-  },
-  segmentButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    paddingVertical: 11
-  },
-  segmentButtonActive: {
-    backgroundColor: colors.brand,
-    ...shadows.brand
-  },
-  segmentLabel: {
-    color: colors.muted,
-    fontFamily: fonts.bodyBold
-  },
-  segmentLabelActive: {
-    color: "#fff"
   }
 });

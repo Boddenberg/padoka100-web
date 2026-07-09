@@ -6,7 +6,7 @@ import { RangeCalendar } from "@/components/calendar";
 import { AiAnalysisCard } from "@/components/resumo/ai-analysis";
 import { DaySummarySheet } from "@/components/resumo/day-summary-sheet";
 import { PeriodChart } from "@/components/resumo/period-chart";
-import { Badge, Card, Money, Page, SectionTitle, Skeleton, StateText } from "@/components/ui";
+import { Badge, Button, Card, Money, Page, SectionTitle, Skeleton, StateText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, formatWholeCurrency, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
@@ -59,6 +59,8 @@ export function SummaryScreen() {
   }, [salesDaysQuery.data]);
 
   const markedDays = useMemo(() => new Set(dayIdByDate.keys()), [dayIdByDate]);
+  // Dia único selecionado que teve venda: habilita o botão de resumo do dia.
+  const selectedDayId = start === end ? dayIdByDate.get(start) : undefined;
 
   const totals = periodQuery.data;
   const periodLabel = describePeriod(start, end, today);
@@ -141,16 +143,16 @@ export function SummaryScreen() {
               onPress={() => setPeriod(startOfMonth(today), today)}
             />
           </View>
-          <RangeCalendar
-            start={start}
-            end={end}
-            marked={markedDays}
-            onChange={setPeriod}
-            onDayOpen={(day) => {
-              const dayId = dayIdByDate.get(day);
-              if (dayId) setOpenDayId(dayId);
-            }}
-          />
+          <RangeCalendar start={start} end={end} marked={markedDays} onChange={setPeriod} />
+          {/* Um único dia com venda selecionado → botão claro para o resumo dele,
+              sem abrir por acidente durante a escolha do período. */}
+          {start === end && selectedDayId ? (
+            <Button
+              title={`Ver resumo do dia ${formatDate(start)}`}
+              tone="soft"
+              onPress={() => setOpenDayId(selectedDayId)}
+            />
+          ) : null}
         </Card>
 
         {/* 3. Gráfico de vendas do período selecionado. */}

@@ -1,32 +1,31 @@
 import { Tabs } from "expo-router";
 import { BarChart3, Package, ShoppingBag, UserRound } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts } from "@/lib/theme";
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.brandDeep,
         tabBarInactiveTintColor: colors.muted,
-        // Tab bar flutuante estilo "ilha": descolada do rodapé, cantos
-        // redondos e sombra suave — o conteúdo passa por baixo.
+        // Barra encaixada no rodapé (largura total, rente ao fundo, sem folga
+        // em baixo nem nas laterais), respeitando a área segura do aparelho.
         tabBarStyle: {
           position: "absolute",
-          left: 12,
-          right: 12,
-          bottom: 6,
-          minHeight: 68,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          minHeight: 62 + insets.bottom,
           paddingTop: 8,
-          paddingBottom: 8,
-          borderTopWidth: 0,
-          borderRadius: 28,
+          paddingBottom: Math.max(insets.bottom, 8),
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
           backgroundColor: colors.surface,
-          shadowColor: "#4a2c12",
-          shadowOpacity: 0.16,
-          shadowRadius: 22,
-          shadowOffset: { width: 0, height: 10 },
-          elevation: 16
+          elevation: 0
         },
         tabBarLabelStyle: {
           fontSize: 12,
