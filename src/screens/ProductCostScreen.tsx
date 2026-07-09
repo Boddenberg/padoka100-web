@@ -1,7 +1,7 @@
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Keyboard as KeyboardIcon, Mic, PartyPopper } from "lucide-react-native";
+import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Keyboard as KeyboardIcon, Mic, PartyPopper, X } from "lucide-react-native";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -392,6 +392,11 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
             </Text>
             <AgentTag />
           </View>
+          {/* Saída rápida do fluxo inteiro (volta ao catálogo). A seta ‹ navega
+              entre etapas; o X fecha tudo. */}
+          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
+            <X size={18} color={colors.muted} />
+          </Pressable>
         </View>
 
         {boot === "loading" || productsQuery.isLoading ? (
@@ -956,6 +961,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceWarm
+  },
+  closeButton: {
+    height: 34,
+    width: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface
   },
   headerInfo: {
     flex: 1,
