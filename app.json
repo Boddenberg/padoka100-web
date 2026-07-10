@@ -11,7 +11,9 @@
       "url": "https://u.expo.dev/ed7d0538-750b-4f69-87c3-ebba96be1538"
     },
     "icon": "./Logo.png",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.boddenberg.padoka100",
@@ -24,7 +26,10 @@
     },
     "android": {
       "package": "com.boddenberg.padoka100",
-      "permissions": ["CAMERA", "RECORD_AUDIO"]
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -41,11 +46,14 @@
           "microphonePermission": "Permitir que a Padoka 100 grave vendas por voz."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "extra": {
       "apiProdUrl": "https://padoka100-production.up.railway.app",
       "apiLocalUrl": "http://localhost:8000",
+      "supabaseUrl": "",
+      "supabaseAnonKey": "",
       "eas": {
         "projectId": "ed7d0538-750b-4f69-87c3-ebba96be1538"
       }
