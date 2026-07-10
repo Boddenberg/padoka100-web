@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
+import { apiLogEnabled, clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
 
 const STATUS_COLOR = (entry: ApiLogEntry) => {
   if (entry.status === null) return "#ff7a7a";
@@ -30,6 +30,8 @@ export function ApiDebugOverlay() {
   const calls = useApiLog();
   const [open, setOpen] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  if (!apiLogEnabled) return null;
 
   const total = calls.reduce((sum, call) => sum + responseChars(call), 0);
 

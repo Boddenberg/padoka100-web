@@ -2,7 +2,7 @@ import { ChevronDown, Share2, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { Card } from "@/components/ui";
-import { clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
+import { apiLogEnabled, clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
 import { colors, fonts, radius } from "@/lib/theme";
 
 const mono = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
@@ -27,6 +27,8 @@ export function ApiLogPanel() {
   const entries = useApiLog();
   const [expanded, setExpanded] = useState<number | null>(null);
   const [onlyErrors, setOnlyErrors] = useState(false);
+
+  if (!apiLogEnabled) return null;
 
   const shown = onlyErrors ? entries.filter((entry) => !entry.ok) : entries;
 
