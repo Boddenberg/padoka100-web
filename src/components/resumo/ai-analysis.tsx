@@ -6,6 +6,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
 import { Button, Card, Input, StateText } from "@/components/ui";
+import { useAuth } from "@/contexts/auth";
+import { hasAccess, upgradeMessage } from "@/lib/access";
 import { api, ApiError } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -21,6 +23,8 @@ interface NormalizedAnalysis {
 // específica quando a pessoa escreve uma pergunta. Exige login como dono.
 export function AiAnalysisCard({ start, end }: { start: string; end: string }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const canUseAiAnalysis = hasAccess(user, "ia.analitica");
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<NormalizedAnalysis | null>(null);
 
@@ -54,11 +58,13 @@ export function AiAnalysisCard({ start, end }: { start: string; end: string }) {
         onChangeText={setQuestion}
         placeholder="Pergunta opcional. Ex: o que devo produzir menos?"
         multiline
+        editable={canUseAiAnalysis}
       />
 
+      {!canUseAiAnalysis ? <StateText text={upgradeMessage("ia.analitica")} /> : null}
       <Pressable
-        onPress={() => analyze.mutate()}
-        disabled={analyze.isPending}
+        onPress={() => canUseAiAnalysis && analyze.mutate()}
+        disabled={!canUseAiAnalysis || analyze.isPending}
         style={({ pressed }) => pressed && styles.pressed}
       >
         <LinearGradient

@@ -24,6 +24,7 @@ import {
   Stepper
 } from "@/components/ui";
 import { api, ApiError, createAudioForm, type NativeFile } from "@/lib/api";
+import { hasAccess, upgradeMessage } from "@/lib/access";
 import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { useAuth } from "@/contexts/auth";
@@ -48,11 +49,13 @@ const EMPTY_PRODUCTS: Produto[] = [];
 export function SalesScreen() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const canUseOperationalAi = hasAccess(user, "ia.operacional");
   const insets = useSafeAreaInsets();
   const [cart, setCart] = useState<Cart>({});
   const [sheet, setSheet] = useState<ActiveSheet>(null);
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [accessNotice, setAccessNotice] = useState<string | null>(null);
   const [aiInitialText, setAiInitialText] = useState("");
   const [aiAutoRecord, setAiAutoRecord] = useState(false);
 
@@ -200,6 +203,11 @@ export function SalesScreen() {
   }
 
   function openAgent(options?: { text?: string; record?: boolean }) {
+    if (!canUseOperationalAi) {
+      setAccessNotice(upgradeMessage("ia.operacional"));
+      return;
+    }
+    setAccessNotice(null);
     setAiInitialText(options?.text || "");
     setAiAutoRecord(Boolean(options?.record));
     setSheet("ai");
@@ -279,6 +287,7 @@ export function SalesScreen() {
             }}
           />
         ) : null}
+        {!loading && accessNotice ? <StateText text={accessNotice} /> : null}
 
         {currentDay ? (
           <>

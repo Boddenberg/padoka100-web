@@ -282,6 +282,7 @@ export interface CriarDiaDeVendaRequest {
 
 // Autenticação e perfil (/auth/* e /perfil/me).
 export type PapelUsuario = "usuario" | "administrador" | "dono";
+export type PlanoUsuario = "basico" | "analitico" | "ia" | "admin";
 
 export interface UsuarioPerfil {
   id: UUID;
@@ -291,6 +292,8 @@ export interface UsuarioPerfil {
   foto_url?: string | null;
   data_nascimento?: string | null;
   papel?: PapelUsuario | string;
+  plano?: PlanoUsuario | string;
+  capacidades?: string[];
 }
 
 export interface LoginRequest {
