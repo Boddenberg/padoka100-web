@@ -13,6 +13,7 @@ export interface ApiLogEntry {
   ok: boolean;
   durationMs: number;
   request: string | null; // corpo enviado, já redigido e truncado
+  responseChars: number; // tamanho original do corpo recebido, antes do truncamento
   response: string; // corpo recebido (ou mensagem de erro), truncado
 }
 
@@ -63,10 +64,12 @@ export interface RecordApiCallInput {
   ok: boolean;
   durationMs: number;
   requestBody?: unknown;
+  responseChars?: number;
   response: unknown;
 }
 
 export function recordApiCall(input: RecordApiCallInput) {
+  const response = truncate(toText(input.response));
   const entry: ApiLogEntry = {
     id: nextId++,
     at: Date.now(),
@@ -76,7 +79,8 @@ export function recordApiCall(input: RecordApiCallInput) {
     ok: input.ok,
     durationMs: input.durationMs,
     request: input.requestBody === undefined ? null : truncate(toText(input.requestBody)),
-    response: truncate(toText(input.response))
+    responseChars: input.responseChars ?? response.length,
+    response
   };
   entries = [entry, ...entries].slice(0, MAX_ENTRIES);
   emit();

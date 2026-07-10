@@ -1,5 +1,4 @@
 import { recordApiCall } from "@/lib/api-log";
-import { recordApiCall as recordApiDebug } from "@/lib/api-debug";
 import { getBaseUrl, readApiSettings, type ApiSettings } from "@/lib/settings";
 import type {
   ConfirmarCusteioRequest,
@@ -172,6 +171,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     });
   } catch (networkError) {
     // Falhou antes de ter resposta (offline, DNS, servidor fora): registra e propaga.
+    const message = networkError instanceof Error ? networkError.message : String(networkError);
     recordApiCall({
       method,
       path: displayPath,
@@ -179,15 +179,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       ok: false,
       durationMs: Date.now() - startedAt,
       requestBody,
-      response: networkError instanceof Error ? networkError.message : String(networkError)
+      responseChars: message.length,
+      response: message
     });
     throw networkError;
   }
 
   const { value: payload, chars } = await parseResponse(response);
-
-  // DEBUG provisório: rota + tamanho da resposta no overlay (ver api-debug.ts).
-  recordApiDebug({ method, path, status: response.status, chars });
 
   recordApiCall({
     method,
@@ -196,6 +194,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     ok: response.ok,
     durationMs: Date.now() - startedAt,
     requestBody,
+    responseChars: chars,
     response: payload
   });
 

@@ -1,59 +1,100 @@
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { clearApiCalls, getApiCalls, subscribeApiCalls, type ApiDebugEntry } from "@/lib/api-debug";
+import { clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
 
-// DEBUG TEMPORÁRIO: overlay no cantinho que mostra, para cada chamada da API, a
-// rota e a quantidade de caracteres que a resposta teve. É provisório — para
-// remover, apague este componente, src/lib/api-debug.ts e as referências a eles
-// em src/lib/api.ts e app/_layout.tsx.
-
-function useApiCalls(): ApiDebugEntry[] {
-  return useSyncExternalStore(subscribeApiCalls, getApiCalls, getApiCalls);
-}
-
-const STATUS_COLOR = (status: number) => {
-  if (status >= 500) return "#ff7a7a";
-  if (status >= 400) return "#ffb454";
-  if (status >= 200 && status < 300) return "#7ee787";
+const STATUS_COLOR = (entry: ApiLogEntry) => {
+  if (entry.status === null) return "#ff7a7a";
+  if (entry.status >= 500) return "#ff7a7a";
+  if (entry.status >= 400) return "#ffb454";
+  if (entry.status >= 200 && entry.status < 300) return "#7ee787";
   return "#c9d1d9";
 };
 
+function statusLabel(entry: ApiLogEntry) {
+  return entry.status === null ? "rede" : String(entry.status);
+}
+
+function formatTime(at: number) {
+  const date = new Date(at);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function responseChars(entry: ApiLogEntry) {
+  return entry.responseChars ?? entry.response.length;
+}
+
 export function ApiDebugOverlay() {
   const insets = useSafeAreaInsets();
-  const calls = useApiCalls();
+  const calls = useApiLog();
   const [open, setOpen] = useState(true);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const total = calls.reduce((sum, call) => sum + call.chars, 0);
+  const total = calls.reduce((sum, call) => sum + responseChars(call), 0);
+
+  function toggleOpen() {
+    setOpen((value) => {
+      const next = !value;
+      if (!next) setExpandedId(null);
+      return next;
+    });
+  }
+
+  function clear() {
+    setExpandedId(null);
+    clearApiLog();
+  }
 
   return (
     <View style={[styles.wrap, { top: insets.top + 6 }]} pointerEvents="box-none">
-      <Pressable style={styles.badge} onPress={() => setOpen((value) => !value)}>
+      <Pressable style={styles.badge} onPress={toggleOpen}>
         <Text style={styles.badgeText}>
-          API · {calls.length} · {total} chars {open ? "▾" : "▸"}
+          API | {calls.length} | {total} chars {open ? "v" : ">"}
         </Text>
       </Pressable>
 
       {open ? (
         <View style={styles.panel}>
-          <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
             {calls.length === 0 ? (
               <Text style={styles.empty}>Sem chamadas ainda.</Text>
             ) : (
-              calls.map((call) => (
-                <View key={call.id} style={styles.row}>
-                  <View style={styles.rowHead}>
-                    <Text style={[styles.method, { color: STATUS_COLOR(call.status) }]}>{call.method}</Text>
-                    <Text style={styles.chars}>{call.chars} chars</Text>
+              calls.map((call) => {
+                const expanded = expandedId === call.id;
+                return (
+                  <View key={call.id} style={[styles.row, expanded && styles.rowExpanded]}>
+                    <Pressable
+                      onPress={() => setExpandedId(expanded ? null : call.id)}
+                      style={({ pressed }) => [styles.rowButton, pressed && styles.pressed]}
+                    >
+                      <View style={styles.rowHead}>
+                        <Text style={[styles.method, { color: STATUS_COLOR(call) }]}>{call.method}</Text>
+                        <Text style={[styles.status, { color: STATUS_COLOR(call) }]}>{statusLabel(call)}</Text>
+                        <Text style={styles.chars}>{responseChars(call)} chars</Text>
+                      </View>
+                      <Text style={styles.path} numberOfLines={expanded ? 2 : 1}>
+                        {call.path}
+                      </Text>
+                      <Text style={styles.meta}>
+                        {call.durationMs}ms | {formatTime(call.at)}
+                      </Text>
+                    </Pressable>
+
+                    {expanded ? (
+                      <View style={styles.detail}>
+                        <Text style={styles.detailLabel}>response</Text>
+                        <Text selectable style={styles.code}>
+                          {call.response || "(vazio)"}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
-                  <Text style={styles.path} numberOfLines={1}>
-                    {call.path}
-                  </Text>
-                </View>
-              ))
+                );
+              })
             )}
           </ScrollView>
-          <Pressable style={styles.clear} onPress={clearApiCalls}>
+          <Pressable style={styles.clear} onPress={clear}>
             <Text style={styles.clearText}>limpar</Text>
           </Pressable>
         </View>
@@ -82,14 +123,17 @@ const styles = StyleSheet.create({
   },
   panel: {
     marginTop: 6,
-    width: 240,
-    maxHeight: 320,
-    backgroundColor: "rgba(20,16,12,0.92)",
+    width: 292,
+    maxHeight: 430,
+    backgroundColor: "rgba(20,16,12,0.94)",
     borderRadius: 12,
     padding: 8
   },
   list: {
     flexGrow: 0
+  },
+  listContent: {
+    gap: 2
   },
   empty: {
     color: "#c9d1d9",
@@ -101,17 +145,34 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.12)",
     paddingVertical: 5
   },
+  rowExpanded: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 8,
+    paddingHorizontal: 6
+  },
+  rowButton: {
+    gap: 2
+  },
+  pressed: {
+    opacity: 0.72
+  },
   rowHead: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center"
+    alignItems: "center",
+    gap: 7
   },
   method: {
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 0.5
   },
+  status: {
+    minWidth: 28,
+    fontSize: 10,
+    fontWeight: "800"
+  },
   chars: {
+    marginLeft: "auto",
     color: "#fff",
     fontSize: 11,
     fontWeight: "700"
@@ -120,6 +181,30 @@ const styles = StyleSheet.create({
     color: "#c9d1d9",
     fontSize: 10.5,
     marginTop: 1
+  },
+  meta: {
+    color: "rgba(255,255,255,0.62)",
+    fontSize: 9.5
+  },
+  detail: {
+    marginTop: 7,
+    paddingTop: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.14)"
+  },
+  detailLabel: {
+    color: "#ffb454",
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase"
+  },
+  code: {
+    marginTop: 4,
+    color: "#f0f6fc",
+    fontFamily: "monospace",
+    fontSize: 10.5,
+    lineHeight: 15
   },
   clear: {
     alignSelf: "flex-end",
