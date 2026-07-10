@@ -1,3 +1,4 @@
+import { recordApiCall } from "@/lib/api-log";
 import { getBaseUrl, readApiSettings, type ApiSettings } from "@/lib/settings";
 import type {
   ConfirmarCusteioRequest,
@@ -99,6 +100,16 @@ function buildUrl(path: string, query: QueryParams | undefined, settings: ApiSet
   return url.toString();
 }
 
+// Só o caminho + query para o log (esconde o host da requisição).
+function safePath(url: string, fallback: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname + parsed.search;
+  } catch {
+    return fallback;
+  }
+}
+
 async function parseResponse(response: Response) {
   const contentType = response.headers.get("content-type") || "";
   if (response.status === 204) return null;
@@ -136,14 +147,45 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (path.startsWith("/api/v1") && settings.apiKey.trim()) headers.set("X-API-Key", settings.apiKey.trim());
   if (path.startsWith("/api/v1") && sessionToken) headers.set("Authorization", `Bearer ${sessionToken}`);
 
-  const response = await fetch(buildUrl(path, options.query, settings), {
-    method,
-    headers,
-    body: options.formData || (options.body !== undefined ? JSON.stringify(options.body) : undefined),
-    signal: options.signal
-  });
+  const url = buildUrl(path, options.query, settings);
+  const displayPath = safePath(url, path);
+  // Não logamos o binário do multipart nem os headers (token fica de fora).
+  const requestBody = options.formData ? "[multipart/form-data]" : options.body;
+  const startedAt = Date.now();
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      body: options.formData || (options.body !== undefined ? JSON.stringify(options.body) : undefined),
+      signal: options.signal
+    });
+  } catch (networkError) {
+    // Falhou antes de ter resposta (offline, DNS, servidor fora): registra e propaga.
+    recordApiCall({
+      method,
+      path: displayPath,
+      status: null,
+      ok: false,
+      durationMs: Date.now() - startedAt,
+      requestBody,
+      response: networkError instanceof Error ? networkError.message : String(networkError)
+    });
+    throw networkError;
+  }
 
   const payload = await parseResponse(response);
+
+  recordApiCall({
+    method,
+    path: displayPath,
+    status: response.status,
+    ok: response.ok,
+    durationMs: Date.now() - startedAt,
+    requestBody,
+    response: payload
+  });
 
   if (!response.ok) {
     if (response.status === 404 && options.allowNotFound) return null as T;

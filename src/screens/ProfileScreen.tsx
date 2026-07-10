@@ -4,6 +4,7 @@ import { Camera, Images, KeyRound, LogIn, LogOut, Mail, ShieldCheck, UserRound }
 import { useEffect, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
+import { ApiLogPanel } from "@/components/api-log-panel";
 import { Badge, Button, Card, Field, Input, Page, Sheet, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { useAuth } from "@/contexts/auth";
@@ -222,6 +223,9 @@ export function ProfileScreen() {
             </>
           )}
         </Card>
+
+        {/* Diagnóstico: histórico de chamadas ao servidor (ajuda a investigar erros). */}
+        <ApiLogPanel />
       </Page>
 
       <ChangePasswordSheet visible={sheet === "password"} onClose={() => setSheet(null)} />
