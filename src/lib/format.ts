@@ -27,8 +27,17 @@ export function formatDate(value: string | null | undefined) {
   return value;
 }
 
+// Dia de HOJE no calendário LOCAL do aparelho, como "YYYY-MM-DD".
+// NÃO use toISOString() aqui: ele converte o instante para UTC e, à noite no
+// Brasil (UTC-3), devolveria o dia seguinte — o backend então recusa como
+// "data futura" (relatórios, vigente_desde, data_venda...). getFullYear/Month/
+// Date são locais, alinhados ao calendário da tela e ao dia real do usuário.
 export function todayInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function toNumber(value: DecimalString | number | null | undefined) {
