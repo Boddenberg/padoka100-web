@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
+import { useAuth } from "@/contexts/auth";
+import { hasAccess, upgradeMessage } from "@/lib/access";
 import { api, createMediaForm, type NativeFile } from "@/lib/api";
 import { cleanPayload, formatCurrency, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -34,6 +36,10 @@ function confirmDestructive(title: string, message: string, confirmLabel: string
   ]);
 }
 
+function showUpgrade(capability: string) {
+  Alert.alert("Plano necessario", upgradeMessage(capability));
+}
+
 type ProductDraft = {
   nome: string;
   descricao: string;
@@ -52,6 +58,8 @@ const emptyProduct: ProductDraft = {
 
 export function CatalogScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const canUseShoppingList = hasAccess(user, "compras.usar");
   const [sheet, setSheet] = useState<"product" | "location" | "edit" | "edit-location" | null>(null);
   const [editing, setEditing] = useState<Produto | null>(null);
   const [editingLocal, setEditingLocal] = useState<LocalVenda | null>(null);
@@ -115,7 +123,10 @@ export function CatalogScreen() {
     <>
       <Page title="Catálogo" subtitle="Produtos, preços, fotos e locais de venda." onRefresh={onRefresh} refreshing={refreshing}>
         {/* Porta de entrada da lista de compras por produção planejada. */}
-        <Pressable onPress={() => router.push("/lista-compras")} style={({ pressed }) => pressed && styles.pressed}>
+        <Pressable
+          onPress={() => (canUseShoppingList ? router.push("/lista-compras") : showUpgrade("compras.usar"))}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
           <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.shopCard, shadows.floating]}>
             <View style={styles.shopIcon}>
               <ShoppingCart size={22} color="#fff" />
@@ -127,6 +138,7 @@ export function CatalogScreen() {
             <ChevronRight size={20} color="#fff" />
           </LinearGradient>
         </Pressable>
+        {!canUseShoppingList ? <StateText text={upgradeMessage("compras.usar")} /> : null}
 
         <View style={styles.actions}>
           <View style={styles.actionButton}>
@@ -235,6 +247,8 @@ function EditProductSheet({ visible, onClose, product }: { visible: boolean; onC
 function EditProductForm({ onClose, product }: { onClose: () => void; product: Produto }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { user } = useAuth();
+  const canUseCostAssistant = hasAccess(user, "custos.assistente");
   const [nome, setNome] = useState(product.nome);
   const [descricao, setDescricao] = useState(product.descricao || "");
   const [situacao, setSituacao] = useState(product.situacao || "ativo");
@@ -324,6 +338,10 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
       {/* Porta de entrada do custeio assistido: fecha o sheet e abre a sessão guiada. */}
       <Pressable
         onPress={() => {
+          if (!canUseCostAssistant) {
+            showUpgrade("custos.assistente");
+            return;
+          }
           onClose();
           router.push(`/produto/${product.id}/custos`);
         }}
@@ -350,6 +368,7 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
           <ChevronRight size={20} color="#fff" />
         </LinearGradient>
       </Pressable>
+      {!canUseCostAssistant ? <StateText text={upgradeMessage("custos.assistente")} /> : null}
 
       <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
       {photoUrl ? (
