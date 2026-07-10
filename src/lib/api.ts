@@ -1,3 +1,4 @@
+import { recordApiCall } from "@/lib/api-debug";
 import { getBaseUrl, readApiSettings, type ApiSettings } from "@/lib/settings";
 import type {
   ConfirmarCusteioRequest,
@@ -99,11 +100,19 @@ function buildUrl(path: string, query: QueryParams | undefined, settings: ApiSet
   return url.toString();
 }
 
-async function parseResponse(response: Response) {
+// Lê o corpo uma única vez como texto para medir a quantidade de caracteres da
+// resposta (debug provisório) e ainda assim entregar o JSON/texto já parseado.
+async function parseResponse(response: Response): Promise<{ value: unknown; chars: number }> {
+  if (response.status === 204) return { value: null, chars: 0 };
+
   const contentType = response.headers.get("content-type") || "";
-  if (response.status === 204) return null;
-  if (contentType.includes("application/json")) return response.json();
-  return response.text();
+  const text = await response.text();
+  const chars = text.length;
+
+  if (contentType.includes("application/json")) {
+    return { value: text ? JSON.parse(text) : null, chars };
+  }
+  return { value: text, chars };
 }
 
 function extractErrorMessage(payload: unknown, fallback: string) {
@@ -143,7 +152,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     signal: options.signal
   });
 
-  const payload = await parseResponse(response);
+  const { value: payload, chars } = await parseResponse(response);
+
+  // DEBUG provisório: rota + tamanho da resposta no overlay (ver api-debug.ts).
+  recordApiCall({ method, path, status: response.status, chars });
 
   if (!response.ok) {
     if (response.status === 404 && options.allowNotFound) return null as T;

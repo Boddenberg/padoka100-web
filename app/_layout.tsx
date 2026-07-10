@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { View } from "react-native";
 import { AppProviders } from "@/providers";
+import { ApiDebugOverlay } from "@/components/api-debug-overlay";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { useAuth } from "@/contexts/auth";
 import { colors } from "@/lib/theme";
@@ -43,6 +44,7 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <AuthRedirector />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      <ApiDebugOverlay />
     </AppProviders>
   );
 }
