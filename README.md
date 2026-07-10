@@ -7,7 +7,8 @@ App React Native com Expo para iOS e Android. A aplicacao abre direto no modo ve
 - Expo + React Native + TypeScript
 - Expo Router
 - TanStack Query
-- SecureStore para API key
+- Supabase Auth para login, cadastro, recuperacao de senha e Google OAuth
+- SecureStore/AsyncStorage para sessao local
 - AsyncStorage para preferencia de ambiente
 - expo-image-picker para fotos de produtos
 - expo-audio para vendas por voz
@@ -36,7 +37,9 @@ No celular fisico, `localhost` aponta para o proprio aparelho. Para testar backe
 "apiLocalUrl": "http://192.168.0.10:8000"
 ```
 
-A API key deve ser salva na aba **Ajustes**. Ela fica no SecureStore do dispositivo.
+O login usa Supabase Auth. Configure `EXPO_PUBLIC_SUPABASE_URL` e
+`EXPO_PUBLIC_SUPABASE_ANON_KEY` no build, ou `expo.extra.supabaseUrl` e
+`expo.extra.supabaseAnonKey` em `app.json`. Veja `docs/SUPABASE_AUTH.md`.
 
 ## Funcionalidades
 

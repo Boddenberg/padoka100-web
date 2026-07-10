@@ -37,9 +37,9 @@ clássico, e as telas mostram recado amigável em vez de "not found".
 | Resumo por data | `GET /api/v1/relatorios/dias/por-data/{data}/resumo` | No client (`api.relatorios.dayByDate`) |
 | Produtos do dia | `GET /api/v1/relatorios/dias/{id}/produtos-venda` | No client (`api.relatorios.dayProducts`) |
 
-O login continua **opcional** (`AUTH_REQUIRED = false` em `src/constants/auth.ts`)
-porque produtos, dias, vendas, relatórios e IA operacional seguem sem Bearer.
-Login é necessário só para perfil, análise IA e custos (papel dono).
+O login agora é **obrigatorio** (`AUTH_REQUIRED = true` em `src/constants/auth.ts`).
+O app usa Supabase Auth para obter a sessao e envia `Authorization: Bearer` para
+o backend. O backend ainda aceita `X-API-Key` como compatibilidade operacional.
 
 ## 🟡 Client pronto, UI ainda não construída
 

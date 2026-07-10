@@ -8,6 +8,7 @@ import { ApiLogPanel } from "@/components/api-log-panel";
 import { Badge, Button, Card, Field, Input, Page, Sheet, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { useAuth } from "@/contexts/auth";
+import { planLabel } from "@/lib/access";
 import { api, ApiError } from "@/lib/api";
 import { emptyProfile, readProfile, saveProfile, type LocalProfile } from "@/lib/profile";
 import { colors, fonts, radius } from "@/lib/theme";
@@ -110,6 +111,7 @@ export function ProfileScreen() {
   }
 
   const papel = user?.papel ? PAPEL_LABEL[user.papel] || user.papel : null;
+  const plano = user ? planLabel(user) : null;
 
   return (
     <>
@@ -123,6 +125,7 @@ export function ProfileScreen() {
               {user ? (
                 <View style={styles.headerBadges}>
                   <Badge text={user.email} tone="good" />
+                  {plano ? <Badge text={`Plano ${plano}`} tone="agent" /> : null}
                   {papel ? <Badge text={papel} tone="agent" /> : null}
                 </View>
               ) : (
@@ -191,6 +194,7 @@ export function ProfileScreen() {
             <>
               <InfoRow icon={<UserRound size={18} color={colors.brandDeep} />} label="Nome" value={user.nome || "não informado"} />
               <InfoRow icon={<Mail size={18} color={colors.brandDeep} />} label="E-mail de acesso" value={user.email} />
+              {plano ? <InfoRow icon={<ShieldCheck size={18} color={colors.brandDeep} />} label="Plano" value={plano} /> : null}
               {papel ? (
                 <InfoRow icon={<ShieldCheck size={18} color={colors.brandDeep} />} label="Papel" value={papel} />
               ) : null}
