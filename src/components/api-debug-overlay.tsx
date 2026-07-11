@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { apiLogEnabled, clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
+import { clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
 
 const STATUS_COLOR = (entry: ApiLogEntry) => {
   if (entry.status === null) return "#ff7a7a";
@@ -31,7 +31,9 @@ export function ApiDebugOverlay() {
   const [open, setOpen] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  if (!apiLogEnabled) return null;
+  // Overlay flutuante é ferramenta de desenvolvimento: nunca vai para produção
+  // (admin usa o painel de Diagnóstico no fim do Perfil).
+  if (!__DEV__) return null;
 
   const total = calls.reduce((sum, call) => sum + responseChars(call), 0);
 

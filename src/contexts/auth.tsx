@@ -1,6 +1,8 @@
 import * as WebBrowser from "expo-web-browser";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { isAdmin } from "@/lib/access";
 import { api, ApiError, setApiToken, setUnauthorizedHandler } from "@/lib/api";
+import { setApiLogAdminEnabled } from "@/lib/api-log";
 import { clearSession, readSession, saveSession } from "@/lib/session";
 import {
   buildAuthRedirectUrl,
@@ -52,6 +54,12 @@ function readUrlParam(url: string, key: string) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<UsuarioPerfil | null>(null);
+
+  // Fora do dev, o Diagnóstico (fim do Perfil) só registra chamadas para
+  // contas admin; logout ou troca de conta desliga e limpa o histórico.
+  useEffect(() => {
+    setApiLogAdminEnabled(isAdmin(user));
+  }, [user]);
 
   const establishSession = useCallback(async (accessToken: string, fallback?: UsuarioPerfil | null) => {
     setApiToken(accessToken);

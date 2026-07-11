@@ -19,7 +19,22 @@ export interface ApiLogEntry {
 
 const MAX_ENTRIES = 40;
 const MAX_TEXT = 4000;
-export const apiLogEnabled = __DEV__;
+
+// Em desenvolvimento o registro fica sempre ligado. Em produção só liga para
+// contas admin — o AuthProvider chama setApiLogAdminEnabled quando o perfil
+// carrega (e desliga no logout).
+let adminEnabled = false;
+
+export function setApiLogAdminEnabled(value: boolean) {
+  adminEnabled = value;
+  // Ao perder o acesso admin (logout/troca de conta), o histórico não fica
+  // para a próxima pessoa que entrar no aparelho.
+  if (!value && !__DEV__) clearApiLog();
+}
+
+export function apiLogEnabled() {
+  return __DEV__ || adminEnabled;
+}
 
 let entries: ApiLogEntry[] = [];
 let nextId = 1;
@@ -70,7 +85,7 @@ export interface RecordApiCallInput {
 }
 
 export function recordApiCall(input: RecordApiCallInput) {
-  if (!apiLogEnabled) return;
+  if (!apiLogEnabled()) return;
 
   const response = truncate(toText(input.response));
   const entry: ApiLogEntry = {

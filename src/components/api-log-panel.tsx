@@ -2,8 +2,10 @@ import { ChevronDown, Share2, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { Card } from "@/components/ui";
-import { apiLogEnabled, clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
+import { isAdmin } from "@/lib/access";
+import { clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
 import { colors, fonts, radius } from "@/lib/theme";
+import { useAuth } from "@/contexts/auth";
 
 const mono = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
 
@@ -23,12 +25,14 @@ function formatTime(at: number) {
 
 // Painel de Diagnóstico exibido no fim do Perfil: lista as últimas chamadas ao
 // servidor e deixa abrir cada uma para ver o corpo enviado e a resposta crua.
+// Em produção só existe para contas admin; em dev aparece sempre.
 export function ApiLogPanel() {
+  const { user } = useAuth();
   const entries = useApiLog();
   const [expanded, setExpanded] = useState<number | null>(null);
   const [onlyErrors, setOnlyErrors] = useState(false);
 
-  if (!apiLogEnabled) return null;
+  if (!__DEV__ && !isAdmin(user)) return null;
 
   const shown = onlyErrors ? entries.filter((entry) => !entry.ok) : entries;
 

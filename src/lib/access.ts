@@ -21,6 +21,12 @@ export function hasAccess(user: UsuarioPerfil | null | undefined, capability: st
   return Boolean(user?.capacidades?.includes(capability));
 }
 
+// Conta admin da plataforma (papel ou plano): enxerga ferramentas de
+// diagnóstico que o usuário comum nunca deve ver.
+export function isAdmin(user: UsuarioPerfil | null | undefined) {
+  return user?.papel === "administrador" || user?.plano === "admin";
+}
+
 export function planLabel(user: UsuarioPerfil | null | undefined) {
   return PLAN_LABEL[String(user?.plano || "basico")] || String(user?.plano || "basico");
 }
