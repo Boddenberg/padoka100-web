@@ -19,7 +19,13 @@ export interface ApiLogEntry {
 
 const MAX_ENTRIES = 40;
 const MAX_TEXT = 4000;
-export const apiLogEnabled = __DEV__;
+
+// Liga o overlay/painel de logs em dev e em qualquer bundle publicado com
+// EXPO_PUBLIC_API_LOGS=1 (ambientes preview/development no EAS). Producao nao
+// define a flag -> logs desligados, sem expor payload/PII no app publicado.
+// Flag inlined no publish (em vez de Updates.channel) para funcionar tambem no
+// Expo Go, onde o canal e nulo.
+export const apiLogEnabled = __DEV__ || process.env.EXPO_PUBLIC_API_LOGS === "1";
 
 let entries: ApiLogEntry[] = [];
 let nextId = 1;
