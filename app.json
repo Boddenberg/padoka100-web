@@ -3,6 +3,7 @@
     "name": "Padoka 100%",
     "slug": "padoka100",
     "version": "1.0.0",
+    "platforms": ["ios", "android"],
     "orientation": "portrait",
     "scheme": "padoka100",
     "userInterfaceStyle": "light",
