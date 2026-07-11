@@ -19,6 +19,7 @@ export interface ApiLogEntry {
 
 const MAX_ENTRIES = 40;
 const MAX_TEXT = 4000;
+export const apiLogEnabled = __DEV__;
 
 let entries: ApiLogEntry[] = [];
 let nextId = 1;
@@ -69,6 +70,8 @@ export interface RecordApiCallInput {
 }
 
 export function recordApiCall(input: RecordApiCallInput) {
+  if (!apiLogEnabled) return;
+
   const response = truncate(toText(input.response));
   const entry: ApiLogEntry = {
     id: nextId++,

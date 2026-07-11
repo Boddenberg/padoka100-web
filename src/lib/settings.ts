@@ -20,14 +20,12 @@ export interface ApiSettings {
   apiKey: string;
 }
 
-const extra = Constants.expoConfig?.extra as { apiProdUrl?: string; apiLocalUrl?: string; apiKey?: string } | undefined;
+const extra = Constants.expoConfig?.extra as { apiProdUrl?: string; apiLocalUrl?: string } | undefined;
 
 export const apiUrls = {
   production: stripTrailingSlash(extra?.apiProdUrl || "https://padoka100-production.up.railway.app"),
   local: stripTrailingSlash(extra?.apiLocalUrl || "http://localhost:8000")
 };
-
-const defaultApiKey = process.env.EXPO_PUBLIC_API_KEY || extra?.apiKey || "";
 
 function stripTrailingSlash(value: string) {
   return value.replace(/\/+$/, "");
@@ -49,7 +47,7 @@ export async function readApiSettings(): Promise<ApiSettings> {
   cachedEnvironment = environment === "local" ? "local" : "production";
   return {
     environment: cachedEnvironment,
-    apiKey: apiKey || defaultApiKey
+    apiKey: apiKey || ""
   };
 }
 
