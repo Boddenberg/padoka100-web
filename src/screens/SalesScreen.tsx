@@ -76,7 +76,9 @@ export function SalesScreen() {
   const onRefresh = () => {
     currentDayQuery.refetch();
     productsQuery.refetch();
-    resumoQuery.refetch();
+    // refetch() atropela o `enabled`: sem dia aberto, buscaria
+    // /relatorios/dias/undefined/resumo e estouraria um 422 na tela.
+    if (currentDayQuery.data?.id) resumoQuery.refetch();
   };
 
   const availableByProduct = useMemo(() => {

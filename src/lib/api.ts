@@ -131,13 +131,11 @@ function extractErrorMessage(payload: unknown, fallback: string) {
   if ("detail" in payload) {
     const detail = (payload as { detail?: unknown }).detail;
     if (typeof detail === "string") return detail;
+    // `detail` em lista = erro de validação do FastAPI/Pydantic ("Input should
+    // be a valid UUID..."): mensagem técnica e em inglês, nunca vai para a tela.
+    // O corpo cru continua disponível no payload do ApiError (e no Diagnóstico).
     if (Array.isArray(detail)) {
-      return detail
-        .map((item) => {
-          if (item && typeof item === "object" && "msg" in item) return String((item as { msg: unknown }).msg);
-          return String(item);
-        })
-        .join("; ");
+      return "Não deu para concluir agora. Puxe a tela para atualizar e tente de novo.";
     }
   }
 
@@ -288,7 +286,13 @@ export const api = {
   dias: {
     list: (query?: { data_inicio?: string; data_fim?: string; situacao?: string }) =>
       apiRequest<DiaDeVenda[]>("/api/v1/dias-de-venda", { query }),
-    current: () => apiRequest<DiaDeVenda | null>("/api/v1/dias-de-venda/atual", { allowNotFound: true }),
+    // Dia sem id utilizável (backend já devolveu `id: null`) vira "sem dia
+    // aberto": todas as ações do dia dependem do id, e um id inválido acaba
+    // interpolado nas URLs (ex.: /relatorios/dias/null/resumo → 422).
+    current: async () => {
+      const day = await apiRequest<DiaDeVenda | null>("/api/v1/dias-de-venda/atual", { allowNotFound: true });
+      return day && typeof day.id === "string" && day.id ? day : null;
+    },
     create: (body: CriarDiaDeVendaRequest) => apiRequest<DiaDeVenda>("/api/v1/dias-de-venda", { method: "POST", body }),
     saveProductionItem: (diaId: UUID, body: CriarItemProducaoRequest) =>
       apiRequest(`/api/v1/dias-de-venda/${diaId}/itens-producao`, { method: "POST", body }),
