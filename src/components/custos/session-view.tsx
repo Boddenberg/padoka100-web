@@ -223,6 +223,7 @@ export function IngredientRow({
   ingrediente,
   phase,
   priceResolved,
+  costOk,
   onEdit
 }: {
   ingrediente: IngredienteRascunho;
@@ -230,23 +231,37 @@ export function IngredientRow({
   // Nos preços: o backend já fechou o custo (ex.: preço salvo de uma compra
   // anterior no catálogo)? Se sim, não pedimos o preço de novo.
   priceResolved?: boolean;
+  // Nos preços: o backend conseguiu somar o custo DESTE item? Fonte de verdade
+  // do "pronto" verde. `undefined` = sem custo simulado (backend antigo): cai no
+  // comportamento antigo. `false` com compra preenchida = medida não bate.
+  costOk?: boolean;
   onEdit: () => void;
 }) {
   const recipePhase = phase === "receita";
   const priced = hasPurchaseData(ingrediente);
-  const ready = recipePhase ? hasRecipeData(ingrediente) : priced || Boolean(priceResolved);
+  // Sem custo simulado, mantém o antigo (preço preenchido = pronto).
+  const costResolved = costOk === undefined ? priced || Boolean(priceResolved) : costOk;
+  // Comprou e pagou, mas a conta não fechou → é a medida (unidade) que não casa.
+  const unitIssue = !recipePhase && priced && costOk === false;
+  const ready = recipePhase ? hasRecipeData(ingrediente) : costResolved;
 
   let subtitle: string;
   if (recipePhase) {
     subtitle = recipeUsageText(ingrediente) || "Toque para informar a quantidade usada";
   } else if (priced) {
     subtitle = purchaseText(ingrediente, formatCurrency);
-  } else if (priceResolved) {
+  } else if (costResolved) {
     subtitle = "Usando o preço salvo de uma compra anterior";
   } else {
     subtitle = recipeUsageText(ingrediente) || "Toque para informar o preço";
   }
-  const hint = ready ? null : recipePhase ? "Toque para informar a quantidade usada" : "Toque para informar quanto pagou";
+  const hint = ready
+    ? null
+    : recipePhase
+      ? "Toque para informar a quantidade usada"
+      : unitIssue
+        ? `A medida não bate: usei "${ingrediente.unidade_usada || "?"}", comprei "${ingrediente.unidade_compra || "?"}" — toque para acertar`
+        : "Toque para informar quanto pagou";
 
   return (
     <Pressable onPress={onEdit} style={({ pressed }) => [styles.draftCard, shadows.soft, pressed && styles.pressed]}>

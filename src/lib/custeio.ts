@@ -201,6 +201,64 @@ export function missingPurchaseCount(ingredientes: IngredienteRascunho[] | null 
   return (ingredientes || []).filter((item) => !hasPurchaseData(item)).length;
 }
 
+// --- Custo por ingrediente calculado pelo backend --------------------------
+// O backend devolve `custo_simulado.ingredientes` na MESMA ordem do rascunho,
+// já com o custo de cada um. `custo_total_estimado` nulo/zero = a conta NÃO
+// fechou para aquele item. Usamos isso como fonte de verdade do "pronto" verde:
+// assim a tela não mente dizendo "pronto" quando o backend não conseguiu somar.
+
+export interface IngredienteCusteado extends IngredienteRascunho {
+  custo_total_estimado?: number | string | null;
+  custo_unitario_base?: number | string | null;
+}
+
+export function simulatedIngredients(custo: CustoSimulado | null | undefined): IngredienteCusteado[] {
+  const list = (custo as { ingredientes?: unknown } | null | undefined)?.ingredientes;
+  return Array.isArray(list) ? (list as IngredienteCusteado[]) : [];
+}
+
+// O backend fechou o custo desse ingrediente? (vale para custo vindo da compra
+// OU reaproveitado de um insumo salvo de compra anterior.)
+export function ingredientCostOk(sim: IngredienteCusteado | null | undefined): boolean {
+  return toNumber(sim?.custo_total_estimado) > 0;
+}
+
+// Ingredientes com preço/quantidade preenchidos mas cuja conta não fecha — na
+// prática, sempre por medida (unidade usada × comprada) incompatível ou não
+// suportada. É a causa nº1 do botão de confirmar sumir com tudo "preenchido".
+export interface UnitIssue {
+  nome: string;
+  usada?: string | null;
+  compra?: string | null;
+}
+
+export function unitMismatchIssues(custo: CustoSimulado | null | undefined): UnitIssue[] {
+  return simulatedIngredients(custo)
+    .filter((item) => hasPurchaseData(item) && !ingredientCostOk(item))
+    .map((item) => ({
+      nome: item.nome || "ingrediente",
+      usada: item.unidade_usada,
+      compra: item.unidade_compra
+    }));
+}
+
+// Detecta a pendência genérica do backend ("...os ingredientes pendentes"),
+// que não nomeia ninguém — trocamos por avisos acionáveis por ingrediente.
+export function isGenericPendencia(texto: string): boolean {
+  return /ingredientes pendentes/i.test(texto);
+}
+
+// Aviso legível para a senhora: nomeia o ingrediente e as duas medidas.
+export function formatUnitIssue(issue: UnitIssue): string {
+  const usada = issue.usada?.trim();
+  const compra = issue.compra?.trim();
+  if (usada && compra) {
+    return `${issue.nome}: você usou em "${usada}" e comprou em "${compra}". Deixe as duas na mesma medida — g, kg, ml, L ou unidade.`;
+  }
+  const medida = usada || compra;
+  return `${issue.nome}: a medida ${medida ? `"${medida}" ` : ""}precisa ser g, kg, ml, L ou unidade.`;
+}
+
 // Entradas numéricas em pt-BR aceitam vírgula ("1,5" → 1.5).
 export function parseDecimalInput(text: string): number | null {
   const normalized = text.trim().replace(/\./g, ".").replace(",", ".");

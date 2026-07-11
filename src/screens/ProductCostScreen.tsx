@@ -28,18 +28,24 @@ import {
   clearStoredPhase,
   clearStoredSessionId,
   finalidadeForPhase,
+  formatUnitIssue,
   guidedItems,
   hasRecipeData,
+  ingredientCostOk,
   isConfirmedSession,
   isDiscardedSession,
+  isGenericPendencia,
   missingPurchaseCount,
   phaseFromSession,
   readStoredPhase,
   readStoredSessionId,
   sessionId,
+  simulatedIngredients,
   storeSessionId,
   storeStoredPhase,
-  type CusteioPhase
+  unitMismatchIssues,
+  type CusteioPhase,
+  type IngredienteCusteado
 } from "@/lib/custeio";
 import { formatCurrency, todayInputValue, toNumber } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
@@ -337,7 +343,17 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
   // --- Estado derivado para a tela. -----------------------------------------
   const confirmed = isConfirmedSession(session);
   const step = confirmed ? 4 : phase === "receita" ? 1 : phase === "precos" ? 2 : 3;
-  const pendencias = guidedItems(session?.pendencias);
+  // Custo por ingrediente (mesma ordem do rascunho) que o backend já calculou —
+  // fonte de verdade do "pronto" verde e de quais medidas não fecharam.
+  const simIngredientes = simulatedIngredients(session?.custo_simulado);
+  const unitIssues = unitMismatchIssues(session?.custo_simulado);
+  // Pendências do backend para o Resultado: substituímos o texto genérico
+  // ("os ingredientes pendentes") por avisos que nomeiam o item e a medida.
+  const backendPendencias = guidedItems(session?.pendencias);
+  const pendencias =
+    unitIssues.length > 0
+      ? [...unitIssues.map(formatUnitIssue), ...backendPendencias.filter((texto) => !isGenericPendencia(texto))]
+      : backendPendencias;
   const thinking = sendText.isPending || sendFile.isPending || patchDraft.isPending || sendForm.isPending;
   // Estado de envio por tipo: a foto mostra "Enviando" no botão de foto, não no
   // microfone (era o que confundia).
@@ -446,6 +462,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 precoVenda={precoVenda}
                 incompleteHint={incompleteHint}
                 pendencias={pendencias}
+                hasUnitIssues={unitIssues.length > 0}
                 acceptPending={confirmSession.isPending}
                 acceptError={confirmSession.error instanceof Error ? confirmSession.error.message : null}
                 redoPending={restartSession.isPending}
@@ -490,6 +507,7 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 ) : (
                   <PricePhaseBody
                     ingredientes={ingredientes}
+                    simIngredientes={simIngredientes}
                     custosAdicionais={custosAdicionais}
                     priceResolved={custoResolvido}
                     onEditIngrediente={(index) => setSheet({ kind: "ingrediente-preco", index })}
@@ -651,6 +669,7 @@ function RecipePhaseBody({
 
 function PricePhaseBody({
   ingredientes,
+  simIngredientes,
   custosAdicionais,
   priceResolved,
   onEditIngrediente,
@@ -659,6 +678,7 @@ function PricePhaseBody({
   onSeeResult
 }: {
   ingredientes: IngredienteRascunho[];
+  simIngredientes: IngredienteCusteado[];
   custosAdicionais: CustoAdicionalRascunho[];
   priceResolved: boolean;
   onEditIngrediente: (index: number) => void;
@@ -680,6 +700,8 @@ function PricePhaseBody({
           ingrediente={ingrediente}
           phase="precos"
           priceResolved={priceResolved}
+          // Só marca "pronto" verde se o backend realmente fechou o custo do item.
+          costOk={simIngredientes.length > 0 ? ingredientCostOk(simIngredientes[index]) : undefined}
           onEdit={() => onEditIngrediente(index)}
         />
       ))}
@@ -707,6 +729,7 @@ function ResultPhase({
   precoVenda,
   incompleteHint,
   pendencias,
+  hasUnitIssues,
   acceptPending,
   acceptError,
   redoPending,
@@ -721,6 +744,7 @@ function ResultPhase({
   precoVenda: number | null;
   incompleteHint?: string;
   pendencias: string[];
+  hasUnitIssues: boolean;
   acceptPending: boolean;
   acceptError: string | null;
   redoPending: boolean;
@@ -774,7 +798,11 @@ function ResultPhase({
       ) : (
         <>
           <NoticeStack items={pendencias} tone="danger" />
-          <Text style={styles.gateHint}>Ainda faltam dados para fechar o custo. Use a seta ↑ para voltar aos preços e completar os itens em laranja.</Text>
+          <Text style={styles.gateHint}>
+            {hasUnitIssues
+              ? "Acerte a medida dos itens acima e o custo fecha sozinho. Toque neles na etapa Preços — ou volte à Receita para trocar a medida usada."
+              : "Ainda faltam dados para fechar o custo. Use a seta ↑ para voltar aos preços e completar os itens em laranja."}
+          </Text>
         </>
       )}
 
