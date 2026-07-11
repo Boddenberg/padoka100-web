@@ -1,20 +1,35 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Camera, Images, KeyRound, LogIn, LogOut, Mail, ShieldCheck, UserRound } from "lucide-react-native";
+import {
+  CalendarDays,
+  Camera,
+  Images,
+  KeyRound,
+  LogIn,
+  LogOut,
+  Mail,
+  Pencil,
+  Phone,
+  UserRound
+} from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { ApiLogPanel } from "@/components/api-log-panel";
+import { PlansShowcase } from "@/components/plans-showcase";
 import { Badge, Button, Card, Field, Input, Page, Sheet, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { useAuth } from "@/contexts/auth";
 import { planLabel } from "@/lib/access";
 import { api, ApiError } from "@/lib/api";
+import { brDateToIso, maskBrDate, toBrDate } from "@/lib/format";
+import { formatBrazilianPhone, isValidBrazilianPhone, PHONE_ERROR } from "@/lib/phone";
 import { emptyProfile, readProfile, saveProfile, type LocalProfile } from "@/lib/profile";
 import { colors, fonts, radius } from "@/lib/theme";
+import type { UsuarioPerfil } from "@/types/api";
 import { pickImage } from "@/utils/media";
 
-type ActiveSheet = "password" | "email" | null;
+type ActiveSheet = "personal" | "password" | null;
 
 const PAPEL_LABEL: Record<string, string> = {
   dono: "Dono",
@@ -22,9 +37,9 @@ const PAPEL_LABEL: Record<string, string> = {
   usuario: "Usuário"
 };
 
-// Perfil substitui a antiga tela Ajustes: dados da pessoa, conta e
-// segurança, e a conexão com o servidor no fim. Quando logado, os dados
-// pessoais sincronizam com o servidor; senão, ficam no aparelho.
+// Perfil em modo leitura: os dados pessoais aparecem como informação, e o
+// lápis abre a edição num sheet. Quando logado, os dados sincronizam com o
+// servidor; senão, ficam no aparelho. A vitrine de planos vem na sequência.
 export function ProfileScreen() {
   const router = useRouter();
   const { status, user, signOut, setUser } = useAuth();
@@ -32,41 +47,27 @@ export function ProfileScreen() {
 
   const [profile, setProfile] = useState<LocalProfile>(emptyProfile);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
 
-  // Carrega os dados locais e, se logado, mescla o que veio do servidor.
+  // Carrega os dados locais e, se logado, mescla o que veio do servidor,
+  // já normalizando telefone e nascimento para o formato de exibição.
   useEffect(() => {
     readProfile()
       .then((local) => {
         setProfile({
           ...local,
           nome: user?.nome || local.nome,
-          telefone: user?.telefone || local.telefone,
+          telefone: formatBrazilianPhone(user?.telefone || local.telefone),
           email: user?.email || local.email,
-          nascimento: user?.data_nascimento || local.nascimento,
+          nascimento: toBrDate(user?.data_nascimento || local.nascimento),
           fotoUri: local.fotoUri || user?.foto_url || null
         });
       })
       .catch(() => undefined)
       .finally(() => setProfileLoaded(true));
   }, [user]);
-
-  const saveData = useMutation({
-    mutationFn: async () => {
-      await saveProfile(profile);
-      // Logado: espelha os campos textuais no servidor.
-      if (status === "signed-in") {
-        const updated = await api.auth.updateProfile({
-          nome: profile.nome || null,
-          telefone: profile.telefone || null,
-          data_nascimento: profile.nascimento || null,
-          email: profile.email || null
-        });
-        setUser(updated);
-      }
-    }
-  });
 
   async function choosePhoto(source: "camera" | "gallery") {
     try {
@@ -116,7 +117,7 @@ export function ProfileScreen() {
   return (
     <>
       <Page title="Perfil" subtitle="Seus dados e sua conta.">
-        {/* Foto e dados pessoais */}
+        {/* Foto e dados pessoais (somente leitura; o lápis edita) */}
         <Card>
           <View style={styles.header}>
             <ProfilePhoto uri={profile.fotoUri} />
@@ -124,7 +125,6 @@ export function ProfileScreen() {
               <Text style={styles.headerName}>{profile.nome.trim() || "Seu nome"}</Text>
               {user ? (
                 <View style={styles.headerBadges}>
-                  <Badge text={user.email} tone="good" />
                   {plano ? <Badge text={`Plano ${plano}`} tone="agent" /> : null}
                   {papel ? <Badge text={papel} tone="agent" /> : null}
                 </View>
@@ -141,74 +141,47 @@ export function ProfileScreen() {
           {photoUploading ? <StateText text="Enviando foto..." /> : null}
           {photoError ? <StateText tone="error" text={photoError} /> : null}
 
-          <Field label="Nome">
-            <Input
-              value={profile.nome}
-              onChangeText={(nome) => setProfile({ ...profile, nome })}
-              placeholder="Como você quer ser chamado"
-              maxLength={60}
-            />
-          </Field>
-          <Field label="Data de nascimento">
-            <Input
-              value={profile.nascimento}
-              onChangeText={(nascimento) => setProfile({ ...profile, nascimento })}
-              placeholder="DD/MM/AAAA"
-              keyboardType="numbers-and-punctuation"
-            />
-          </Field>
-          <Field label="Telefone">
-            <Input
-              value={profile.telefone}
-              onChangeText={(telefone) => setProfile({ ...profile, telefone })}
-              placeholder="(00) 00000-0000"
-              keyboardType="phone-pad"
-            />
-          </Field>
-          <Field label="E-mail">
-            <Input
-              value={profile.email}
-              onChangeText={(email) => setProfile({ ...profile, email })}
-              placeholder="seu@email.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </Field>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Dados pessoais</Text>
+            <Pressable
+              accessibilityLabel="Editar dados pessoais"
+              disabled={!profileLoaded}
+              onPress={() => {
+                setSavedMessage(null);
+                setSheet("personal");
+              }}
+              style={({ pressed }) => [styles.editButton, pressed && styles.pressed, !profileLoaded && styles.pressed]}
+            >
+              <Pencil size={18} color={colors.brandDeep} />
+            </Pressable>
+          </View>
 
-          {saveData.isSuccess ? (
-            <StateText tone="success" text={status === "signed-in" ? "Dados salvos na sua conta." : "Dados salvos neste aparelho."} />
-          ) : null}
-          {saveData.error ? <StateText tone="error" text={profileErrorMessage(saveData.error)} /> : null}
-          <Button
-            title={saveData.isPending ? "Salvando..." : "Salvar dados"}
-            disabled={!profileLoaded || saveData.isPending}
-            onPress={() => saveData.mutate()}
+          <InfoRow icon={<UserRound size={18} color={colors.brandDeep} />} label="Nome" value={profile.nome.trim() || "Não informado"} />
+          <InfoRow
+            icon={<CalendarDays size={18} color={colors.brandDeep} />}
+            label="Data de nascimento"
+            value={profile.nascimento.trim() || "Não informada"}
           />
+          <InfoRow icon={<Phone size={18} color={colors.brandDeep} />} label="Telefone" value={profile.telefone.trim() || "Não informado"} />
+          <InfoRow icon={<Mail size={18} color={colors.brandDeep} />} label="E-mail" value={profile.email.trim() || "Não informado"} />
+
+          {savedMessage ? <StateText tone="success" text={savedMessage} /> : null}
         </Card>
 
-        {/* Conta e segurança */}
+        {/* Planos: aparece logado (menos admin, que não faz upgrade). */}
+        {status === "signed-in" && user ? <PlansShowcase user={user} /> : null}
+
+        {/* Conta e segurança: só ações — os dados moram em "Dados pessoais". */}
         <Card>
           <Text style={styles.sectionTitle}>Conta e segurança</Text>
 
           {status === "signed-in" && user ? (
             <>
-              <InfoRow icon={<UserRound size={18} color={colors.brandDeep} />} label="Nome" value={user.nome || "não informado"} />
-              <InfoRow icon={<Mail size={18} color={colors.brandDeep} />} label="E-mail de acesso" value={user.email} />
-              {plano ? <InfoRow icon={<ShieldCheck size={18} color={colors.brandDeep} />} label="Plano" value={plano} /> : null}
-              {papel ? (
-                <InfoRow icon={<ShieldCheck size={18} color={colors.brandDeep} />} label="Papel" value={papel} />
-              ) : null}
               <Button
                 title="Alterar senha"
                 tone="soft"
                 icon={<KeyRound size={18} color={colors.ink} />}
                 onPress={() => setSheet("password")}
-              />
-              <Button
-                title="Alterar e-mail"
-                tone="soft"
-                icon={<Mail size={18} color={colors.ink} />}
-                onPress={() => setSheet("email")}
               />
               <Button title="Sair da conta" tone="danger" icon={<LogOut size={18} color="#fff" />} onPress={confirmSignOut} />
             </>
@@ -232,15 +205,18 @@ export function ProfileScreen() {
         <ApiLogPanel />
       </Page>
 
-      <ChangePasswordSheet visible={sheet === "password"} onClose={() => setSheet(null)} />
-      <ChangeEmailSheet
-        visible={sheet === "email"}
-        currentEmail={user?.email || ""}
+      <EditPersonalSheet
+        visible={sheet === "personal"}
+        profile={profile}
+        signedIn={status === "signed-in"}
         onClose={() => setSheet(null)}
-        onChanged={(updatedEmail) => {
-          if (user) setUser({ ...user, email: updatedEmail });
+        onSaved={(next, updated) => {
+          setProfile(next);
+          if (updated) setUser(updated);
+          setSavedMessage(updated ? "Dados salvos na sua conta." : "Dados salvos neste aparelho.");
         }}
       />
+      <ChangePasswordSheet visible={sheet === "password"} onClose={() => setSheet(null)} />
     </>
   );
 }
@@ -274,6 +250,123 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
         <Text style={styles.infoValue}>{value}</Text>
       </View>
     </View>
+  );
+}
+
+// Edição dos dados pessoais num sheet: valida telefone e nascimento antes de
+// salvar. Logado, espelha no servidor (nascimento vai em ISO, como a API pede).
+function EditPersonalSheet({
+  visible,
+  profile,
+  signedIn,
+  onClose,
+  onSaved
+}: {
+  visible: boolean;
+  profile: LocalProfile;
+  signedIn: boolean;
+  onClose: () => void;
+  onSaved: (next: LocalProfile, updated: UsuarioPerfil | null) => void;
+}) {
+  const [draft, setDraft] = useState<LocalProfile>(profile);
+  const [validation, setValidation] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const next: LocalProfile = {
+        ...draft,
+        nome: draft.nome.trim(),
+        email: draft.email.trim(),
+        telefone: formatBrazilianPhone(draft.telefone),
+        nascimento: draft.nascimento.trim()
+      };
+      await saveProfile(next);
+      if (signedIn) {
+        const updated = await api.auth.updateProfile({
+          nome: next.nome || null,
+          telefone: next.telefone || null,
+          data_nascimento: next.nascimento ? brDateToIso(next.nascimento) : null,
+          email: next.email || null
+        });
+        return { next, updated };
+      }
+      return { next, updated: null };
+    },
+    onSuccess: ({ next, updated }) => {
+      onSaved(next, updated);
+      onClose();
+    }
+  });
+  const resetSave = save.reset;
+
+  // Cada abertura parte do que está salvo, sem sobras da edição anterior.
+  useEffect(() => {
+    if (visible) {
+      setDraft(profile);
+      setValidation(null);
+      resetSave();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  function submit() {
+    if (draft.telefone.trim() && !isValidBrazilianPhone(draft.telefone)) {
+      setValidation(PHONE_ERROR);
+      return;
+    }
+    if (draft.nascimento.trim() && !brDateToIso(draft.nascimento.trim())) {
+      setValidation("Data de nascimento inválida. Use o formato DD/MM/AAAA.");
+      return;
+    }
+    if (draft.email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(draft.email.trim())) {
+      setValidation("E-mail inválido. Confira e tente de novo.");
+      return;
+    }
+    setValidation(null);
+    save.mutate();
+  }
+
+  return (
+    <Sheet visible={visible} title="Editar dados pessoais" subtitle="Mude o que precisar e salve." onClose={onClose}>
+      <Field label="Nome">
+        <Input
+          value={draft.nome}
+          onChangeText={(nome) => setDraft({ ...draft, nome })}
+          placeholder="Como você quer ser chamado"
+          maxLength={60}
+        />
+      </Field>
+      <Field label="Data de nascimento">
+        <Input
+          value={draft.nascimento}
+          onChangeText={(nascimento) => setDraft({ ...draft, nascimento: maskBrDate(nascimento) })}
+          placeholder="DD/MM/AAAA"
+          keyboardType="number-pad"
+          maxLength={10}
+        />
+      </Field>
+      <Field label="Telefone">
+        <Input
+          value={draft.telefone}
+          onChangeText={(telefone) => setDraft({ ...draft, telefone: formatBrazilianPhone(telefone) })}
+          placeholder="(11) 98765-4321"
+          keyboardType="phone-pad"
+          maxLength={16}
+        />
+      </Field>
+      <Field label="E-mail">
+        <Input
+          value={draft.email}
+          onChangeText={(email) => setDraft({ ...draft, email })}
+          placeholder="seu@email.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+      </Field>
+      {validation ? <StateText tone="error" text={validation} /> : null}
+      {save.error ? <StateText tone="error" text={profileErrorMessage(save.error)} /> : null}
+      <Button title={save.isPending ? "Salvando..." : "Salvar dados"} disabled={save.isPending} onPress={submit} />
+    </Sheet>
   );
 }
 
@@ -330,44 +423,6 @@ function ChangePasswordSheet({ visible, onClose }: { visible: boolean; onClose: 
   );
 }
 
-// Troca de e-mail via atualização de perfil.
-function ChangeEmailSheet({
-  visible,
-  currentEmail,
-  onClose,
-  onChanged
-}: {
-  visible: boolean;
-  currentEmail: string;
-  onClose: () => void;
-  onChanged: (email: string) => void;
-}) {
-  const [email, setEmail] = useState("");
-
-  const change = useMutation({
-    mutationFn: () => api.auth.updateProfile({ email: email.trim() }),
-    onSuccess: (updated) => {
-      onChanged(updated.email || email.trim());
-      setEmail("");
-      onClose();
-    }
-  });
-
-  return (
-    <Sheet visible={visible} title="Alterar e-mail" subtitle={currentEmail ? `Atual: ${currentEmail}` : undefined} onClose={onClose}>
-      <Field label="Novo e-mail">
-        <Input value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="novo@email.com" />
-      </Field>
-      {change.error ? <StateText tone="error" text={securityErrorMessage(change.error)} /> : null}
-      <Button
-        title={change.isPending ? "Salvando..." : "Salvar novo e-mail"}
-        disabled={!email.trim() || change.isPending}
-        onPress={() => change.mutate()}
-      />
-    </Sheet>
-  );
-}
-
 function securityErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
     if ([401, 403].includes(error.status)) return "Senha atual incorreta ou sessão expirada.";
@@ -378,8 +433,10 @@ function securityErrorMessage(error: unknown) {
 }
 
 function profileErrorMessage(error: unknown) {
-  if (error instanceof ApiError && [401, 403].includes(error.status)) {
-    return "Sua sessão expirou. Entre de novo para salvar na conta.";
+  if (error instanceof ApiError) {
+    if ([401, 403].includes(error.status)) return "Sua sessão expirou. Entre de novo para salvar na conta.";
+    if (error.status === 409) return "Já existe uma conta com esse e-mail.";
+    if (error.status === 422) return "Confira os dados informados.";
   }
   return error instanceof Error ? error.message : "Não foi possível salvar.";
 }
@@ -443,10 +500,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fonts.bodyBold
   },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4
+  },
   sectionTitle: {
     color: colors.ink,
     fontSize: 18,
     fontFamily: fonts.display
+  },
+  editButton: {
+    height: 44,
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.brandSoft,
+    backgroundColor: colors.surfaceGlow
   },
   infoRow: {
     flexDirection: "row",

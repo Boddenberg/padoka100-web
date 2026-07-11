@@ -9,6 +9,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button, Field, Input, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { loginErrorMessage, useAuth } from "@/contexts/auth";
+import { formatBrazilianPhone, isValidBrazilianPhone, PHONE_ERROR } from "@/lib/phone";
 import { supabaseAuthConfigured } from "@/lib/supabase";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { getGreeting } from "@/utils/greeting";
@@ -25,6 +26,7 @@ export function LoginScreen() {
   const [senha, setSenha] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -71,6 +73,17 @@ export function LoginScreen() {
     (mode !== "register" || nome.trim().length > 0) &&
     !submit.isPending;
 
+  // Telefone é opcional no cadastro, mas se veio preenchido precisa ser um
+  // telefone brasileiro de verdade.
+  function handleSubmit() {
+    if (mode === "register" && telefone.trim() && !isValidBrazilianPhone(telefone)) {
+      setPhoneError(PHONE_ERROR);
+      return;
+    }
+    setPhoneError(null);
+    submit.mutate();
+  }
+
   return (
     <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.background}>
       <SafeAreaView style={styles.safe}>
@@ -96,7 +109,16 @@ export function LoginScreen() {
                       <Input value={nome} onChangeText={setNome} placeholder="Ex: Maria da Padoka" />
                     </Field>
                     <Field label="Telefone">
-                      <Input value={telefone} onChangeText={setTelefone} placeholder="(00) 00000-0000" keyboardType="phone-pad" />
+                      <Input
+                        value={telefone}
+                        onChangeText={(value) => {
+                          setTelefone(formatBrazilianPhone(value));
+                          if (phoneError) setPhoneError(null);
+                        }}
+                        placeholder="(11) 98765-4321"
+                        keyboardType="phone-pad"
+                        maxLength={16}
+                      />
                     </Field>
                   </>
                 ) : null}
@@ -121,7 +143,7 @@ export function LoginScreen() {
                         secureTextEntry={!showPassword}
                         placeholder="Sua senha"
                         style={styles.passwordInput}
-                        onSubmitEditing={() => canSubmit && submit.mutate()}
+                        onSubmitEditing={() => canSubmit && handleSubmit()}
                       />
                       <Pressable
                         onPress={() => setShowPassword((current) => !current)}
@@ -137,6 +159,7 @@ export function LoginScreen() {
                   <StateText tone="error" text="Supabase Auth ainda nao foi configurado para este build." />
                 ) : null}
                 {successMessage ? <StateText tone="success" text={successMessage} /> : null}
+                {phoneError ? <StateText tone="error" text={phoneError} /> : null}
                 {submit.error ? <StateText tone="error" text={loginErrorMessage(submit.error)} /> : null}
                 {googleLogin.error ? <StateText tone="error" text={loginErrorMessage(googleLogin.error)} /> : null}
 
@@ -144,7 +167,7 @@ export function LoginScreen() {
                   title={submit.isPending ? pendingTitleByMode[mode] : actionTitleByMode[mode]}
                   icon={iconByMode[mode]}
                   disabled={!canSubmit}
-                  onPress={() => submit.mutate()}
+                  onPress={handleSubmit}
                 />
 
                 {mode === "login" ? (
