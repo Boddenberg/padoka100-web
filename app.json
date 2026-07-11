@@ -2,13 +2,14 @@
   "expo": {
     "name": "Padoka 100%",
     "slug": "padoka100",
+    "owner": "padoka",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "padoka100",
     "userInterfaceStyle": "light",
     "runtimeVersion": "exposdk:54.0.0",
     "updates": {
-      "url": "https://u.expo.dev/ed7d0538-750b-4f69-87c3-ebba96be1538"
+      "url": "https://u.expo.dev/1e644724-8f8e-46db-9ddb-c6f1a6cfcfa4"
     },
     "icon": "./Logo.png",
     "assetBundlePatterns": [
@@ -27,8 +28,9 @@
     "android": {
       "package": "com.boddenberg.padoka100",
       "permissions": [
-        "CAMERA",
-        "RECORD_AUDIO"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "plugins": [
@@ -54,8 +56,9 @@
       "apiLocalUrl": "http://localhost:8000",
       "supabaseUrl": "",
       "supabaseAnonKey": "",
+      "router": {},
       "eas": {
-        "projectId": "ed7d0538-750b-4f69-87c3-ebba96be1538"
+        "projectId": "1e644724-8f8e-46db-9ddb-c6f1a6cfcfa4"
       }
     }
   }
