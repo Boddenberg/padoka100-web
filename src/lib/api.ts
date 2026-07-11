@@ -152,8 +152,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   headers.set("Accept", "application/json");
   if (options.body !== undefined && !options.formData) headers.set("Content-Type", "application/json");
-  if (path.startsWith("/api/v1") && settings.apiKey.trim()) headers.set("X-API-Key", settings.apiKey.trim());
-  if (path.startsWith("/api/v1") && sessionToken) headers.set("Authorization", `Bearer ${sessionToken}`);
+  // Autenticação em /api/v1: a sessão real do usuário (Bearer do Supabase) tem
+  // prioridade. Só caímos no X-API-Key legado quando NÃO há sessão — se os dois
+  // forem juntos, o backend segue o caminho da service key e devolve 500 em
+  // rotas de usuário como /perfil/me.
+  if (path.startsWith("/api/v1")) {
+    if (sessionToken) {
+      headers.set("Authorization", `Bearer ${sessionToken}`);
+    } else if (settings.apiKey.trim()) {
+      headers.set("X-API-Key", settings.apiKey.trim());
+    }
+  }
 
   const url = buildUrl(path, options.query, settings);
   const displayPath = safePath(url, path);

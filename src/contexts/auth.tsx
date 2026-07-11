@@ -172,6 +172,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
       if (error) throw error;
+      // "Confirmar e-mail" ligado: o Supabase nao devolve erro quando o e-mail
+      // ja existe (protecao contra enumeracao de usuarios) — devolve um usuario
+      // "fantasma", com `identities` vazio e sem sessao. Sem tratar isso, o app
+      // mostraria um "confira seu e-mail" enganoso para uma conta que ja existe.
+      const emailJaCadastrado =
+        signUpData.user != null &&
+        Array.isArray(signUpData.user.identities) &&
+        signUpData.user.identities.length === 0;
+      if (emailJaCadastrado) {
+        throw new ApiError("E-mail ja cadastrado.", 409, null);
+      }
       if (signUpData.session?.access_token) {
         await establishSession(signUpData.session.access_token);
         return { requiresEmailConfirmation: false };
@@ -282,15 +293,41 @@ export function useAuth() {
 export function loginErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
     if ([401, 403].includes(error.status)) return "E-mail ou senha invalidos. Confira e tente de novo.";
-    if (error.status === 409) return "Ja existe uma conta com esse e-mail.";
+    if (error.status === 409) return "Ja existe uma conta com esse e-mail. Tente entrar ou recuperar a senha.";
     if (error.status === 422) return "Confira os dados: e-mail valido e senha com pelo menos 8 caracteres.";
   }
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message: unknown }).message);
-    if (message.toLowerCase().includes("invalid login credentials")) {
-      return "E-mail ou senha invalidos. Confira e tente de novo.";
-    }
-    return message;
+  // Erros do Supabase Auth NAO sao ApiError: expoem `code`/`message` proprios e
+  // status 400/422 (nunca 409), entao precisam ser traduzidos a parte — senao a
+  // mensagem crua em ingles ("User already registered") vaza para a tela.
+  const code =
+    error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+  const rawMessage =
+    error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : "";
+  const lower = rawMessage.toLowerCase();
+
+  if (
+    code === "user_already_exists" ||
+    code === "email_exists" ||
+    lower.includes("already registered") ||
+    lower.includes("already been registered")
+  ) {
+    return "Ja existe uma conta com esse e-mail. Tente entrar ou recuperar a senha.";
   }
+  if (code === "invalid_credentials" || lower.includes("invalid login credentials")) {
+    return "E-mail ou senha invalidos. Confira e tente de novo.";
+  }
+  if (code === "email_not_confirmed" || lower.includes("email not confirmed")) {
+    return "Confirme seu e-mail pelo link que enviamos antes de entrar.";
+  }
+  if (code === "weak_password" || lower.includes("password should be")) {
+    return "Senha muito fraca. Escolha uma senha mais longa.";
+  }
+  if (code === "email_address_invalid" || lower.includes("invalid email")) {
+    return "E-mail invalido. Confira e tente de novo.";
+  }
+  if (code.includes("rate_limit") || lower.includes("rate limit") || lower.includes("too many requests")) {
+    return "Muitas tentativas em pouco tempo. Aguarde um instante e tente de novo.";
+  }
+  if (rawMessage) return rawMessage;
   return "Nao foi possivel continuar. Tente novamente.";
 }
