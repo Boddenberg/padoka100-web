@@ -2,8 +2,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff, LogIn, Mail, UserPlus } from "lucide-react-native";
-import { useState } from "react";
-import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
 import { Button, Field, Input, StateText } from "@/components/ui";
@@ -30,6 +30,19 @@ export function LoginScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  // Com o teclado aberto: a marca (logo/título) some para dar espaço, e a
+  // rolagem passa a alinhar ao topo — assim os campos de baixo (senha,
+  // confirmar) ficam visíveis em vez de cortados atrás do teclado.
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Cadastro só prossegue com as duas senhas iguais; a validação reaparece
   // sozinha se a pessoa mudar a primeira senha depois de confirmar.
@@ -105,25 +118,28 @@ export function LoginScreen() {
   return (
     <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.background}>
       <SafeAreaView style={styles.safe}>
-        {/* Teclado nao cobre os campos: no iOS o ScrollView insere o espaco do
-            teclado e rola ate o campo focado (automaticallyAdjustKeyboardInsets);
-            no Android a janela e redimensionada (softwareKeyboardLayoutMode:
-            "resize"). keyboardShouldPersistTaps deixa tocar em Entrar/Criar conta
-            com o teclado aberto, e "interactive" permite rolar sem fecha-lo. */}
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          showsVerticalScrollIndicator={false}
-          automaticallyAdjustKeyboardInsets
-        >
-          <Pressable style={styles.content} onPress={Keyboard.dismiss} accessible={false}>
-              <View style={styles.brand}>
-                <Image source={require("../../Logo.png")} style={styles.logo} contentFit="contain" />
-                <Text style={styles.greeting}>{getGreeting()}</Text>
-                <Text style={styles.title}>Padoka 100%</Text>
-                <Text style={styles.subtitle}>{subtitleByMode[mode]}</Text>
-              </View>
+        {/* Teclado nao cobre os campos: no iOS o KeyboardAvoidingView + insets
+            rolam ate o campo focado; no Android a janela e redimensionada
+            (softwareKeyboardLayoutMode: "resize"). Com o teclado aberto a
+            rolagem alinha ao topo (styles.scrollKeyboard) para nada ser
+            cortado, e a marca some para o cartao subir. */}
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <ScrollView
+            contentContainerStyle={[styles.scroll, keyboardOpen && styles.scrollKeyboard]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+            automaticallyAdjustKeyboardInsets
+          >
+            <Pressable style={styles.content} onPress={Keyboard.dismiss} accessible={false}>
+              {!keyboardOpen ? (
+                <View style={styles.brand}>
+                  <Image source={require("../../Logo.png")} style={styles.logo} contentFit="contain" />
+                  <Text style={styles.greeting}>{getGreeting()}</Text>
+                  <Text style={styles.title}>Padoka 100%</Text>
+                  <Text style={styles.subtitle}>{subtitleByMode[mode]}</Text>
+                </View>
+              ) : null}
 
               <View style={[styles.card, shadows.floating]}>
                 <View style={styles.modeRow}>
@@ -253,8 +269,9 @@ export function LoginScreen() {
                   </Pressable>
                 ) : null}
               </View>
-          </Pressable>
-        </ScrollView>
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -299,9 +316,17 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1
   },
+  flex: {
+    flex: 1
+  },
   scroll: {
     flexGrow: 1,
     justifyContent: "center"
+  },
+  // Teclado aberto: alinha ao topo para poder rolar até os campos de baixo
+  // (com "center" o conteúdo que transborda fica cortado e sem rolagem).
+  scrollKeyboard: {
+    justifyContent: "flex-start"
   },
   content: {
     gap: 18,

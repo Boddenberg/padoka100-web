@@ -7,7 +7,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -63,6 +62,8 @@ export function Page({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
+        // iOS: rola sozinho até o campo focado; Android já redimensiona a janela.
+        automaticallyAdjustKeyboardInsets
         refreshControl={
           onRefresh ? (
             <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.brand} colors={[colors.brand]} />
@@ -455,7 +456,10 @@ export function Sheet({
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.scrim}>
+      {/* "padding" nos dois: no Android o Modal é uma janela à parte e NÃO é
+          redimensionado pelo softwareKeyboardLayoutMode "resize", então sem
+          isso o teclado cobre os campos de baixo do sheet. */}
+      <KeyboardAvoidingView behavior="padding" style={styles.scrim}>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={() => {
