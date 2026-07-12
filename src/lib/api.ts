@@ -11,6 +11,7 @@ import type {
   SessaoCusteio
 } from "@/types/custeio";
 import type {
+  AcaoNotificacaoResposta,
   AnaliseEspecificaRequest,
   AnalisePadraoRequest,
   AtualizarPerfilRequest,
@@ -18,6 +19,7 @@ import type {
   CriarDiaDeVendaRequest,
   CriarItemProducaoRequest,
   DiaDeVenda,
+  FeedNotificacoes,
   IniciarHojeRequest,
   ProdutoDaVenda,
   RegistrarRequest,
@@ -28,7 +30,6 @@ import type {
   LocalVenda,
   LoginRequest,
   Midia,
-  Notificacao,
   Produto,
   RegistrarVendaRequest,
   RespostaLogin,
@@ -337,12 +338,37 @@ export const api = {
     timeline: (query?: { dia_de_venda_id?: string; tipo_entidade?: string; entidade_id?: string; limite?: number }) =>
       apiRequest<EventoLinhaDoTempo[]>("/api/v1/historico/linha-do-tempo", { query: { limite: 100, ...query } })
   },
-  // Avisos in-app que o backend publica para os usuários. `list` tolera 404
-  // (endpoint pode não existir ainda) para nunca quebrar a tela.
+  // Avisos in-app do backend. `feed` é a rota principal do sino (exige Bearer):
+  // devolve itens já ordenados + `resumo` (badge). Todas toleram 404 para nunca
+  // quebrar a tela enquanto o backend não publica a rota.
   notificacoes: {
-    list: () => apiRequest<unknown>("/api/v1/notificacoes", { query: { limite: 50 }, allowNotFound: true }),
+    feed: (params?: { limite?: number; incluirLidas?: boolean }) =>
+      apiRequest<FeedNotificacoes | null>("/api/v1/notificacoes/feed", {
+        query: { limite: params?.limite ?? 20, incluir_lidas: params?.incluirLidas ?? true },
+        allowNotFound: true
+      }),
+    // Compat: lista simples do front antigo, usada como fallback se `feed` não existir.
+    list: () =>
+      apiRequest<unknown>("/api/v1/notificacoes", { query: { limite: 50, incluir_lidas: true }, allowNotFound: true }),
     marcarLida: (id: UUID) =>
-      apiRequest<Notificacao | null>(`/api/v1/notificacoes/${id}/lida`, { method: "POST", body: {}, allowNotFound: true })
+      apiRequest<AcaoNotificacaoResposta | null>(`/api/v1/notificacoes/${id}/lida`, {
+        method: "POST",
+        body: {},
+        allowNotFound: true
+      }),
+    marcarNaoLida: (id: UUID) =>
+      apiRequest<AcaoNotificacaoResposta | null>(`/api/v1/notificacoes/${id}/nao-lida`, {
+        method: "POST",
+        body: {},
+        allowNotFound: true
+      }),
+    // "Excluir" para o usuário = ocultar do seu feed (não apaga do banco de todos).
+    ocultar: (id: UUID) =>
+      apiRequest<AcaoNotificacaoResposta | null>(`/api/v1/notificacoes/${id}/ocultar`, {
+        method: "POST",
+        body: {},
+        allowNotFound: true
+      })
   },
   ia: {
     // Endpoints genéricos: interpretam qualquer comando (venda, abrir dia com

@@ -6,6 +6,7 @@ import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from "re
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar, AgentTag } from "@/components/agent";
+import { CoachAnchor, useCoach, type CoachStep } from "@/components/coach/coach-tour";
 import { NotificationsButton } from "@/components/notifications";
 import { SettingsButton } from "@/components/settings-menu";
 import {
@@ -28,6 +29,7 @@ import { hasAccess, upgradeMessage } from "@/lib/access";
 import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { useAuth } from "@/contexts/auth";
+import { hasSeenSalesTour, markSalesTourSeen } from "@/lib/onboarding";
 import { haptics } from "@/lib/haptics";
 import { getGreeting } from "@/utils/greeting";
 import { fixProductName } from "@/utils/text";
@@ -48,7 +50,8 @@ const EMPTY_PRODUCTS: Produto[] = [];
 
 export function SalesScreen() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, status } = useAuth();
+  const coach = useCoach();
   const canUseOperationalAi = hasAccess(user, "ia.operacional");
   const insets = useSafeAreaInsets();
   const [cart, setCart] = useState<Cart>({});
@@ -219,6 +222,108 @@ export function SalesScreen() {
   const error = currentDayQuery.error || productsQuery.error || resumoQuery.error;
   const saleDisabled = !currentDay || !itemCount || currentDay.situacao !== "aberto" || !stockReady || hasStockIssue;
 
+  // Passeio guiado de primeiro acesso (coach marks). Os passos se adaptam ao
+  // estado da tela: sem dia aberto não há produtos para destacar, então esse
+  // passo é omitido (e o próprio tour pula qualquer alvo que não encontrar).
+  const tourStateRef = useRef({ hasDay: false, hasProducts: false });
+  tourStateRef.current = { hasDay: Boolean(currentDay), hasProducts: filteredProducts.length > 0 };
+
+  const buildTourSteps = (): CoachStep[] => {
+    const { hasDay, hasProducts } = tourStateRef.current;
+    const steps: CoachStep[] = [
+      {
+        emoji: "👋",
+        title: "Bem-vindo(a) ao Padoka 100!",
+        body: "Vou te mostrar rapidinho onde fica cada coisa. É um passo de cada vez — toque em “Próximo”."
+      },
+      {
+        target: "coach-hero",
+        emoji: "🌅",
+        title: hasDay ? "O seu dia de venda" : "Comece o seu dia aqui",
+        body: hasDay
+          ? "Aqui aparece o total vendido de hoje. Toque nos botões para ver a produção, as vendas e para fechar o dia."
+          : "Toque em “Começar o dia” e diga quanto você preparou. Depois é só vender."
+      },
+      {
+        target: "coach-agent",
+        emoji: "🎤",
+        title: "Fale ou escreva",
+        body: `Toque no microfone e fale, por exemplo, “vende 2 pães de queijo”. O ${AGENT_NAME} registra pra você. Aqui também dá para buscar um produto.`
+      }
+    ];
+    if (hasDay && hasProducts) {
+      steps.push({
+        target: "coach-products",
+        emoji: "🥖",
+        title: "Toque para vender",
+        body: "Toque no produto para colocar na sacola. Use os botões “+” e “−” para ajustar a quantidade.",
+        maxSpotlightHeight: 260
+      });
+    }
+    steps.push({
+      region: "tabs",
+      cornerRadius: 26,
+      emoji: "🧭",
+      title: "Tudo à mão aqui embaixo",
+      body: "Venda, Catálogo, Resumo e Perfil. Toque nos ícones para trocar de tela."
+    });
+    steps.push({
+      emoji: "✅",
+      title: "Prontinho!",
+      body: "Você pode rever este passeio quando quiser, em Preferências (a engrenagem no topo). Boas vendas! 🥐"
+    });
+    return steps;
+  };
+
+  // Primeiro login: abre o passeio uma única vez, e SÓ quando a sessão está
+  // comprovadamente válida — produtos carregados com sucesso significa que o
+  // token funcionou. Sem essa trava, um 401 logo após restaurar a sessão salva
+  // (que assume "logado" por um instante) fazia o tour disparar já na tela de
+  // login, apontando para alvos que não existem mais.
+  const coachRef = useRef(coach);
+  coachRef.current = coach;
+  const tourStartedRef = useRef(false);
+  const canStartTour = status === "signed-in" && Boolean(user?.id) && productsQuery.isSuccess && !loading;
+
+  useEffect(() => {
+    if (tourStartedRef.current || !canStartTour || !user?.id) return;
+    const userId = user.id;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    void hasSeenSalesTour(userId).then((seen) => {
+      if (cancelled || seen) return;
+      // Pausa curta deixa o layout assentar antes de medir os alvos.
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        tourStartedRef.current = true;
+        coach.startTour(buildTourSteps(), {
+          onFinish: () => markSalesTourSeen(userId),
+          onSkip: () => markSalesTourSeen(userId)
+        });
+      }, 700);
+    });
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canStartTour, user?.id]);
+
+  // Sessão caiu (ex.: 401 → logout) ou saiu da Venda: encerra o passeio na hora,
+  // para o overlay nunca sobrar órfão sobre a tela de login.
+  useEffect(() => {
+    if (status !== "signed-in") coachRef.current.stop();
+  }, [status]);
+  useEffect(() => () => coachRef.current.stop(), []);
+
+  // "Rever tutorial" (Preferências): reabre o passeio ignorando o histórico.
+  useEffect(() => {
+    if (coach.replayNonce === 0) return;
+    const timer = setTimeout(() => coach.startTour(buildTourSteps()), 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coach.replayNonce]);
+
   return (
     <>
       <Page
@@ -252,47 +357,53 @@ export function SalesScreen() {
         {message ? <SuccessToast message={message} /> : null}
 
         {currentDay ? (
-          <DayHero
-            day={currentDay}
-            sold={resumoQuery.data?.total_vendido}
-            produced={resumoQuery.data?.total_disponivel ?? resumoQuery.data?.total_produzido}
-            revenue={resumoQuery.data?.faturamento_bruto ?? resumoQuery.data?.faturamento_total}
-            onProduction={() => setSheet("production")}
-            onSales={() => setSheet("sales")}
-            onClose={() => setSheet("close-day")}
-          />
+          <CoachAnchor name="coach-hero">
+            <DayHero
+              day={currentDay}
+              sold={resumoQuery.data?.total_vendido}
+              produced={resumoQuery.data?.total_disponivel ?? resumoQuery.data?.total_produzido}
+              revenue={resumoQuery.data?.faturamento_bruto ?? resumoQuery.data?.faturamento_total}
+              onProduction={() => setSheet("production")}
+              onSales={() => setSheet("sales")}
+              onClose={() => setSheet("close-day")}
+            />
+          </CoachAnchor>
         ) : !loading ? (
-          <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-            <View pointerEvents="none" style={styles.heroGlowOne} />
-            <View pointerEvents="none" style={styles.heroGlowTwo} />
-            <Text style={styles.heroTitle}>Bora começar o dia de venda?</Text>
-            <Text style={styles.heroMuted}>Registre a produção de hoje e venda com um toque. Dá para produzir mais depois.</Text>
-            <Button title="Começar o dia" onPress={() => setSheet("open-day")} />
-          </LinearGradient>
+          <CoachAnchor name="coach-hero">
+            <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+              <View pointerEvents="none" style={styles.heroGlowOne} />
+              <View pointerEvents="none" style={styles.heroGlowTwo} />
+              <Text style={styles.heroTitle}>Bora começar o dia de venda?</Text>
+              <Text style={styles.heroMuted}>Registre a produção de hoje e venda com um toque. Dá para produzir mais depois.</Text>
+              <Button title="Começar o dia" onPress={() => setSheet("open-day")} />
+            </LinearGradient>
+          </CoachAnchor>
         ) : null}
 
         {!loading ? (
-          <AgentBanner
-            hint={
-              currentDay
-                ? "“Busca, venda, o que precisar: fala ou escreve!”"
-                : "“Posso abrir o dia com a produção: fala ou escreve!”"
-            }
-            search={search}
-            onSearchChange={setSearch}
-            onSpeak={() => openAgent({ record: true })}
-            onAsk={() => {
-              if (search.trim()) {
-                openAgent({ text: search.trim() });
-                setSearch("");
+          <CoachAnchor name="coach-agent">
+            <AgentBanner
+              hint={
+                currentDay
+                  ? "“Busca, venda, o que precisar: fala ou escreve!”"
+                  : "“Posso abrir o dia com a produção: fala ou escreve!”"
               }
-            }}
-          />
+              search={search}
+              onSearchChange={setSearch}
+              onSpeak={() => openAgent({ record: true })}
+              onAsk={() => {
+                if (search.trim()) {
+                  openAgent({ text: search.trim() });
+                  setSearch("");
+                }
+              }}
+            />
+          </CoachAnchor>
         ) : null}
         {!loading && accessNotice ? <StateText text={accessNotice} /> : null}
 
         {currentDay ? (
-          <>
+          <CoachAnchor name="coach-products">
             {filteredProducts.length ? (
               <FlatList
                 data={filteredProducts}
@@ -317,7 +428,7 @@ export function SalesScreen() {
                 hint={dayProducts.length ? "Tente outro nome na busca." : "Registre a produção para começar a vender."}
               />
             )}
-          </>
+          </CoachAnchor>
         ) : null}
       </Page>
 

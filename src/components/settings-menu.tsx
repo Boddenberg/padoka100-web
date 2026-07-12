@@ -1,6 +1,7 @@
-import { Settings } from "lucide-react-native";
+import { Compass, Settings } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useCoach } from "@/components/coach/coach-tour";
 import { Sheet } from "@/components/ui";
 import { useFontScale, type FontLevel } from "@/lib/font-scale";
 import { colors, fonts, radius } from "@/lib/theme";
@@ -15,6 +16,7 @@ const FONT_OPTIONS: { level: FontLevel; label: string; sample: number }[] = [
 export function SettingsButton() {
   const [open, setOpen] = useState(false);
   const { level, setLevel } = useFontScale();
+  const coach = useCoach();
 
   return (
     <>
@@ -40,6 +42,20 @@ export function SettingsButton() {
             );
           })}
         </View>
+
+        <Text style={styles.groupTitle}>Ajuda</Text>
+        <Text style={styles.groupHint}>Quer relembrar onde fica cada coisa? Refaça o passeio guiado.</Text>
+        <Pressable
+          onPress={() => {
+            // Fecha as Preferências e reabre o passeio na tela de Venda.
+            setOpen(false);
+            coach.replaySalesTour();
+          }}
+          style={({ pressed }) => [styles.tourButton, pressed && styles.pressed]}
+        >
+          <Compass size={20} color={colors.brandDeep} />
+          <Text style={styles.tourButtonText}>Ver tutorial de novo</Text>
+        </Pressable>
       </Sheet>
     </>
   );
@@ -102,5 +118,21 @@ const styles = StyleSheet.create({
   },
   optionTextActive: {
     color: colors.brandDeep
+  },
+  tourButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    minHeight: 52,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.brandSoft,
+    backgroundColor: colors.surfaceWarm
+  },
+  tourButtonText: {
+    color: colors.brandDeep,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold
   }
 });

@@ -210,9 +210,41 @@ export interface Notificacao {
   midias?: NotificacaoMidia[] | null;
   lida?: boolean;
   lida_em?: string | null;
+  // `nova` = ainda não lida (destaque visual); `expira_em` some sozinha depois.
+  nova?: boolean;
+  expira_em?: string | null;
   criado_em?: string | null;
   publicado_em?: string | null;
   [key: string]: unknown;
+}
+
+// Contadores que o feed devolve para o sino e as seções da UI.
+export interface ResumoNotificacoes {
+  total?: number;
+  nao_lidas?: number;
+  lidas?: number;
+  novas?: number;
+  retornadas?: number;
+}
+
+// Resposta principal do sino: GET /notificacoes/feed. `itens` já vem ordenado
+// (não lidas antes das lidas; alta > normal > baixa; mais recentes primeiro).
+export interface FeedNotificacoes {
+  itens: Notificacao[];
+  resumo?: ResumoNotificacoes;
+  limite?: number;
+  tem_mais?: boolean;
+  persistida?: boolean;
+}
+
+// Resposta das ações por clique (lida / não-lida / ocultar).
+export interface AcaoNotificacaoResposta {
+  notificacao_id: UUID;
+  lida?: boolean;
+  lida_em?: string | null;
+  oculta?: boolean;
+  oculta_em?: string | null;
+  persistida?: boolean;
 }
 
 export interface Midia {

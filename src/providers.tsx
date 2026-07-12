@@ -2,6 +2,7 @@ import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-
 import { useEffect, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 import { AuthProvider } from "@/contexts/auth";
+import { CoachProvider } from "@/components/coach/coach-tour";
 import { ApiError } from "@/lib/api";
 import { FontScaleProvider } from "@/lib/font-scale";
 
@@ -46,7 +47,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <FontScaleProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <CoachProvider>{children}</CoachProvider>
+        </AuthProvider>
       </FontScaleProvider>
     </QueryClientProvider>
   );
