@@ -1,13 +1,14 @@
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
-import { Mic, Send, Sparkles } from "lucide-react-native";
+import { Camera, Images, Mic, Send, Sparkles } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar } from "@/components/agent";
 import { Badge, Button, Card, Input, Sheet, StateText } from "@/components/ui";
-import { api, createAudioForm, type NativeFile } from "@/lib/api";
+import { api, createAudioForm, createIaPhotoForm, type NativeFile } from "@/lib/api";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
+import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
 import type { DiaDeVenda, RespostaInterpretarVenda } from "@/types/api";
 
@@ -18,6 +19,13 @@ export type AgentPrompts = {
   idle: string;
   exampleVoice: string;
   exampleText: string;
+};
+
+// Quando a tela permite foto, diz ao agente o que ele vai ler: a lousa/folha
+// de produção do dia (precisa do dia aberto) ou o cardápio para cadastrar.
+export type AgentPhoto = {
+  kind: "producao" | "cardapio";
+  contexto?: string;
 };
 
 // Depois de qualquer comando confirmado, tudo pode ter mudado (dia, produtos,
@@ -36,7 +44,8 @@ export function AgentSheet({
   initialText,
   autoRecord,
   onMessage,
-  prompts
+  prompts,
+  photo
 }: {
   visible: boolean;
   onClose: () => void;
@@ -45,6 +54,7 @@ export function AgentSheet({
   autoRecord: boolean;
   onMessage: (message: string) => void;
   prompts?: AgentPrompts;
+  photo?: AgentPhoto;
 }) {
   return (
     <Sheet
@@ -62,6 +72,7 @@ export function AgentSheet({
           autoRecord={autoRecord}
           onMessage={onMessage}
           prompts={prompts}
+          photo={photo}
         />
       ) : null}
     </Sheet>
@@ -74,7 +85,8 @@ function AgentConversation({
   initialText,
   autoRecord,
   onMessage,
-  prompts
+  prompts,
+  photo
 }: {
   onClose: () => void;
   day: DiaDeVenda | null;
@@ -82,6 +94,7 @@ function AgentConversation({
   autoRecord: boolean;
   onMessage: (message: string) => void;
   prompts?: AgentPrompts;
+  photo?: AgentPhoto;
 }) {
   const queryClient = useQueryClient();
   const [text, setText] = useState(initialText);
@@ -111,6 +124,26 @@ function AgentConversation({
     onSuccess: (response) => {
       setText(response.transcricao);
       setResult(response.interpretacao || null);
+    }
+  });
+  // Foto (lousa de produção ou cardápio): interpreta e cai no mesmo
+  // "Entendi assim" para a pessoa revisar antes de confirmar.
+  const photoUpload = useMutation({
+    mutationFn: async (source: "camera" | "gallery") => {
+      if (!photo) return null;
+      // Documento inteiro (sem recorte 4:3), para não perder itens da folha.
+      const file = await pickImage(source, photo.kind, { allowsEditing: false });
+      if (!file) return null;
+      const form = createIaPhotoForm(file, {
+        diaDeVendaId: photo.kind === "producao" ? day?.id : undefined,
+        contexto: photo.contexto
+      });
+      return photo.kind === "cardapio" ? api.ia.importMenuPhoto(form) : api.ia.importProductionPhoto(form);
+    },
+    onSuccess: (response) => {
+      if (!response) return;
+      setConfirmNotice(null);
+      setResult(response);
     }
   });
   const confirm = useMutation({
@@ -167,7 +200,7 @@ function AgentConversation({
     await startRecording();
   }
 
-  const busy = interpret.isPending || upload.isPending;
+  const busy = interpret.isPending || upload.isPending || photoUpload.isPending;
 
   return (
     <>
@@ -175,11 +208,13 @@ function AgentConversation({
         <Text style={styles.agentBubbleText}>
           {recorderState.isRecording
             ? "Tô ouvindo... pode falar!"
-            : busy
-              ? "Pensando aqui..."
-              : result
-                ? result.mensagem_assistente
-                : idleHint}
+            : photoUpload.isPending
+              ? "Lendo a foto..."
+              : busy
+                ? "Pensando aqui..."
+                : result
+                  ? result.mensagem_assistente
+                  : idleHint}
         </Text>
       </View>
 
@@ -229,8 +264,42 @@ function AgentConversation({
         </Pressable>
       </View>
 
+      {photo ? (
+        <>
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>ou envie uma foto</Text>
+            <View style={styles.orLine} />
+          </View>
+          <View style={styles.photoRow}>
+            <Pressable
+              onPress={() => photoUpload.mutate("camera")}
+              disabled={photoUpload.isPending}
+              style={({ pressed }) => [styles.photoButton, pressed && styles.pressed]}
+            >
+              <Camera size={20} color={colors.agentDeep} />
+              <Text style={styles.photoButtonText}>Fotografar</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => photoUpload.mutate("gallery")}
+              disabled={photoUpload.isPending}
+              style={({ pressed }) => [styles.photoButton, pressed && styles.pressed]}
+            >
+              <Images size={20} color={colors.agentDeep} />
+              <Text style={styles.photoButtonText}>Galeria</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.photoHint}>
+            {photo.kind === "cardapio"
+              ? "Foto do cardápio: eu leio os itens e os preços pra cadastrar."
+              : "Foto da lousa ou folha: eu leio a produção do dia."}
+          </Text>
+        </>
+      ) : null}
+
       {interpret.error instanceof Error ? <StateText tone="error" text={interpret.error.message} /> : null}
       {upload.error instanceof Error ? <StateText tone="error" text={upload.error.message} /> : null}
+      {photoUpload.error instanceof Error ? <StateText tone="error" text={photoUpload.error.message} /> : null}
 
       {result ? (
         <Card style={styles.resultCard}>
@@ -325,6 +394,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10
+  },
+  photoRow: {
+    flexDirection: "row",
+    gap: 10
+  },
+  photoButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 52,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.agentSoft,
+    backgroundColor: colors.surface
+  },
+  photoButtonText: {
+    color: colors.agentDeep,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
+  },
+  photoHint: {
+    color: colors.muted,
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontFamily: fonts.body,
+    textAlign: "center"
   },
   commandInput: {
     flex: 1

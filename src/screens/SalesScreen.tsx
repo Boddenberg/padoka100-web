@@ -560,6 +560,7 @@ export function SalesScreen() {
         initialText={aiInitialText}
         autoRecord={aiAutoRecord}
         onMessage={setMessage}
+        photo={currentDay ? { kind: "producao", contexto: "Foto da lousa de produção de hoje" } : undefined}
       />
     </>
   );

@@ -296,6 +296,16 @@ export function createAudioForm(file: NativeFile, diaDeVendaId?: UUID | null) {
   return form;
 }
 
+// Foto para o agente ler: lousa/folha de produção ou cardápio de produtos.
+// Produção precisa do dia; cardápio não. O `contexto` ajuda o modelo.
+export function createIaPhotoForm(file: NativeFile, options?: { diaDeVendaId?: UUID | null; contexto?: string | null }) {
+  const form = new FormData();
+  form.append("file", file as unknown as Blob);
+  if (options?.diaDeVendaId) form.append("dia_de_venda_id", options.diaDeVendaId);
+  if (options?.contexto) form.append("contexto", options.contexto);
+  return form;
+}
+
 // Entrada de áudio/imagem do custeio assistido (multipart em /entradas/arquivo).
 // `finalidade` segrega a etapa: foto da receita vs. foto da nota/preços.
 export function createCusteioFileForm(
@@ -441,6 +451,12 @@ export const api = {
       apiRequest<RespostaInterpretarVenda>("/api/v1/ia/interpretar-comando", { method: "POST", body }),
     transcribeAudio: (formData: FormData) =>
       apiRequest<RespostaTranscreverAudio>("/api/v1/ia/transcrever-audio", { method: "POST", formData }),
+    // Fotos: lousa/folha de produção do dia e cardápio para cadastrar produtos.
+    // Ambas devolvem a mesma interpretação (revisar → confirmar).
+    importProductionPhoto: (formData: FormData) =>
+      apiRequest<RespostaInterpretarVenda>("/api/v1/ia/producao/importar-foto", { method: "POST", formData }),
+    importMenuPhoto: (formData: FormData) =>
+      apiRequest<RespostaInterpretarVenda>("/api/v1/ia/produtos/importar-cardapio", { method: "POST", formData }),
     confirmCommand: (interacaoId: UUID) =>
       apiRequest<RespostaConfirmarComando>(`/api/v1/ia/interacoes/${interacaoId}/confirmar`, { method: "POST" }),
     // Análises do período (exigem Bearer token e papel "dono").

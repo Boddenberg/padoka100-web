@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronRight, Mic, Sparkles } from "lucide-react-native";
+import { Camera, ChevronRight, Mic, Sparkles } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -48,11 +48,19 @@ export function ProductsScreen() {
   const [editing, setEditing] = useState<Produto | null>(null);
   const productsQuery = useQuery({ queryKey: ["produtos", "todos"], queryFn: () => api.produtos.list(false) });
 
-  // Cadastro por voz com o Pãozinho, para quem tem o plano com IA.
+  // Cadastro por voz ou foto do cardápio com o Pãozinho (plano com IA).
   const { user } = useAuth();
   const canUseAgent = hasAccess(user, "ia.operacional");
   const [agentOpen, setAgentOpen] = useState(false);
+  const [agentAutoRecord, setAgentAutoRecord] = useState(false);
   const [agentMessage, setAgentMessage] = useState<string | null>(null);
+
+  // "Por voz" já abre gravando; "por foto" abre nos botões de foto.
+  const openAgent = (mode: "voice" | "photo") => {
+    setSheet(null);
+    setAgentAutoRecord(mode === "voice");
+    setAgentOpen(true);
+  };
 
   // O recado de sucesso do Pãozinho se despede sozinho.
   useEffect(() => {
@@ -131,14 +139,7 @@ export function ProductsScreen() {
       <CreateProductSheet
         visible={sheet === "create"}
         onClose={() => setSheet(null)}
-        onVoice={
-          canUseAgent
-            ? () => {
-                setSheet(null);
-                setAgentOpen(true);
-              }
-            : undefined
-        }
+        onAssistant={canUseAgent ? openAgent : undefined}
       />
       <EditProductSheet visible={sheet === "edit"} onClose={() => setSheet(null)} product={editingProduct} />
       <AgentSheet
@@ -146,19 +147,28 @@ export function ProductsScreen() {
         onClose={() => setAgentOpen(false)}
         day={null}
         initialText=""
-        autoRecord
+        autoRecord={agentAutoRecord}
         onMessage={setAgentMessage}
         prompts={{
-          idle: "Me fala o produto e o preço — por voz ou por texto — que eu cadastro pra você.",
+          idle: "Me fala o produto e o preço — por voz, foto do cardápio ou texto — que eu cadastro pra você.",
           exampleVoice: "Ex: “cadastra pão de queijo por 4 e 50”",
           exampleText: "Ex: cadastra pão de queijo por 4,50"
         }}
+        photo={{ kind: "cardapio", contexto: "Cardápio da banca" }}
       />
     </>
   );
 }
 
-function CreateProductSheet({ visible, onClose, onVoice }: { visible: boolean; onClose: () => void; onVoice?: () => void }) {
+function CreateProductSheet({
+  visible,
+  onClose,
+  onAssistant
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onAssistant?: (mode: "voice" | "photo") => void;
+}) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<ProductDraft>(emptyProduct);
   const createProduct = useMutation({
@@ -188,9 +198,12 @@ function CreateProductSheet({ visible, onClose, onVoice }: { visible: boolean; o
 
   return (
     <Sheet visible={visible} title="Cadastrar produto" subtitle="Depois adicione a foto na edição." onClose={onClose}>
-      {onVoice ? (
-        <AgentSays size={40} text="Se preferir, me fala o produto e o preço que eu cadastro pra você.">
-          <Button title={`Cadastrar por voz com o ${AGENT_NAME}`} tone="agent" icon={<Mic size={18} color="#fff" />} onPress={onVoice} />
+      {onAssistant ? (
+        <AgentSays size={40} text="Se preferir, eu cadastro pra você: me fale o produto e o preço, ou mande a foto do seu cardápio.">
+          <View style={styles.assistantActions}>
+            <Button title="Por voz" tone="agent" icon={<Mic size={18} color="#fff" />} onPress={() => onAssistant("voice")} style={styles.assistantButton} />
+            <Button title="Por foto" tone="agent" icon={<Camera size={18} color="#fff" />} onPress={() => onAssistant("photo")} style={styles.assistantButton} />
+          </View>
         </AgentSays>
       ) : null}
       <ProductFields draft={draft} setDraft={setDraft} />
@@ -444,6 +457,13 @@ function ProductFields({ draft, setDraft }: { draft: ProductDraft; setDraft: (dr
 }
 
 const styles = StyleSheet.create({
+  assistantActions: {
+    flexDirection: "row",
+    gap: 8
+  },
+  assistantButton: {
+    flex: 1
+  },
   editPrice: {
     color: colors.ink,
     fontSize: 26,
