@@ -1,0 +1,370 @@
+import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync } from "expo-audio";
+import { LinearGradient } from "expo-linear-gradient";
+import { Mic, Send, Sparkles } from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AGENT_NAME, AgentAvatar } from "@/components/agent";
+import { Badge, Button, Card, Input, Sheet, StateText } from "@/components/ui";
+import { api, createAudioForm, type NativeFile } from "@/lib/api";
+import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
+import { fixProductName } from "@/utils/text";
+import type { DiaDeVenda, RespostaInterpretarVenda } from "@/types/api";
+
+// Conversa com o Seu Pãozinho, disponível para qualquer tela do app.
+// O backend interpreta comandos genéricos (venda, abrir dia, cadastro...);
+// aqui só muda o convite e os exemplos conforme o contexto.
+export type AgentPrompts = {
+  idle: string;
+  exampleVoice: string;
+  exampleText: string;
+};
+
+// Depois de qualquer comando confirmado, tudo pode ter mudado (dia, produtos,
+// vendas, relatórios) — invalida em bloco para as telas se atualizarem sozinhas.
+export function invalidateDay(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ["dias"] });
+  queryClient.invalidateQueries({ queryKey: ["produtos"] });
+  queryClient.invalidateQueries({ queryKey: ["relatorios"] });
+  queryClient.invalidateQueries({ queryKey: ["vendas"] });
+}
+
+export function AgentSheet({
+  visible,
+  onClose,
+  day,
+  initialText,
+  autoRecord,
+  onMessage,
+  prompts
+}: {
+  visible: boolean;
+  onClose: () => void;
+  day: DiaDeVenda | null;
+  initialText: string;
+  autoRecord: boolean;
+  onMessage: (message: string) => void;
+  prompts?: AgentPrompts;
+}) {
+  return (
+    <Sheet
+      visible={visible}
+      title={AGENT_NAME}
+      subtitle="Seu agente de IA da padaria"
+      onClose={onClose}
+      headerAccent={<AgentAvatar size={46} />}
+    >
+      {visible ? (
+        <AgentConversation
+          onClose={onClose}
+          day={day}
+          initialText={initialText}
+          autoRecord={autoRecord}
+          onMessage={onMessage}
+          prompts={prompts}
+        />
+      ) : null}
+    </Sheet>
+  );
+}
+
+function AgentConversation({
+  onClose,
+  day,
+  initialText,
+  autoRecord,
+  onMessage,
+  prompts
+}: {
+  onClose: () => void;
+  day: DiaDeVenda | null;
+  initialText: string;
+  autoRecord: boolean;
+  onMessage: (message: string) => void;
+  prompts?: AgentPrompts;
+}) {
+  const queryClient = useQueryClient();
+  const [text, setText] = useState(initialText);
+  const [result, setResult] = useState<RespostaInterpretarVenda | null>(null);
+  // Recado quando a confirmação não pôde ser aplicada (sucesso: false).
+  const [confirmNotice, setConfirmNotice] = useState<string | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
+
+  const idleHint =
+    prompts?.idle ??
+    (day
+      ? "Me fala o que vendeu — por voz ou por texto — que eu monto a sacola e registro."
+      : "O dia ainda não foi aberto. Me fala a produção de hoje que eu abro pra você!");
+  const exampleVoice = prompts?.exampleVoice ?? (day ? "Ex: “vende 2 pães de queijo e 1 café”" : "Ex: “abre o dia com 20 pães de queijo”");
+  const exampleText = prompts?.exampleText ?? (day ? "Ex: vende 2 pães de queijo" : "Ex: abre o dia com 20 pães");
+
+  const interpret = useMutation({
+    mutationFn: (command: string) => api.ia.interpretCommand({ texto: command, dia_de_venda_id: day?.id, permitir_fallback: true }),
+    onSuccess: (response) => {
+      setConfirmNotice(null);
+      setResult(response);
+    }
+  });
+  const upload = useMutation({
+    mutationFn: (file: NativeFile) => api.ia.transcribeAudio(createAudioForm(file, day?.id)),
+    onSuccess: (response) => {
+      setText(response.transcricao);
+      setResult(response.interpretacao || null);
+    }
+  });
+  const confirm = useMutation({
+    mutationFn: () => api.ia.confirmCommand(result!.interacao_ia_id),
+    onSuccess: (response) => {
+      // A API pode responder sem erro HTTP mas sem conseguir aplicar:
+      // nesse caso o sheet fica aberto com o recado amigável.
+      if (response.sucesso === false) {
+        const detail =
+          response.mensagem_assistente ||
+          (typeof response.resultado?.mensagem === "string" ? response.resultado.mensagem : null);
+        setConfirmNotice(detail || "Não consegui aplicar o comando. Tente pedir de novo.");
+        return;
+      }
+      onMessage(response.mensagem_assistente || `${AGENT_NAME} resolveu pra você!`);
+      onClose();
+      invalidateDay(queryClient);
+    }
+  });
+
+  // Ao abrir: interpreta o texto vindo da busca ou já começa a gravar.
+  useEffect(() => {
+    if (initialText) {
+      interpret.mutate(initialText);
+    } else if (autoRecord) {
+      void startRecording();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function startRecording() {
+    try {
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Microfone", "Permissão para usar o microfone foi negada.");
+        return;
+      }
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+    } catch (error) {
+      Alert.alert("Áudio", error instanceof Error ? error.message : "Não foi possível gravar.");
+    }
+  }
+
+  async function toggleRecording() {
+    if (recorderState.isRecording) {
+      await recorder.stop();
+      if (recorder.uri) {
+        upload.mutate({ uri: recorder.uri, name: `venda-${Date.now()}.m4a`, type: "audio/mp4" });
+      }
+      return;
+    }
+    await startRecording();
+  }
+
+  const busy = interpret.isPending || upload.isPending;
+
+  return (
+    <>
+      <View style={styles.agentBubble}>
+        <Text style={styles.agentBubbleText}>
+          {recorderState.isRecording
+            ? "Tô ouvindo... pode falar!"
+            : busy
+              ? "Pensando aqui..."
+              : result
+                ? result.mensagem_assistente
+                : idleHint}
+        </Text>
+      </View>
+
+      <Pressable onPress={toggleRecording} disabled={upload.isPending} style={({ pressed }) => pressed && styles.pressed}>
+        <LinearGradient
+          colors={recorderState.isRecording ? (["#ff5252", "#d81b43"] as const) : gradients.agent}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.recordButton, recorderState.isRecording ? styles.recordButtonActive : shadows.agent]}
+        >
+          <Mic size={30} color="#fff" />
+          <Text style={styles.recordText}>
+            {recorderState.isRecording ? "Gravando... toque para parar" : upload.isPending ? "Enviando áudio..." : "Toque e fala"}
+          </Text>
+          {!recorderState.isRecording ? <Text style={styles.recordHint}>{exampleVoice}</Text> : null}
+        </LinearGradient>
+      </Pressable>
+
+      <View style={styles.orRow}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>ou escreva</Text>
+        <View style={styles.orLine} />
+      </View>
+
+      <View style={styles.commandRow}>
+        <Input
+          value={text}
+          onChangeText={setText}
+          placeholder={exampleText}
+          style={styles.commandInput}
+          returnKeyType="send"
+          onSubmitEditing={() => text.trim() && interpret.mutate(text.trim())}
+        />
+        <Pressable
+          onPress={() => text.trim() && interpret.mutate(text.trim())}
+          disabled={!text.trim() || interpret.isPending}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <LinearGradient
+            colors={text.trim() ? gradients.agent : ([colors.border, colors.border] as const)}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.sendButton}
+          >
+            <Send size={20} color={text.trim() ? "#fff" : colors.muted} />
+          </LinearGradient>
+        </Pressable>
+      </View>
+
+      {interpret.error instanceof Error ? <StateText tone="error" text={interpret.error.message} /> : null}
+      {upload.error instanceof Error ? <StateText tone="error" text={upload.error.message} /> : null}
+
+      {result ? (
+        <Card style={styles.resultCard}>
+          <View style={styles.resultHeader}>
+            <Sparkles size={16} color={colors.agentDeep} />
+            <Text style={styles.resultTitle}>Entendi assim:</Text>
+          </View>
+          {result.itens?.map((item) => (
+            <View key={`${item.produto_id}-${item.nome_produto}`} style={styles.resultRow}>
+              <Text style={styles.resultItem}>
+                {item.quantidade}x {fixProductName(item.nome_produto)}
+              </Text>
+              <Badge text={`${Math.round(item.confianca * 100)}%`} tone={item.confianca >= 0.75 ? "good" : "warn"} />
+            </View>
+          ))}
+          {result.itens_nao_identificados?.length ? (
+            <StateText tone="error" text={`Não identifiquei: ${result.itens_nao_identificados.join(", ")}`} />
+          ) : null}
+          {result.mensagem_confirmacao ? <StateText text={result.mensagem_confirmacao} /> : null}
+          <Button
+            title={confirm.isPending ? "Confirmando..." : "Confirmar"}
+            tone="success"
+            disabled={!result.interacao_ia_id || confirm.isPending}
+            onPress={() => confirm.mutate()}
+          />
+          {confirmNotice ? <StateText tone="error" text={confirmNotice} /> : null}
+          {confirm.error instanceof Error ? <StateText tone="error" text={confirm.error.message} /> : null}
+        </Card>
+      ) : null}
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  pressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.92
+  },
+  agentBubble: {
+    borderRadius: radius.lg,
+    borderTopLeftRadius: radius.sm,
+    backgroundColor: colors.agentSoft,
+    padding: 14
+  },
+  agentBubbleText: {
+    color: colors.agentDeep,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold,
+    lineHeight: 21
+  },
+  recordButton: {
+    alignItems: "center",
+    gap: 6,
+    borderRadius: radius.xl,
+    padding: 22
+  },
+  recordButtonActive: {
+    shadowColor: "#d81b43",
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8
+  },
+  recordText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: fonts.bodyBold
+  },
+  recordHint: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12.5,
+    fontFamily: fonts.body
+  },
+  orRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border
+  },
+  orText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontFamily: fonts.bodyBold,
+    textTransform: "uppercase",
+    letterSpacing: 0.8
+  },
+  commandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  commandInput: {
+    flex: 1
+  },
+  sendButton: {
+    height: 52,
+    width: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill
+  },
+  resultCard: {
+    borderColor: colors.agentSoft,
+    borderWidth: 1.5
+  },
+  resultHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  resultTitle: {
+    color: colors.agentDeep,
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
+  },
+  resultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceGlow,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 12
+  },
+  resultItem: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold
+  }
+});
