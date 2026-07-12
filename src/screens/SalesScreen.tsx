@@ -592,7 +592,7 @@ function AgentBanner({
         <View style={styles.searchBox}>
           <Search size={18} color={colors.muted} />
           <Input
-            placeholder="Busque ou peça qualquer ação..."
+            placeholder="Busque ou peça ao Pãozinho"
             value={search}
             onChangeText={onSearchChange}
             style={styles.searchInput}
