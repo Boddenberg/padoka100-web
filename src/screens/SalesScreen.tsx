@@ -1,5 +1,6 @@
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { Ban, CalendarDays, CheckCircle2, ChevronRight, Mic, ReceiptText, Search, Send, Sparkles } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -28,6 +29,7 @@ import { api, ApiError, createAudioForm, friendlyErrorMessage, type NativeFile }
 import { hasAccess, upgradeMessage } from "@/lib/access";
 import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
+import { addDays } from "@/utils/dates";
 import { useAuth } from "@/contexts/auth";
 import { hasSeenSalesTour, markSalesTourSeen } from "@/lib/onboarding";
 import { haptics } from "@/lib/haptics";
@@ -222,6 +224,24 @@ export function SalesScreen() {
   const error = currentDayQuery.error || productsQuery.error || resumoQuery.error;
   const saleDisabled = !currentDay || !itemCount || currentDay.situacao !== "aberto" || !stockReady || hasStockIssue;
 
+  // A tela Hoje conta em que passo do dia a pessoa está:
+  // 1 Preparar (nada cadastrado) → 2 Vender (sem dia aberto) → dia aberto.
+  const isFirstRun = !loading && !currentDay && productsQuery.isSuccess && products.length === 0;
+  const isReadyToStart = !loading && !currentDay && productsQuery.isSuccess && products.length > 0;
+
+  // "Ontem" no estado pronto-para-começar: um resumo de uma linha, só para
+  // quem pode ver relatórios (a aba Resumo é o destino do toque).
+  const canSeeReports = hasAccess(user, "relatorios.avancados");
+  const canUseShoppingList = hasAccess(user, "compras.usar");
+  const yesterday = addDays(todayInputValue(), -1);
+  const yesterdayQuery = useQuery({
+    queryKey: ["relatorios", "periodo", yesterday, yesterday],
+    queryFn: () => api.relatorios.period(yesterday, yesterday),
+    enabled: isReadyToStart && canSeeReports
+  });
+  const yesterdaySold = yesterdayQuery.data?.total_vendido ?? 0;
+  const hasYesterday = Boolean(yesterdayQuery.data) && (toNumber(yesterdayQuery.data?.faturamento_bruto) > 0 || yesterdaySold > 0);
+
   // Passeio guiado de primeiro acesso (coach marks). Os passos se adaptam ao
   // estado da tela: sem dia aberto não há produtos para destacar, então esse
   // passo é omitido (e o próprio tour pula qualquer alvo que não encontrar).
@@ -265,7 +285,7 @@ export function SalesScreen() {
       cornerRadius: 26,
       emoji: "🧭",
       title: "Tudo à mão aqui embaixo",
-      body: "Venda, Catálogo, Resumo e Perfil. Toque nos ícones para trocar de tela."
+      body: "Hoje, Minha padoca, Resumo e Perfil. Toque nos ícones para trocar de tela."
     });
     steps.push({
       emoji: "✅",
@@ -328,8 +348,14 @@ export function SalesScreen() {
     <>
       <Page
         greeting={getGreeting(user?.nome)}
-        title="Venda"
-        subtitle="Toque nos produtos ou fale com o agente."
+        title="Hoje"
+        subtitle={
+          isFirstRun
+            ? "Vamos deixar tudo pronto para a primeira venda."
+            : isReadyToStart
+              ? "Fornada pronta? É só começar."
+              : "Toque nos produtos ou fale com o agente."
+        }
         onRefresh={onRefresh}
         refreshing={refreshing}
         headerRight={
@@ -368,26 +394,100 @@ export function SalesScreen() {
               onClose={() => setSheet("close-day")}
             />
           </CoachAnchor>
-        ) : !loading ? (
+        ) : isFirstRun ? (
           <CoachAnchor name="coach-hero">
             <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
               <View pointerEvents="none" style={styles.heroGlowOne} />
               <View pointerEvents="none" style={styles.heroGlowTwo} />
-              <Text style={styles.heroTitle}>Bora começar o dia de venda?</Text>
-              <Text style={styles.heroMuted}>Registre a produção de hoje e venda com um toque. Dá para produzir mais depois.</Text>
+              <DayJourney current={1} />
+              <Text style={styles.heroTitle}>Vamos preparar sua padoca</Text>
+              <Text style={styles.heroMuted}>Falta pouco para a primeira venda.</Text>
+            </LinearGradient>
+          </CoachAnchor>
+        ) : isReadyToStart ? (
+          <CoachAnchor name="coach-hero">
+            <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+              <View pointerEvents="none" style={styles.heroGlowOne} />
+              <View pointerEvents="none" style={styles.heroGlowTwo} />
+              <DayJourney current={2} />
+              <Text style={styles.heroTitle}>Bora começar o dia?</Text>
+              <Text style={styles.heroMuted}>Diga o que você preparou hoje e venda com um toque. Dá para produzir mais depois.</Text>
               <Button title="Começar o dia" onPress={() => setSheet("open-day")} />
             </LinearGradient>
           </CoachAnchor>
         ) : null}
 
-        {!loading ? (
+        {/* Primeiro uso: a sequência real do primeiro dia vira a lista de
+            tarefas. Só o passo 1 é possível agora — os outros ficam à espera. */}
+        {isFirstRun ? (
+          <>
+            <View style={styles.taskCard}>
+              <View style={styles.taskNumber}>
+                <Text style={styles.taskNumberText}>1</Text>
+              </View>
+              <View style={styles.taskBody}>
+                <Text style={styles.taskTitle}>Cadastre o que você vende</Text>
+                <Text style={styles.taskHint}>Nome e preço já bastam. Foto pode vir depois.</Text>
+                <Button title="Cadastrar produto" onPress={() => router.push("/produtos?novo=1")} style={styles.taskButton} />
+              </View>
+            </View>
+            <View style={[styles.taskCard, styles.taskCardOff]}>
+              <View style={[styles.taskNumber, styles.taskNumberOff]}>
+                <Text style={[styles.taskNumberText, styles.taskNumberTextOff]}>2</Text>
+              </View>
+              <View style={styles.taskBody}>
+                <Text style={styles.taskTitle}>Comece o dia</Text>
+                <Text style={styles.taskHint}>Diga quantos de cada um você preparou.</Text>
+              </View>
+            </View>
+            <View style={[styles.taskCard, styles.taskCardOff]}>
+              <View style={[styles.taskNumber, styles.taskNumberOff]}>
+                <Text style={[styles.taskNumberText, styles.taskNumberTextOff]}>3</Text>
+              </View>
+              <View style={styles.taskBody}>
+                <Text style={styles.taskTitle}>Venda com um toque</Text>
+                <Text style={styles.taskHint}>Toque no produto e a venda está registrada.</Text>
+              </View>
+            </View>
+          </>
+        ) : null}
+
+        {/* Pronto para começar: ontem e atalhos, discretos, abaixo da ação do dia. */}
+        {isReadyToStart ? (
+          <>
+            {hasYesterday && canSeeReports ? (
+              <>
+                <Text style={styles.sectionLabel}>Ontem</Text>
+                <RowLink
+                  emoji="📊"
+                  title={`${formatCurrency(yesterdayQuery.data?.faturamento_bruto)} · ${yesterdaySold} ${yesterdaySold === 1 ? "item" : "itens"}`}
+                  hint="Toque para ver o resumo no relatório"
+                  onPress={() => router.push("/resumo")}
+                />
+              </>
+            ) : null}
+            <Text style={styles.sectionLabel}>Atalhos</Text>
+            {canUseShoppingList ? (
+              <RowLink
+                emoji="🛒"
+                title="Lista de compras"
+                hint="Veja o que comprar para a próxima produção"
+                onPress={() => router.push("/lista-compras")}
+              />
+            ) : null}
+            <RowLink
+              emoji="🎤"
+              title={`Falar com o ${AGENT_NAME}`}
+              hint="Dá para abrir o dia ditando a produção"
+              onPress={() => openAgent({ record: false })}
+            />
+          </>
+        ) : null}
+
+        {!loading && currentDay ? (
           <CoachAnchor name="coach-agent">
             <AgentBanner
-              hint={
-                currentDay
-                  ? "“Busca, venda, o que precisar: fala ou escreve!”"
-                  : "“Posso abrir o dia com a produção: fala ou escreve!”"
-              }
+              hint="“Busca, venda, o que precisar: fala ou escreve!”"
               search={search}
               onSearchChange={setSearch}
               onSpeak={() => openAgent({ record: true })}
@@ -425,7 +525,13 @@ export function SalesScreen() {
               <EmptyState
                 emoji="🧺"
                 title={dayProducts.length ? "Nenhum produto encontrado" : "Nenhum produto na venda de hoje"}
-                hint={dayProducts.length ? "Tente outro nome na busca." : "Registre a produção para começar a vender."}
+                hint={
+                  dayProducts.length
+                    ? "Tente outro nome na busca."
+                    : "Diga o que você produziu e os produtos aparecem aqui para vender."
+                }
+                actionLabel={dayProducts.length ? undefined : "Registrar produção"}
+                onAction={dayProducts.length ? undefined : () => setSheet("production")}
               />
             )}
           </CoachAnchor>
@@ -444,7 +550,7 @@ export function SalesScreen() {
             <Text style={styles.cartTotal}>{formatCurrency(total)}</Text>
           </View>
           <Button
-            title={registerSale.isPending ? "Registrando..." : "Registrar"}
+            title={registerSale.isPending ? "Registrando..." : "Registrar venda"}
             disabled={saleDisabled || registerSale.isPending}
             onPress={() => registerSale.mutate()}
           />
@@ -525,6 +631,48 @@ function DayHero({
         {isOpen ? <HeroChip label="Fechar dia" onPress={onClose} /> : null}
       </View>
     </LinearGradient>
+  );
+}
+
+// A linha do dia dentro do cartão: Preparar → Vender → Fechar. Mostra o que
+// já foi feito, o passo atual e o que vem depois — o fio da história de Hoje.
+function DayJourney({ current }: { current: 1 | 2 }) {
+  const steps = ["Preparar", "Vender", "Fechar"];
+  return (
+    <View style={styles.journey}>
+      {steps.map((label, index) => {
+        const number = index + 1;
+        const done = number < current;
+        const active = number === current;
+        return (
+          <View key={label} style={styles.journeyItem}>
+            {index > 0 ? <View style={styles.journeyLine} /> : null}
+            <View style={styles.journeyStep}>
+              <View style={[styles.journeyDot, active && styles.journeyDotActive, done && styles.journeyDotDone]}>
+                <Text style={[styles.journeyDotText, active && styles.journeyDotTextActive]}>{done ? "✓" : number}</Text>
+              </View>
+              <Text style={styles.journeyLabel}>{label}</Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// Linha de atalho: emoji num quadradinho quente, título e uma dica curta.
+function RowLink({ emoji, title, hint, onPress }: { emoji: string; title: string; hint: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.rowLink, shadows.soft, pressed && styles.pressed]}>
+      <View style={styles.rowLinkIcon}>
+        <Text style={{ fontSize: 19 }}>{emoji}</Text>
+      </View>
+      <View style={styles.rowLinkInfo}>
+        <Text style={styles.rowLinkTitle}>{title}</Text>
+        <Text style={styles.rowLinkHint}>{hint}</Text>
+      </View>
+      <ChevronRight size={18} color={colors.muted} />
+    </Pressable>
   );
 }
 
@@ -800,6 +948,21 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
         />
         <Button title="Voltar" tone="soft" onPress={() => setPendingLeftovers(null)} />
       </>
+    );
+  }
+
+  if (!products.length) {
+    return (
+      <EmptyState
+        emoji="🥖"
+        title="Nenhum produto cadastrado"
+        hint="Cadastre o que você vende para poder começar o dia."
+        actionLabel="Cadastrar produto"
+        onAction={() => {
+          onClose();
+          router.push("/produtos?novo=1");
+        }}
+      />
     );
   }
 
@@ -1263,6 +1426,147 @@ const styles = StyleSheet.create({
   },
   heroRevenueRow: {
     marginVertical: 4
+  },
+  journey: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 2
+  },
+  journeyItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start"
+  },
+  journeyLine: {
+    flex: 1,
+    height: 2,
+    marginTop: 13,
+    marginHorizontal: 4,
+    borderRadius: 1,
+    backgroundColor: "rgba(255,255,255,0.4)"
+  },
+  journeyStep: {
+    alignItems: "center",
+    gap: 3
+  },
+  journeyDot: {
+    height: 28,
+    width: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.5)"
+  },
+  journeyDotActive: {
+    backgroundColor: "#fff",
+    borderColor: "#fff"
+  },
+  journeyDotDone: {
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderColor: "transparent"
+  },
+  journeyDotText: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: fonts.display
+  },
+  journeyDotTextActive: {
+    color: colors.brandDeep
+  },
+  journeyLabel: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 11,
+    fontFamily: fonts.bodyBold
+  },
+  taskCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    padding: 14,
+    ...shadows.soft
+  },
+  taskCardOff: {
+    opacity: 0.55
+  },
+  taskNumber: {
+    height: 30,
+    width: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand
+  },
+  taskNumberOff: {
+    backgroundColor: colors.surfaceWarm
+  },
+  taskNumberText: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: fonts.display
+  },
+  taskNumberTextOff: {
+    color: colors.muted
+  },
+  taskBody: {
+    flex: 1,
+    gap: 3
+  },
+  taskTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontFamily: fonts.bodyBold
+  },
+  taskHint: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.body
+  },
+  taskButton: {
+    marginTop: 8
+  },
+  sectionLabel: {
+    marginBottom: -8,
+    color: colors.ink,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold
+  },
+  rowLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    padding: 12
+  },
+  rowLinkIcon: {
+    height: 42,
+    width: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceWarm
+  },
+  rowLinkInfo: {
+    flex: 1,
+    gap: 2
+  },
+  rowLinkTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold
+  },
+  rowLinkHint: {
+    color: colors.muted,
+    fontSize: 12.5,
+    fontFamily: fonts.body
   },
   skeletonStack: {
     gap: 16
