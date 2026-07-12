@@ -271,8 +271,23 @@ export function Money({
   );
 }
 
-// Estado vazio simpático e consistente: emoji num círculo quente + recado.
-export function EmptyState({ emoji = "🥖", title, hint }: { emoji?: string; title: string; hint?: string }) {
+// Estado vazio como convite: emoji num círculo quente, recado e — sempre
+// que existir — a próxima ação como botão, para a tela nunca virar beco.
+export function EmptyState({
+  emoji = "🥖",
+  title,
+  hint,
+  actionLabel,
+  onAction,
+  actionTone = "brand"
+}: {
+  emoji?: string;
+  title: string;
+  hint?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  actionTone?: ButtonTone;
+}) {
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyEmojiCircle}>
@@ -280,6 +295,9 @@ export function EmptyState({ emoji = "🥖", title, hint }: { emoji?: string; ti
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       {hint ? <Text style={styles.emptyHint}>{hint}</Text> : null}
+      {actionLabel && onAction ? (
+        <Button title={actionLabel} tone={actionTone} onPress={onAction} style={styles.emptyAction} />
+      ) : null}
     </View>
   );
 }
@@ -577,6 +595,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceGlow,
     padding: 24
+  },
+  emptyAction: {
+    alignSelf: "stretch",
+    marginTop: 8
   },
   emptyEmojiCircle: {
     height: 60,
