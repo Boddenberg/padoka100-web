@@ -98,8 +98,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         if (session) {
           setApiToken(session.token);
-          setUser(session.usuario);
-          setStatus("signed-in");
+          // Confere o token salvo ANTES de declarar "logado": assim um token
+          // expirado leva direto ao login, em vez de abrir a tela Hoje e só
+          // então tomar 401 (o "sessão expirada" que piscava). Falha de rede
+          // (offline) mantém a sessão salva, para o app abrir mesmo sem sinal.
+          try {
+            const profile = await api.auth.me();
+            if (!active) return;
+            setUser(profile);
+            setStatus("signed-in");
+            await saveSession({ token: session.token, usuario: profile });
+          } catch (error) {
+            if (!active) return;
+            if (error instanceof ApiError && [401, 403].includes(error.status)) {
+              await clearLocalAuth();
+            } else {
+              setUser(session.usuario);
+              setStatus("signed-in");
+            }
+          }
         } else {
           setStatus("signed-out");
         }
@@ -111,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [establishSession]);
+  }, [establishSession, clearLocalAuth]);
 
   useEffect(() => {
     if (!supabaseAuthConfigured) return undefined;

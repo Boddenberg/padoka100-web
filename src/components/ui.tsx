@@ -174,6 +174,37 @@ export function Input(props: TextInputProps) {
   );
 }
 
+// Campo de dinheiro: "R$" fixo à esquerda, para o valor nunca ficar sem
+// unidade. Teclado numérico e vírgula decimal (pt-BR).
+export function MoneyInput({
+  value,
+  onChangeText,
+  placeholder = "0,00",
+  onSubmitEditing
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder?: string;
+  onSubmitEditing?: () => void;
+}) {
+  const scale = useFontMultiplier();
+  return (
+    <View style={styles.moneyInput}>
+      <Text style={[styles.moneyPrefix, { fontSize: 16 * scale }]}>R$</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.muted}
+        keyboardType="decimal-pad"
+        returnKeyType="done"
+        onSubmitEditing={onSubmitEditing}
+        style={[styles.moneyField, { fontSize: 16 * scale }]}
+      />
+    </View>
+  );
+}
+
 export function StateText({ text, tone = "muted" }: { text: string; tone?: "muted" | "error" | "success" }) {
   const scale = useFontMultiplier();
   return (
@@ -555,6 +586,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     color: colors.ink,
     fontSize: 16,
+    fontFamily: fonts.body
+  },
+  moneyInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 52,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16
+  },
+  moneyPrefix: {
+    color: colors.muted,
+    fontFamily: fonts.bodyBold
+  },
+  moneyField: {
+    flex: 1,
+    paddingVertical: 0,
+    color: colors.ink,
     fontFamily: fonts.body
   },
   stateText: {

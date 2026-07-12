@@ -6,25 +6,38 @@ import { useEffect } from "react";
 import { View } from "react-native";
 import { AppProviders } from "@/providers";
 import { ApiDebugOverlay } from "@/components/api-debug-overlay";
+import { AppSplash } from "@/components/app-splash";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { useAuth } from "@/contexts/auth";
 import { colors } from "@/lib/theme";
 
-// Proteção de rotas: com AUTH_REQUIRED ligado, quem não está logado só vê
-// a tela de login (e quem está logado não volta para ela).
-function AuthRedirector() {
+// Proteção de rotas + tela de carregamento: enquanto a sessão está sendo
+// conferida (ou um redirecionamento está pendente), a splash cobre tudo, para
+// a pessoa nunca ver a tela errada — nem um "sessão expirada" piscando — antes
+// de o app decidir para onde levar. O Stack continua montado por baixo (o
+// expo-router precisa do navegador para o redirect funcionar).
+function RootNavigator() {
   const { status } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const inLogin = segments[0] === "login";
 
   useEffect(() => {
     if (!AUTH_REQUIRED || status === "loading") return;
-    const inLogin = segments[0] === "login";
     if (status === "signed-out" && !inLogin) router.replace("/login");
     if (status === "signed-in" && inLogin) router.replace("/");
-  }, [status, segments, router]);
+  }, [status, inLogin, router]);
 
-  return null;
+  // Cobre o intervalo entre "já sei o status" e "o redirect assentou".
+  const redirecting =
+    AUTH_REQUIRED && ((status === "signed-out" && !inLogin) || (status === "signed-in" && inLogin));
+
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      {status === "loading" || redirecting ? <AppSplash /> : null}
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -42,8 +55,7 @@ export default function RootLayout() {
   return (
     <AppProviders>
       <StatusBar style="dark" />
-      <AuthRedirector />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      <RootNavigator />
       <ApiDebugOverlay />
     </AppProviders>
   );
