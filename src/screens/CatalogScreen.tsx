@@ -6,7 +6,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
-import { hasAccess, upgradeMessage } from "@/lib/access";
+import { featurePlanName, hasAccess, upgradeMessage } from "@/lib/access";
 import { api, createMediaForm, type NativeFile } from "@/lib/api";
 import { cleanPayload, formatCurrency, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -37,7 +37,8 @@ function confirmDestructive(title: string, message: string, confirmLabel: string
 }
 
 function showUpgrade(capability: string) {
-  Alert.alert("Plano necessario", upgradeMessage(capability));
+  const plan = featurePlanName(capability);
+  Alert.alert(plan ? `Funcionalidade do plano ${plan}` : "Funcionalidade de outro plano", upgradeMessage(capability));
 }
 
 type ProductDraft = {

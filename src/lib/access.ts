@@ -7,15 +7,22 @@ export const PLAN_LABEL: Record<string, string> = {
   admin: "Admin"
 };
 
-export const FEATURE_LABEL: Record<string, string> = {
-  "relatorios.avancados": "plano Analitico",
-  "custos.usar": "plano Analitico",
-  "compras.usar": "plano Analitico",
-  "ia.operacional": "plano IA",
-  "ia.analitica": "plano IA",
-  "custos.assistente": "plano IA",
-  "admin.gerenciar": "plano Admin"
+// Nome do plano que libera cada funcionalidade — usado nas mensagens e no CTA
+// "Conhecer o Plano X" do aviso de bloqueio.
+export const FEATURE_PLAN: Record<string, string> = {
+  "relatorios.avancados": "Analítico",
+  "custos.usar": "Analítico",
+  "compras.usar": "Analítico",
+  "ia.operacional": "IA",
+  "ia.analitica": "IA",
+  "custos.assistente": "IA",
+  "admin.gerenciar": "Admin"
 };
+
+// Nome do plano (ex.: "Analítico") que desbloqueia a funcionalidade, ou null.
+export function featurePlanName(capability: string): string | null {
+  return FEATURE_PLAN[capability] ?? null;
+}
 
 export function hasAccess(user: UsuarioPerfil | null | undefined, capability: string) {
   return Boolean(user?.capacidades?.includes(capability));
@@ -32,6 +39,8 @@ export function planLabel(user: UsuarioPerfil | null | undefined) {
 }
 
 export function upgradeMessage(capability: string) {
-  const label = FEATURE_LABEL[capability] || "um plano superior";
-  return `Seu acesso atual nao libera esta feature. Ela faz parte do ${label}.`;
+  const plan = FEATURE_PLAN[capability];
+  return plan
+    ? `Seu plano atual não inclui esta funcionalidade. Ela faz parte do plano ${plan}.`
+    : "Seu plano atual não inclui esta funcionalidade. Ela faz parte de um plano superior.";
 }
