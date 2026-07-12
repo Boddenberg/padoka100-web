@@ -258,9 +258,9 @@ export function SalesScreen() {
       },
       {
         target: "coach-agent",
-        emoji: "🎤",
-        title: "Fale ou escreva",
-        body: `Toque no microfone e fale, por exemplo, “vende 2 pães de queijo”. O ${AGENT_NAME} registra pra você. Aqui também dá para buscar um produto.`
+        emoji: "🥐",
+        title: `Fale com o ${AGENT_NAME}`,
+        body: `Toque no ${AGENT_NAME} e fale, por exemplo, “vende 2 pães de queijo”, que ele registra pra você. Aqui também dá para buscar um produto.`
       }
     ];
     if (hasDay && hasProducts) {

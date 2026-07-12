@@ -6,7 +6,6 @@ import { useState } from "react";
 import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
-import { AGENT_NAME, AgentAvatar } from "@/components/agent";
 import { Button, Field, Input, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { loginErrorMessage, useAuth } from "@/contexts/auth";
@@ -125,8 +124,6 @@ export function LoginScreen() {
                 <Text style={styles.title}>Padoka 100%</Text>
                 <Text style={styles.subtitle}>{subtitleByMode[mode]}</Text>
               </View>
-
-              {mode !== "recover" ? <PaozinhoIntro /> : null}
 
               <View style={[styles.card, shadows.floating]}>
                 <View style={styles.modeRow}>
@@ -295,38 +292,6 @@ function ModeChip({ label, active, onPress }: { label: string; active: boolean; 
   );
 }
 
-// Boas-vindas do mascote na tela de login: o Seu Pãozinho se apresenta e explica,
-// em uma frase, o que o app faz — para quem chega sem saber do que se trata.
-function PaozinhoIntro() {
-  return (
-    <View style={styles.intro}>
-      <View style={styles.introHeader}>
-        <AgentAvatar size={54} />
-        <View style={styles.introBubble}>
-          <Text style={styles.introHi}>Oi! Eu sou o {AGENT_NAME} 🥐</Text>
-          <Text style={styles.introText}>
-            Seu ajudante da padaria: registre as vendas num toque — ou é só falar comigo — que eu cuido das contas do dia pra você.
-          </Text>
-        </View>
-      </View>
-      <View style={styles.introChips}>
-        <IntroChip emoji="🎤" label="Venda falando" />
-        <IntroChip emoji="📅" label="Contas do dia" />
-        <IntroChip emoji="🥖" label="No seu bolso" />
-      </View>
-    </View>
-  );
-}
-
-function IntroChip({ emoji, label }: { emoji: string; label: string }) {
-  return (
-    <View style={styles.introChip}>
-      <Text style={styles.introChipEmoji}>{emoji}</Text>
-      <Text style={styles.introChipText}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   background: {
     flex: 1
@@ -339,93 +304,40 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   content: {
-    gap: 24,
+    gap: 18,
     padding: 20
   },
   brand: {
     alignItems: "center",
-    gap: 4
+    gap: 2
   },
   logo: {
-    height: 96,
-    width: 96,
-    borderRadius: 24,
-    marginBottom: 8
+    height: 72,
+    width: 72,
+    borderRadius: 20,
+    marginBottom: 4
   },
   greeting: {
     color: "rgba(255,255,255,0.9)",
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: fonts.bodyBold
   },
   title: {
     color: "#fff",
-    fontSize: 34,
+    fontSize: 30,
     fontFamily: fonts.display
   },
   subtitle: {
     color: "rgba(255,255,255,0.85)",
-    fontSize: 15,
+    fontSize: 14.5,
     fontFamily: fonts.body,
     textAlign: "center"
   },
-  intro: {
-    gap: 10
-  },
-  introHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12
-  },
-  introBubble: {
-    flex: 1,
-    gap: 4,
-    borderRadius: radius.lg,
-    borderTopLeftRadius: radius.sm,
-    backgroundColor: "rgba(255,255,255,0.16)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    padding: 12
-  },
-  introHi: {
-    color: "#fff",
-    fontSize: 15,
-    fontFamily: fonts.bodyBold
-  },
-  introText: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 13.5,
-    lineHeight: 19,
-    fontFamily: fonts.body
-  },
-  introChips: {
-    flexDirection: "row",
-    gap: 8
-  },
-  introChip: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-    borderRadius: radius.lg,
-    backgroundColor: "rgba(255,255,255,0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    paddingVertical: 10,
-    paddingHorizontal: 6
-  },
-  introChipEmoji: {
-    fontSize: 20
-  },
-  introChipText: {
-    color: "#fff",
-    fontSize: 11.5,
-    fontFamily: fonts.bodyBold,
-    textAlign: "center"
-  },
   card: {
-    gap: 14,
+    gap: 13,
     borderRadius: radius.xl,
     backgroundColor: colors.surface,
-    padding: 20
+    padding: 18
   },
   modeRow: {
     flexDirection: "row",
