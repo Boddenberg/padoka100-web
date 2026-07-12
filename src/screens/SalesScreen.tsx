@@ -265,7 +265,7 @@ export function SalesScreen() {
       cornerRadius: 26,
       emoji: "🧭",
       title: "Tudo à mão aqui embaixo",
-      body: "Venda, Catálogo, Resumo e Perfil. Toque nos ícones para trocar de tela."
+      body: "Venda, Produtos, Resumo e Perfil. Toque nos ícones para trocar de tela."
     });
     steps.push({
       emoji: "✅",

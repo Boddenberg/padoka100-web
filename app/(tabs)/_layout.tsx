@@ -38,7 +38,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Venda", tabBarIcon: ({ color }) => <ShoppingBag color={color} /> }} />
-      <Tabs.Screen name="catalogo" options={{ title: "Catálogo", tabBarIcon: ({ color }) => <Package color={color} /> }} />
+      <Tabs.Screen name="catalogo" options={{ title: "Produtos", tabBarIcon: ({ color }) => <Package color={color} /> }} />
       <Tabs.Screen
         name="resumo"
         options={{
