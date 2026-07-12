@@ -1,9 +1,11 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Calculator, ChevronRight, Sparkles } from "lucide-react-native";
+import { Calculator, ChevronRight, Mic, Sparkles } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AGENT_NAME, AgentSays } from "@/components/agent";
+import { AgentSheet } from "@/components/agent-sheet";
 import { Badge, Button, EmptyState, Field, Input, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
 import { hasAccess, upgradeMessage } from "@/lib/access";
@@ -47,6 +49,19 @@ export function ProductsScreen() {
   const [sheet, setSheet] = useState<"create" | "edit" | null>(null);
   const [editing, setEditing] = useState<Produto | null>(null);
   const productsQuery = useQuery({ queryKey: ["produtos", "todos"], queryFn: () => api.produtos.list(false) });
+
+  // Cadastro por voz com o Pãozinho, para quem tem o plano com IA.
+  const { user } = useAuth();
+  const canUseAgent = hasAccess(user, "ia.operacional");
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [agentMessage, setAgentMessage] = useState<string | null>(null);
+
+  // O recado de sucesso do Pãozinho se despede sozinho.
+  useEffect(() => {
+    if (!agentMessage) return;
+    const timer = setTimeout(() => setAgentMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [agentMessage]);
 
   // Atalho vindo de "Hoje" (?novo=1): abre o cadastro direto, sem caçar botão.
   const router = useRouter();
@@ -92,6 +107,7 @@ export function ProductsScreen() {
       >
         <Button title="Cadastrar produto" onPress={() => setSheet("create")} />
 
+        {agentMessage ? <StateText tone="success" text={agentMessage} /> : null}
         {productsQuery.isLoading ? <StateText text="Carregando produtos..." /> : null}
         {productsQuery.error ? <StateText tone="error" text={friendlyErrorMessage(productsQuery.error)} /> : null}
         {activeProducts.map(productRow)}
@@ -114,13 +130,37 @@ export function ProductsScreen() {
         ) : null}
       </SubPage>
 
-      <CreateProductSheet visible={sheet === "create"} onClose={() => setSheet(null)} />
+      <CreateProductSheet
+        visible={sheet === "create"}
+        onClose={() => setSheet(null)}
+        onVoice={
+          canUseAgent
+            ? () => {
+                setSheet(null);
+                setAgentOpen(true);
+              }
+            : undefined
+        }
+      />
       <EditProductSheet visible={sheet === "edit"} onClose={() => setSheet(null)} product={editingProduct} />
+      <AgentSheet
+        visible={agentOpen}
+        onClose={() => setAgentOpen(false)}
+        day={null}
+        initialText=""
+        autoRecord
+        onMessage={setAgentMessage}
+        prompts={{
+          idle: "Me fala o produto e o preço — por voz ou por texto — que eu cadastro pra você.",
+          exampleVoice: "Ex: “cadastra pão de queijo por 4 e 50”",
+          exampleText: "Ex: cadastra pão de queijo por 4,50"
+        }}
+      />
     </>
   );
 }
 
-function CreateProductSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function CreateProductSheet({ visible, onClose, onVoice }: { visible: boolean; onClose: () => void; onVoice?: () => void }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<ProductDraft>(emptyProduct);
   const createProduct = useMutation({
@@ -150,6 +190,11 @@ function CreateProductSheet({ visible, onClose }: { visible: boolean; onClose: (
 
   return (
     <Sheet visible={visible} title="Cadastrar produto" subtitle="Depois adicione a foto na edição." onClose={onClose}>
+      {onVoice ? (
+        <AgentSays size={40} text="Se preferir, me fala o produto e o preço que eu cadastro pra você.">
+          <Button title={`Cadastrar por voz com o ${AGENT_NAME}`} tone="agent" icon={<Mic size={18} color="#fff" />} onPress={onVoice} />
+        </AgentSays>
+      ) : null}
       <ProductFields draft={draft} setDraft={setDraft} />
       {createProduct.error instanceof Error ? <StateText tone="error" text={createProduct.error.message} /> : null}
       <Button
