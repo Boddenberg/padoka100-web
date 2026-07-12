@@ -1,23 +1,21 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Calculator, ChevronRight, Mic, Sparkles } from "lucide-react-native";
+import { ChevronRight, Mic, Sparkles } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentSays } from "@/components/agent";
 import { AgentSheet } from "@/components/agent-sheet";
-import { Badge, Button, EmptyState, Field, Input, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
+import { Badge, Button, EmptyState, Field, Input, MoneyInput, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
 import { hasAccess, upgradeMessage } from "@/lib/access";
 import { api, createMediaForm, friendlyErrorMessage } from "@/lib/api";
 import { cleanPayload, formatCurrency, toNumber, todayInputValue } from "@/lib/format";
-import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
+import { colors, fonts, radius, shadows } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
 import type { Produto } from "@/types/api";
 import {
   PhotoPickerButtons,
-  RemovePhotoLink,
   SubPage,
   confirmDestructive,
   decimalToInput,
@@ -293,6 +291,17 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
 
   const canSave = nome.trim().length > 0 && (!priceOrCostChanged || priceValid) && !save.isPending;
 
+  // "Calcular com IA" / "Quanto custa fazer": leva ao assistente de custo,
+  // ou oferece o upgrade se o plano não cobre.
+  const openCostAssistant = () => {
+    if (!canUseCostAssistant) {
+      showUpgrade("custos.assistente");
+      return;
+    }
+    onClose();
+    router.push(`/produto/${product.id}/custos`);
+  };
+
   return (
     <>
       {/* Identidade do produto: foto e situação atual. */}
@@ -304,17 +313,19 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
         </View>
       </View>
 
-      <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
-      {photoUrl ? (
-        <RemovePhotoLink
-          pending={removePhoto.isPending}
-          onPress={() =>
-            confirmDestructive("Remover foto", "O produto fica sem foto até você enviar outra.", "Remover", () =>
-              removePhoto.mutate()
-            )
-          }
-        />
-      ) : null}
+      <PhotoPickerButtons
+        onPick={(source) => uploadMedia.mutate(source)}
+        disabled={uploadMedia.isPending}
+        onRemove={
+          photoUrl
+            ? () =>
+                confirmDestructive("Remover foto", "O produto fica sem foto até você enviar outra.", "Remover", () =>
+                  removePhoto.mutate()
+                )
+            : undefined
+        }
+        removing={removePhoto.isPending}
+      />
       {uploadMedia.isPending ? <StateText text="Enviando foto..." /> : null}
       {uploadMedia.isSuccess && uploadMedia.data ? <StateText tone="success" text="Foto atualizada!" /> : null}
       {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
@@ -344,58 +355,39 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
         </View>
       </Field>
 
-      {/* 2) Preço e custo — custo acima do preço; salvar cria o novo preço no histórico. */}
+      {/* 2) Preço e custo com R$; ao lado do custo, atalho "Calcular com IA"
+             (é o "quanto custa fazer"). Salvar cria o novo preço no histórico. */}
       <View style={styles.priceSection}>
         <Text style={styles.priceSectionTitle}>Preço e custo</Text>
-        <Field label="Custo">
-          <Input value={cost} onChangeText={setCost} keyboardType="decimal-pad" placeholder="0,00" />
-        </Field>
         <Field label="Preço de venda">
-          <Input value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="0,00" />
+          <MoneyInput value={price} onChangeText={setPrice} />
         </Field>
+        <Field label="Custo">
+          <View style={styles.costRow}>
+            <View style={styles.costField}>
+              <MoneyInput value={cost} onChangeText={setCost} />
+            </View>
+            <Pressable onPress={openCostAssistant} style={({ pressed }) => [styles.iaButton, pressed && sharedStyles.pressed]}>
+              <Sparkles size={16} color={colors.agentDeep} />
+              <Text style={styles.iaButtonText}>Calcular com IA</Text>
+            </Pressable>
+          </View>
+        </Field>
+
         {priceOrCostChanged && !priceValid ? (
           <StateText tone="error" text="Informe um preço de venda maior que zero." />
+        ) : priceOrCostChanged ? (
+          <Text style={styles.priceHint}>Ao salvar, o novo preço entra no histórico do produto.</Text>
+        ) : isCostFromAI(product.preco_atual) ? (
+          <View style={styles.costFromAi}>
+            <Sparkles size={13} color={colors.agentDeep} />
+            <Text style={styles.costFromAiText}>Este custo foi calculado com IA.</Text>
+          </View>
         ) : (
           <Text style={styles.priceHint}>
-            {priceOrCostChanged
-              ? "Ao salvar, o novo preço entra no histórico do produto."
-              : "Mudou o preço ou o custo? É só salvar — o histórico é atualizado sozinho."}
+            Quanto custa fazer? Toque em “Calcular com IA” que o {AGENT_NAME} descobre pra você.
           </Text>
         )}
-
-        {/* Ajuda opcional para descobrir o custo com o assistente. */}
-        <Pressable
-          onPress={() => {
-            if (!canUseCostAssistant) {
-              showUpgrade("custos.assistente");
-              return;
-            }
-            onClose();
-            router.push(`/produto/${product.id}/custos`);
-          }}
-          style={({ pressed }) => pressed && sharedStyles.pressed}
-        >
-          <LinearGradient colors={gradients.agent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.costCard, shadows.agent]}>
-            <View style={styles.costCardIcon}>
-              <Calculator size={22} color="#fff" />
-            </View>
-            <View style={styles.costCardInfo}>
-              <Text style={styles.costCardTitle}>Quanto custa fazer?</Text>
-              <Text style={styles.costCardSubtitle}>
-                {toNumber(product.preco_atual?.preco_custo) > 0
-                  ? `Custo atual: ${formatCurrency(product.preco_atual?.preco_custo)} — recalcule com o assistente`
-                  : "Descubra o custo e o lucro de cada unidade com o assistente"}
-              </Text>
-              {isCostFromAI(product.preco_atual) ? (
-                <View style={styles.aiPill}>
-                  <Sparkles size={11} color="#fff" />
-                  <Text style={styles.aiPillText}>Calculado com IA</Text>
-                </View>
-              ) : null}
-            </View>
-            <ChevronRight size={20} color="#fff" />
-          </LinearGradient>
-        </Pressable>
         {!canUseCostAssistant ? <StateText text={upgradeMessage("custos.assistente")} /> : null}
       </View>
 
@@ -435,12 +427,18 @@ function ProductFields({ draft, setDraft }: { draft: ProductDraft; setDraft: (dr
       <Field label="Descrição">
         <Input value={draft.descricao} onChangeText={(descricao) => setDraft({ ...draft, descricao })} maxLength={160} />
       </Field>
-      <Field label="Preço de venda">
-        <Input value={draft.preco_venda} onChangeText={(preco_venda) => setDraft({ ...draft, preco_venda })} keyboardType="decimal-pad" />
-      </Field>
-      <Field label="Custo">
-        <Input value={draft.preco_custo} onChangeText={(preco_custo) => setDraft({ ...draft, preco_custo })} keyboardType="decimal-pad" />
-      </Field>
+      <View style={styles.priceRow}>
+        <View style={styles.priceCol}>
+          <Field label="Preço de venda">
+            <MoneyInput value={draft.preco_venda} onChangeText={(preco_venda) => setDraft({ ...draft, preco_venda })} />
+          </Field>
+        </View>
+        <View style={styles.priceCol}>
+          <Field label="Custo">
+            <MoneyInput value={draft.preco_custo} onChangeText={(preco_custo) => setDraft({ ...draft, preco_custo })} />
+          </Field>
+        </View>
+      </View>
     </>
   );
 }
@@ -452,50 +450,45 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     letterSpacing: -0.5
   },
-  costCard: {
+  // Preço e custo lado a lado no cadastro: menos rolagem.
+  priceRow: {
+    flexDirection: "row",
+    gap: 10
+  },
+  priceCol: {
+    flex: 1
+  },
+  // Custo + atalho "Calcular com IA" na mesma linha.
+  costRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderRadius: radius.xl,
-    padding: 14
+    gap: 8
   },
-  costCardIcon: {
-    height: 44,
-    width: 44,
+  costField: {
+    flex: 1
+  },
+  iaButton: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.22)"
+    gap: 6,
+    minHeight: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.agentSoft,
+    paddingHorizontal: 14
   },
-  costCardInfo: {
-    flex: 1,
-    gap: 2
-  },
-  costCardTitle: {
-    color: "#fff",
-    fontSize: 16.5,
+  iaButtonText: {
+    color: colors.agentDeep,
+    fontSize: 13.5,
     fontFamily: fonts.bodyBold
   },
-  costCardSubtitle: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 12.5,
-    lineHeight: 17,
-    fontFamily: fonts.body
-  },
-  aiPill: {
+  costFromAi: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    alignSelf: "flex-start",
-    marginTop: 6,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    paddingHorizontal: 9,
-    paddingVertical: 3
+    gap: 6
   },
-  aiPillText: {
-    color: "#fff",
-    fontSize: 11,
+  costFromAiText: {
+    color: colors.agentDeep,
+    fontSize: 13,
     fontFamily: fonts.bodyBold
   },
   priceSection: {

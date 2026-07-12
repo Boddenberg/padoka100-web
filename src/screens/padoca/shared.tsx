@@ -120,7 +120,19 @@ export async function uploadLocationPhoto(localId: string, file: NativeFile) {
   return mediaUrl;
 }
 
-export function PhotoPickerButtons({ onPick, disabled }: { onPick: (source: "camera" | "gallery") => void; disabled?: boolean }) {
+// Fotografar, Galeria e (quando há foto) Remover — os três lado a lado, retos,
+// com a mesma moldura. Ícone em cima, rótulo curto embaixo, para caber a três.
+export function PhotoPickerButtons({
+  onPick,
+  disabled,
+  onRemove,
+  removing
+}: {
+  onPick: (source: "camera" | "gallery") => void;
+  disabled?: boolean;
+  onRemove?: () => void;
+  removing?: boolean;
+}) {
   return (
     <View style={styles.photoActions}>
       <Pressable
@@ -139,17 +151,16 @@ export function PhotoPickerButtons({ onPick, disabled }: { onPick: (source: "cam
         <Images size={20} color={colors.brandDeep} />
         <Text style={styles.photoActionText}>Galeria</Text>
       </Pressable>
+      {onRemove ? (
+        <Pressable
+          onPress={removing ? undefined : onRemove}
+          style={({ pressed }) => [styles.photoAction, styles.photoActionRemove, pressed && styles.pressed]}
+        >
+          <Trash2 size={20} color={colors.danger} />
+          <Text style={[styles.photoActionText, styles.photoActionRemoveText]}>{removing ? "..." : "Remover"}</Text>
+        </Pressable>
+      ) : null}
     </View>
-  );
-}
-
-// Link discreto de tirar a foto atual, sempre logo abaixo dos botões de foto.
-export function RemovePhotoLink({ onPress, pending }: { onPress: () => void; pending?: boolean }) {
-  return (
-    <Pressable onPress={pending ? undefined : onPress} style={({ pressed }) => [styles.removePhoto, pressed && styles.pressed]}>
-      <Trash2 size={16} color={colors.danger} />
-      <Text style={styles.removePhotoText}>{pending ? "Removendo foto..." : "Remover foto"}</Text>
-    </Pressable>
   );
 }
 
@@ -280,38 +291,30 @@ const styles = StyleSheet.create({
   },
   photoActions: {
     flexDirection: "row",
-    gap: 10
+    gap: 8
   },
   photoAction: {
     flex: 1,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    minHeight: 50,
-    borderRadius: radius.pill,
+    gap: 5,
+    minHeight: 60,
+    borderRadius: radius.lg,
     borderWidth: 1.5,
     borderColor: colors.brandSoft,
     backgroundColor: colors.surfaceGlow
   },
   photoActionText: {
     color: colors.brandDeep,
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: fonts.bodyBold
   },
-  removePhoto: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    alignSelf: "center",
-    minHeight: 40,
-    paddingHorizontal: 16
+  photoActionRemove: {
+    borderColor: colors.dangerSoft,
+    backgroundColor: colors.dangerSoft
   },
-  removePhotoText: {
-    color: colors.danger,
-    fontSize: 14,
-    fontFamily: fonts.bodyBold
+  photoActionRemoveText: {
+    color: colors.danger
   },
   locationIcon: {
     alignItems: "center",

@@ -11,7 +11,6 @@ import type { LocalVenda } from "@/types/api";
 import {
   LocationPhoto,
   PhotoPickerButtons,
-  RemovePhotoLink,
   SubPage,
   confirmDestructive,
   sharedStyles,
@@ -145,8 +144,11 @@ function CreateLocationSheet({ visible, onClose }: { visible: boolean; onClose: 
           <Text style={styles.photoHint}>{photo ? "Foto escolhida!" : "Foto do local (opcional)"}</Text>
         </View>
       </View>
-      <PhotoPickerButtons onPick={choosePhoto} disabled={createLocation.isPending} />
-      {photo ? <RemovePhotoLink onPress={() => setPhoto(null)} /> : null}
+      <PhotoPickerButtons
+        onPick={choosePhoto}
+        disabled={createLocation.isPending}
+        onRemove={photo ? () => setPhoto(null) : undefined}
+      />
       {photoError ? <StateText tone="error" text={photoError} /> : null}
 
       <Field label="Nome">
@@ -240,17 +242,19 @@ function EditLocationForm({ onClose, location }: { onClose: () => void; location
         </View>
       </View>
 
-      <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
-      {photoUrl ? (
-        <RemovePhotoLink
-          pending={removePhoto.isPending}
-          onPress={() =>
-            confirmDestructive("Remover foto", "O local fica sem foto até você enviar outra.", "Remover", () =>
-              removePhoto.mutate()
-            )
-          }
-        />
-      ) : null}
+      <PhotoPickerButtons
+        onPick={(source) => uploadMedia.mutate(source)}
+        disabled={uploadMedia.isPending}
+        onRemove={
+          photoUrl
+            ? () =>
+                confirmDestructive("Remover foto", "O local fica sem foto até você enviar outra.", "Remover", () =>
+                  removePhoto.mutate()
+                )
+            : undefined
+        }
+        removing={removePhoto.isPending}
+      />
       {uploadMedia.isPending ? <StateText text="Enviando foto..." /> : null}
       {uploadMedia.isSuccess && uploadMedia.data ? <StateText tone="success" text="Foto atualizada!" /> : null}
       {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
