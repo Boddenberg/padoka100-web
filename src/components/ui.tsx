@@ -125,8 +125,6 @@ export function Button({
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: Boolean(disabled) }}
       style={({ pressed }) => [pressed && !disabled ? styles.pressed : null, style]}
     >
       {gradient && !disabled ? (
@@ -273,23 +271,8 @@ export function Money({
   );
 }
 
-// Estado vazio como convite: emoji num círculo quente, recado e — sempre
-// que existir — a próxima ação como botão, para ninguém ficar sem saída.
-export function EmptyState({
-  emoji = "🥖",
-  title,
-  hint,
-  actionLabel,
-  onAction,
-  actionTone = "brand"
-}: {
-  emoji?: string;
-  title: string;
-  hint?: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  actionTone?: ButtonTone;
-}) {
+// Estado vazio simpático e consistente: emoji num círculo quente + recado.
+export function EmptyState({ emoji = "🥖", title, hint }: { emoji?: string; title: string; hint?: string }) {
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyEmojiCircle}>
@@ -297,9 +280,6 @@ export function EmptyState({
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       {hint ? <Text style={styles.emptyHint}>{hint}</Text> : null}
-      {actionLabel && onAction ? (
-        <Button title={actionLabel} tone={actionTone} onPress={onAction} style={styles.emptyAction} />
-      ) : null}
     </View>
   );
 }
@@ -351,9 +331,6 @@ export function Stepper({
     <View style={styles.stepper}>
       <Pressable
         onPress={value > 0 ? handleDecrement : undefined}
-        accessibilityRole="button"
-        accessibilityLabel="Tirar um"
-        hitSlop={6}
         style={({ pressed }) => [
           styles.stepperButton,
           { height: buttonSize, width: buttonSize, opacity: value > 0 ? (pressed ? 0.7 : 1) : 0.35 }
@@ -362,13 +339,7 @@ export function Stepper({
         <Minus size={size === "sm" ? 16 : 20} color={colors.brandDeep} strokeWidth={3} />
       </Pressable>
       <Text style={[styles.stepperValue, size === "sm" && { fontSize: 16 }]}>{value}</Text>
-      <Pressable
-        onPress={canAdd ? handleIncrement : undefined}
-        accessibilityRole="button"
-        accessibilityLabel="Adicionar um"
-        hitSlop={6}
-        style={({ pressed }) => [pressed && canAdd ? styles.pressed : null]}
-      >
+      <Pressable onPress={canAdd ? handleIncrement : undefined} style={({ pressed }) => [pressed && canAdd ? styles.pressed : null]}>
         <LinearGradient
           colors={canAdd ? gradients.brand : ([colors.border, colors.border] as const)}
           start={{ x: 0, y: 0 }}
@@ -452,7 +423,7 @@ export function Sheet({
               <Text style={styles.sheetTitle}>{title}</Text>
               {subtitle ? <Text style={styles.sheetSubtitle}>{subtitle}</Text> : null}
             </View>
-            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Fechar" hitSlop={6} style={styles.closeButton}>
+            <Pressable onPress={onClose} style={styles.closeButton}>
               <X size={20} color={colors.ink} />
             </Pressable>
           </View>
@@ -482,8 +453,8 @@ const styles = StyleSheet.create({
   },
   page: {
     flexGrow: 1,
-    gap: 20,
-    padding: 20,
+    gap: 16,
+    padding: 16,
     // Espaço para o conteúdo respirar acima da tab bar flutuante.
     paddingBottom: 172
   },
@@ -525,7 +496,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.xl,
     backgroundColor: colors.surface,
-    padding: 18,
+    padding: 16,
     ...shadows.soft
   },
   button: {
@@ -605,11 +576,7 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceGlow,
-    padding: 28
-  },
-  emptyAction: {
-    alignSelf: "stretch",
-    marginTop: 8
+    padding: 24
   },
   emptyEmojiCircle: {
     height: 60,

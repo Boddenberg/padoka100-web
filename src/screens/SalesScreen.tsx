@@ -1,6 +1,5 @@
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { Ban, CalendarDays, CheckCircle2, ChevronRight, Mic, ReceiptText, Search, Send, Sparkles } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -223,10 +222,6 @@ export function SalesScreen() {
   const error = currentDayQuery.error || productsQuery.error || resumoQuery.error;
   const saleDisabled = !currentDay || !itemCount || currentDay.situacao !== "aberto" || !stockReady || hasStockIssue;
 
-  // Primeiro uso de verdade: nada cadastrado ainda. A Venda vira o guia —
-  // ninguém precisa adivinhar que o cadastro mora em outra aba.
-  const isFirstRun = !loading && !currentDay && productsQuery.isSuccess && products.length === 0;
-
   // Passeio guiado de primeiro acesso (coach marks). Os passos se adaptam ao
   // estado da tela: sem dia aberto não há produtos para destacar, então esse
   // passo é omitido (e o próprio tour pula qualquer alvo que não encontrar).
@@ -270,7 +265,7 @@ export function SalesScreen() {
       cornerRadius: 26,
       emoji: "🧭",
       title: "Tudo à mão aqui embaixo",
-      body: "Venda, Produtos, Resumo e Perfil. Toque nos ícones para trocar de tela."
+      body: "Venda, Catálogo, Resumo e Perfil. Toque nos ícones para trocar de tela."
     });
     steps.push({
       emoji: "✅",
@@ -334,7 +329,7 @@ export function SalesScreen() {
       <Page
         greeting={getGreeting(user?.nome)}
         title="Venda"
-        subtitle={isFirstRun ? "Vamos deixar tudo pronto para a primeira venda." : `Toque para vender ou fale com o ${AGENT_NAME}.`}
+        subtitle="Toque nos produtos ou fale com o agente."
         onRefresh={onRefresh}
         refreshing={refreshing}
         headerRight={
@@ -373,23 +368,19 @@ export function SalesScreen() {
               onClose={() => setSheet("close-day")}
             />
           </CoachAnchor>
-        ) : isFirstRun ? (
-          <CoachAnchor name="coach-hero">
-            <FirstStepsCard onCreateProduct={() => router.push("/catalogo?novo=1")} />
-          </CoachAnchor>
         ) : !loading ? (
           <CoachAnchor name="coach-hero">
             <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
               <View pointerEvents="none" style={styles.heroGlowOne} />
               <View pointerEvents="none" style={styles.heroGlowTwo} />
-              <Text style={styles.heroTitle}>Bora começar o dia?</Text>
-              <Text style={styles.heroMuted}>Diga o que você preparou hoje e venda com um toque. Dá para produzir mais depois.</Text>
+              <Text style={styles.heroTitle}>Bora começar o dia de venda?</Text>
+              <Text style={styles.heroMuted}>Registre a produção de hoje e venda com um toque. Dá para produzir mais depois.</Text>
               <Button title="Começar o dia" onPress={() => setSheet("open-day")} />
             </LinearGradient>
           </CoachAnchor>
         ) : null}
 
-        {!loading && !isFirstRun ? (
+        {!loading ? (
           <CoachAnchor name="coach-agent">
             <AgentBanner
               hint={
@@ -434,13 +425,7 @@ export function SalesScreen() {
               <EmptyState
                 emoji="🧺"
                 title={dayProducts.length ? "Nenhum produto encontrado" : "Nenhum produto na venda de hoje"}
-                hint={
-                  dayProducts.length
-                    ? "Tente outro nome na busca."
-                    : "Diga o que você produziu e os produtos aparecem aqui para vender."
-                }
-                actionLabel={dayProducts.length ? undefined : "Registrar produção"}
-                onAction={dayProducts.length ? undefined : () => setSheet("production")}
+                hint={dayProducts.length ? "Tente outro nome na busca." : "Registre a produção para começar a vender."}
               />
             )}
           </CoachAnchor>
@@ -459,7 +444,7 @@ export function SalesScreen() {
             <Text style={styles.cartTotal}>{formatCurrency(total)}</Text>
           </View>
           <Button
-            title={registerSale.isPending ? "Registrando..." : "Registrar venda"}
+            title={registerSale.isPending ? "Registrando..." : "Registrar"}
             disabled={saleDisabled || registerSale.isPending}
             onPress={() => registerSale.mutate()}
           />
@@ -543,39 +528,6 @@ function DayHero({
   );
 }
 
-// Primeiro acesso: a sequência real de uso vira o guia dentro do cartão
-// da madrugada. Só o passo 1 é possível agora — os próximos ficam à meia-luz.
-function FirstStepsCard({ onCreateProduct }: { onCreateProduct: () => void }) {
-  const steps = [
-    { title: "Cadastre o que você vende", hint: "Nome e preço já bastam para começar." },
-    { title: "Comece o dia", hint: "Diga quantos de cada um você preparou." },
-    { title: "Venda com um toque", hint: "Toque no produto e pronto: venda registrada." }
-  ];
-
-  return (
-    <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-      <View pointerEvents="none" style={styles.heroGlowOne} />
-      <View pointerEvents="none" style={styles.heroGlowTwo} />
-      <Text style={styles.heroTitle}>Sua padoca começa aqui</Text>
-      <Text style={styles.heroMuted}>Três passos e a primeira venda sai do forno:</Text>
-      <View style={styles.stepList}>
-        {steps.map((step, index) => (
-          <View key={step.title} style={[styles.stepRow, index > 0 && styles.stepRowNext]}>
-            <View style={[styles.stepNumber, index === 0 && styles.stepNumberActive]}>
-              <Text style={styles.stepNumberText}>{index + 1}</Text>
-            </View>
-            <View style={styles.stepBody}>
-              <Text style={styles.stepTitle}>{step.title}</Text>
-              <Text style={styles.stepHint}>{step.hint}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-      <Button title="Cadastrar produto" onPress={onCreateProduct} />
-    </LinearGradient>
-  );
-}
-
 // Recado de sucesso que entra deslizando e some sozinho.
 function SuccessToast({ message }: { message: string }) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -648,12 +600,7 @@ function AgentBanner({
             onSubmitEditing={onAsk}
           />
         </View>
-        <Pressable
-          onPress={onSpeak}
-          accessibilityRole="button"
-          accessibilityLabel={`Falar com o ${AGENT_NAME}`}
-          style={({ pressed }) => pressed && styles.pressed}
-        >
+        <Pressable onPress={onSpeak} style={({ pressed }) => pressed && styles.pressed}>
           <LinearGradient colors={gradients.agent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.micButton, shadows.agent]}>
             <Mic color="#fff" />
           </LinearGradient>
@@ -853,21 +800,6 @@ function OpenDayForm({ onClose, products }: { onClose: () => void; products: Pro
         />
         <Button title="Voltar" tone="soft" onPress={() => setPendingLeftovers(null)} />
       </>
-    );
-  }
-
-  if (!products.length) {
-    return (
-      <EmptyState
-        emoji="🥖"
-        title="Nenhum produto cadastrado"
-        hint="Cadastre o que você vende para poder começar o dia."
-        actionLabel="Cadastrar produto"
-        onAction={() => {
-          onClose();
-          router.push("/catalogo?novo=1");
-        }}
-      />
     );
   }
 
@@ -1310,7 +1242,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...shadows.floating
   },
-  // Brasas no céu de madrugada: o brilho do forno é a única luz quente.
+  // Círculos de luz no gradiente: profundidade sem pesar.
   heroGlowOne: {
     position: "absolute",
     top: -70,
@@ -1318,7 +1250,7 @@ const styles = StyleSheet.create({
     height: 200,
     width: 200,
     borderRadius: 100,
-    backgroundColor: "rgba(240,140,30,0.20)"
+    backgroundColor: "rgba(255,255,255,0.14)"
   },
   heroGlowTwo: {
     position: "absolute",
@@ -1327,53 +1259,7 @@ const styles = StyleSheet.create({
     height: 220,
     width: 220,
     borderRadius: 110,
-    backgroundColor: "rgba(240,140,30,0.10)"
-  },
-  stepList: {
-    gap: 14,
-    marginVertical: 2
-  },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12
-  },
-  // Passos futuros ficam à meia-luz: dá para ler, mas o agora é o passo 1.
-  stepRowNext: {
-    opacity: 0.55
-  },
-  stepNumber: {
-    height: 30,
-    width: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 15,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.45)"
-  },
-  stepNumberActive: {
-    borderColor: colors.brand,
-    backgroundColor: colors.brand
-  },
-  stepNumberText: {
-    color: "#fff",
-    fontSize: 15,
-    fontFamily: fonts.display
-  },
-  stepBody: {
-    flex: 1,
-    gap: 2
-  },
-  stepTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontFamily: fonts.bodyBold
-  },
-  stepHint: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: fonts.body
+    backgroundColor: "rgba(255,255,255,0.08)"
   },
   heroRevenueRow: {
     marginVertical: 4
@@ -1441,8 +1327,7 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: radius.pill,
-    // O forno acende conforme vende: barra em âmbar, não branca.
-    backgroundColor: "#f08c1e"
+    backgroundColor: "#fff"
   },
   heroActions: {
     flexDirection: "row",

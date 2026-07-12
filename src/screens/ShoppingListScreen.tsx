@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router as appRouter, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import {
   ArrowLeft,
   Check,
@@ -241,13 +241,7 @@ function MontarStep({
       ) : null}
       {error ? <StateText tone="error" text={error} /> : null}
       {!loading && products.length === 0 ? (
-        <EmptyState
-          emoji="🥖"
-          title="Nenhum produto ativo"
-          hint="Cadastre o que você vende para montar a lista de compras."
-          actionLabel="Cadastrar produto"
-          onAction={() => appRouter.push("/catalogo?novo=1")}
-        />
+        <EmptyState emoji="🥖" title="Nenhum produto ativo" hint="Cadastre produtos no catálogo para montar a lista." />
       ) : null}
       {products.map((produto) => (
         <View key={produto.id} style={[styles.productRow, (quantities[produto.id] || 0) > 0 && styles.productRowActive]}>

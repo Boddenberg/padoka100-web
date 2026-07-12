@@ -20,12 +20,7 @@ export function SettingsButton() {
 
   return (
     <>
-      <Pressable
-        onPress={() => setOpen(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Preferências"
-        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-      >
+      <Pressable onPress={() => setOpen(true)} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
         <Settings size={20} color={colors.ink} />
       </Pressable>
 

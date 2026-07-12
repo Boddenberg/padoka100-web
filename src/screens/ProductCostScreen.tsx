@@ -768,7 +768,7 @@ function ResultPhase({
         {session?.custo_simulado ? <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} confirmed /> : null}
         {redoError ? <StateText tone="error" text={redoError} /> : null}
         <Button title={redoPending ? "Preparando..." : "Refazer o cálculo"} tone="outline" disabled={redoPending} onPress={onRedo} />
-        <Button title="Voltar aos produtos" tone="soft" onPress={onBackToCatalog} />
+        <Button title="Voltar ao catálogo" tone="soft" onPress={onBackToCatalog} />
       </>
     );
   }
