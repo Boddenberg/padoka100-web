@@ -24,7 +24,7 @@ import {
   StateText,
   Stepper
 } from "@/components/ui";
-import { api, ApiError, createAudioForm, type NativeFile } from "@/lib/api";
+import { api, ApiError, createAudioForm, friendlyErrorMessage, type NativeFile } from "@/lib/api";
 import { hasAccess, upgradeMessage } from "@/lib/access";
 import { formatCurrency, formatDate, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -353,7 +353,7 @@ export function SalesScreen() {
             </View>
           </View>
         ) : null}
-        {error instanceof Error ? <StateText tone="error" text={error.message} /> : null}
+        {error ? <StateText tone="error" text={friendlyErrorMessage(error)} /> : null}
         {message ? <SuccessToast message={message} /> : null}
 
         {currentDay ? (

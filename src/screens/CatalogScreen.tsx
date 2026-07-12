@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
 import { featurePlanName, hasAccess, upgradeMessage } from "@/lib/access";
-import { api, createMediaForm, type NativeFile } from "@/lib/api";
+import { api, createMediaForm, friendlyErrorMessage, type NativeFile } from "@/lib/api";
 import { cleanPayload, formatCurrency, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
@@ -164,11 +164,11 @@ export function CatalogScreen() {
 
         <SectionTitle text="Produtos" />
         {productsQuery.isLoading ? <StateText text="Carregando produtos..." /> : null}
-        {productsQuery.error instanceof Error ? <StateText tone="error" text={productsQuery.error.message} /> : null}
+        {productsQuery.error ? <StateText tone="error" text={friendlyErrorMessage(productsQuery.error)} /> : null}
         {activeProducts.map(productRow)}
 
         <SectionTitle text="Locais" />
-        {locationsQuery.error instanceof Error ? <StateText tone="error" text={locationsQuery.error.message} /> : null}
+        {locationsQuery.error ? <StateText tone="error" text={friendlyErrorMessage(locationsQuery.error)} /> : null}
         {activeLocations.map(locationRow)}
 
         {inactiveProducts.length > 0 ? (

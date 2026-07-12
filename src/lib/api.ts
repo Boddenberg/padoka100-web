@@ -77,6 +77,11 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler;
 }
 
+// Mensagens amigáveis por categoria. Nunca expomos código HTTP, nome de exceção
+// nem resposta crua do backend na interface — isso fica só nos logs/Diagnóstico.
+export const CONNECTION_ERROR_MESSAGE = "Verifique sua conexão e tente novamente.";
+const GENERIC_ERROR_MESSAGE = "Não foi possível concluir a operação agora. Tente novamente.";
+
 export class ApiError extends Error {
   status: number;
   payload: unknown;
@@ -87,6 +92,70 @@ export class ApiError extends Error {
     this.status = status;
     this.payload = payload;
   }
+}
+
+// Falha antes de ter resposta (offline, DNS, servidor fora, timeout de rede).
+// Mensagem já pronta para a tela; o erro cru fica só no log (recordApiCall).
+export class NetworkError extends Error {
+  constructor() {
+    super(CONNECTION_ERROR_MESSAGE);
+    this.name = "NetworkError";
+  }
+}
+
+function messageForStatus(status: number): string {
+  if (status === 401) return "Sua sessão expirou. Entre novamente.";
+  if (status === 403) return "Você não tem permissão para realizar esta ação.";
+  if (status === 404) return "Não encontramos as informações solicitadas.";
+  if (status === 408 || status === 504) return CONNECTION_ERROR_MESSAGE;
+  return GENERIC_ERROR_MESSAGE; // 5xx e demais
+}
+
+// Distingue mensagem "de gente" (regra de negócio em pt-BR) de texto técnico
+// (exceção, código HTTP, stack, SQL): só a primeira pode chegar à tela.
+function looksHuman(text: string): boolean {
+  const value = text.trim();
+  if (value.length < 3 || value.length > 160) return false;
+  if (/\b[1-5]\d{2}\b/.test(value)) return false; // códigos tipo 401/500
+  if (/[<>{}]|https?:\/\//.test(value)) return false; // html/json/urls
+  if (
+    /(traceback|exception|errno|sqlstate|psycopg|pydantic|stack|internal server|value error|key ?error|type ?error|none type|assert|constraint|foreign key|duplicate key|fetch)/i.test(
+      value
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+// Mensagem de regra de negócio limpa vinda do backend (4xx), quando houver.
+function backendBusinessMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const candidates: unknown[] = [];
+  if ("detail" in payload) {
+    const detail = (payload as { detail?: unknown }).detail;
+    if (typeof detail === "string") candidates.push(detail);
+    else if (detail && typeof detail === "object" && "mensagem" in detail) {
+      candidates.push((detail as { mensagem?: unknown }).mensagem);
+    }
+    // `detail` em lista = validação do Pydantic (técnica, em inglês): nunca usar.
+  }
+  if ("mensagem" in payload) candidates.push((payload as { mensagem?: unknown }).mensagem);
+  if ("message" in payload) candidates.push((payload as { message?: unknown }).message);
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && looksHuman(candidate)) return candidate.trim();
+  }
+  return null;
+}
+
+// Mensagem pronta para a tela a partir de qualquer erro. Nunca vaza detalhe
+// técnico: use este helper (ou .message de ApiError/NetworkError, já amigáveis).
+export function friendlyErrorMessage(error: unknown): string {
+  if (error instanceof ApiError || error instanceof NetworkError) return error.message;
+  if (error instanceof TypeError) return CONNECTION_ERROR_MESSAGE; // fetch caído
+  if (error instanceof Error && looksHuman(error.message)) return error.message;
+  return GENERIC_ERROR_MESSAGE;
 }
 
 function buildUrl(path: string, query: QueryParams | undefined, settings: ApiSettings) {
@@ -126,22 +195,14 @@ async function parseResponse(response: Response): Promise<{ value: unknown; char
   return { value: text, chars };
 }
 
-function extractErrorMessage(payload: unknown, fallback: string) {
-  if (!payload || typeof payload !== "object") return fallback;
-
-  if ("detail" in payload) {
-    const detail = (payload as { detail?: unknown }).detail;
-    if (typeof detail === "string") return detail;
-    // `detail` em lista = erro de validação do FastAPI/Pydantic ("Input should
-    // be a valid UUID..."): mensagem técnica e em inglês, nunca vai para a tela.
-    // O corpo cru continua disponível no payload do ApiError (e no Diagnóstico).
-    if (Array.isArray(detail)) {
-      return "Não deu para concluir agora. Puxe a tela para atualizar e tente de novo.";
-    }
+function messageForError(status: number, payload: unknown): string {
+  // 401/403/404/timeout/5xx: sempre a mensagem por categoria, porque o texto do
+  // backend nesses casos costuma ser técnico. Nos 4xx de regra de negócio,
+  // aproveitamos uma mensagem limpa em português quando o backend manda uma.
+  if (status === 401 || status === 403 || status === 404 || status === 408 || status === 504 || status >= 500) {
+    return messageForStatus(status);
   }
-
-  if ("message" in payload) return String((payload as { message: unknown }).message);
-  return fallback;
+  return backendBusinessMessage(payload) || GENERIC_ERROR_MESSAGE;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -178,7 +239,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       signal: options.signal
     });
   } catch (networkError) {
-    // Falhou antes de ter resposta (offline, DNS, servidor fora): registra e propaga.
+    // Cancelamento (troca de tela / novo fetch): propaga sem virar erro de conexão.
+    if (networkError instanceof Error && networkError.name === "AbortError") throw networkError;
+    // Falhou antes de ter resposta (offline, DNS, servidor fora): registra o erro
+    // cru só no log e mostra uma mensagem de conexão amigável (NetworkError).
     const message = networkError instanceof Error ? networkError.message : String(networkError);
     recordApiCall({
       method,
@@ -190,7 +254,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       responseChars: message.length,
       response: message
     });
-    throw networkError;
+    throw new NetworkError();
   }
 
   const { value: payload, chars } = await parseResponse(response);
@@ -209,7 +273,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (!response.ok) {
     if (response.status === 404 && options.allowNotFound) return null as T;
     if (response.status === 401 && sessionToken) unauthorizedHandler?.();
-    throw new ApiError(extractErrorMessage(payload, `Erro HTTP ${response.status}`), response.status, payload);
+    throw new ApiError(messageForError(response.status, payload), response.status, payload);
   }
 
   return payload as T;

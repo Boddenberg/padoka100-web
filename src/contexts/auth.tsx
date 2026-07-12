@@ -336,6 +336,17 @@ export function loginErrorMessage(error: unknown) {
   if (code.includes("rate_limit") || lower.includes("rate limit") || lower.includes("too many requests")) {
     return "Muitas tentativas em pouco tempo. Aguarde um instante e tente de novo.";
   }
+  // Falha de rede (Supabase Auth usa fetch próprio, fora do nosso ApiError):
+  // nunca deixa a mensagem crua em inglês ("Network request failed") vazar.
+  if (
+    error instanceof TypeError ||
+    lower.includes("network request failed") ||
+    lower.includes("failed to fetch") ||
+    lower.includes("fetch failed") ||
+    lower.includes("network error")
+  ) {
+    return "Verifique sua conexao e tente novamente.";
+  }
   if (rawMessage) return rawMessage;
   return "Nao foi possivel continuar. Tente novamente.";
 }
