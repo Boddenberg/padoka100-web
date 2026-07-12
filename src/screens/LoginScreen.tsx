@@ -25,9 +25,15 @@ export function LoginScreen() {
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [confirmSenha, setConfirmSenha] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  // Cadastro só prossegue com as duas senhas iguais; a validação reaparece
+  // sozinha se a pessoa mudar a primeira senha depois de confirmar.
+  const passwordsMismatch = mode === "register" && confirmSenha.length > 0 && senha !== confirmSenha;
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -52,11 +58,13 @@ export function LoginScreen() {
         setSuccessMessage("Conta criada. Confira seu e-mail para confirmar o acesso.");
         setMode("login");
         setSenha("");
+        setConfirmSenha("");
         return;
       }
       setSuccessMessage("Se existir uma conta com esse e-mail, enviaremos o link de recuperacao.");
       setMode("login");
       setSenha("");
+      setConfirmSenha("");
     }
   });
 
@@ -71,12 +79,13 @@ export function LoginScreen() {
     supabaseAuthConfigured &&
     email.trim().length > 0 &&
     (mode === "recover" || senha.length >= 1) &&
-    (mode !== "register" || nome.trim().length > 0) &&
+    (mode !== "register" || (nome.trim().length > 0 && confirmSenha.length > 0 && senha === confirmSenha)) &&
     !submit.isPending;
 
   // Telefone é opcional no cadastro, mas se veio preenchido precisa ser um
   // telefone brasileiro de verdade.
   function handleSubmit() {
+    if (mode === "register" && senha !== confirmSenha) return;
     if (mode === "register" && telefone.trim() && !isValidBrazilianPhone(telefone)) {
       setPhoneError(PHONE_ERROR);
       return;
@@ -165,6 +174,30 @@ export function LoginScreen() {
                         {showPassword ? <EyeOff size={20} color={colors.muted} /> : <Eye size={20} color={colors.muted} />}
                       </Pressable>
                     </View>
+                  </Field>
+                ) : null}
+
+                {mode === "register" ? (
+                  <Field label="Confirmar senha">
+                    <View style={styles.passwordRow}>
+                      <Input
+                        value={confirmSenha}
+                        onChangeText={setConfirmSenha}
+                        secureTextEntry={!showConfirm}
+                        placeholder="Digite a senha de novo"
+                        style={styles.passwordInput}
+                        onSubmitEditing={() => canSubmit && handleSubmit()}
+                      />
+                      <Pressable
+                        onPress={() => setShowConfirm((current) => !current)}
+                        style={({ pressed }) => [styles.eyeButton, pressed && styles.pressed]}
+                      >
+                        {showConfirm ? <EyeOff size={20} color={colors.muted} /> : <Eye size={20} color={colors.muted} />}
+                      </Pressable>
+                    </View>
+                    {passwordsMismatch ? (
+                      <StateText tone="error" text="As senhas não são iguais. Confira e tente novamente." />
+                    ) : null}
                   </Field>
                 ) : null}
 
