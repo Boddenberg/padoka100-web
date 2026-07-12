@@ -1,10 +1,10 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Calculator, Camera, ChevronRight, Images, MapPin, ShoppingCart, Sparkles, Trash2 } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Badge, Button, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
+import { Badge, Button, EmptyState, Field, Input, Page, ProductPhoto, SectionTitle, Sheet, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
 import { featurePlanName, hasAccess, upgradeMessage } from "@/lib/access";
 import { api, createMediaForm, friendlyErrorMessage, type NativeFile } from "@/lib/api";
@@ -64,7 +64,7 @@ type ProductDraft = {
 const emptyProduct: ProductDraft = {
   nome: "",
   descricao: "",
-  cor_botao: "#ff7a1a",
+  cor_botao: "#e56910",
   preco_venda: "",
   preco_custo: "0"
 };
@@ -74,6 +74,15 @@ export function CatalogScreen() {
   const { user } = useAuth();
   const canUseShoppingList = hasAccess(user, "compras.usar");
   const [sheet, setSheet] = useState<"product" | "location" | "edit" | "edit-location" | null>(null);
+  // Atalho vindo da Venda (?novo=1): abre o cadastro de produto direto,
+  // sem a pessoa precisar achar o botão nesta tela.
+  const params = useLocalSearchParams<{ novo?: string }>();
+  useEffect(() => {
+    if (params.novo) {
+      setSheet("product");
+      router.setParams({ novo: "" });
+    }
+  }, [params.novo, router]);
   const [editing, setEditing] = useState<Produto | null>(null);
   const [editingLocal, setEditingLocal] = useState<LocalVenda | null>(null);
   const productsQuery = useQuery({ queryKey: ["produtos", "todos"], queryFn: () => api.produtos.list(false) });
@@ -134,7 +143,7 @@ export function CatalogScreen() {
 
   return (
     <>
-      <Page title="Catálogo" subtitle="Produtos, preços, fotos e locais de venda." onRefresh={onRefresh} refreshing={refreshing}>
+      <Page title="Produtos" subtitle="Cadastre o que você vende: preço, foto e locais." onRefresh={onRefresh} refreshing={refreshing}>
         {/* Porta de entrada da lista de compras por produção planejada. */}
         <Pressable
           onPress={() => (canUseShoppingList ? router.push("/lista-compras") : showUpgrade("compras.usar"))}
@@ -155,26 +164,45 @@ export function CatalogScreen() {
 
         <View style={styles.actions}>
           <View style={styles.actionButton}>
-            <Button title="Novo produto" onPress={() => setSheet("product")} />
+            <Button title="Cadastrar produto" onPress={() => setSheet("product")} />
           </View>
           <View style={styles.actionButton}>
-            <Button title="Novo local" tone="soft" onPress={() => setSheet("location")} />
+            <Button title="Cadastrar local" tone="soft" onPress={() => setSheet("location")} />
           </View>
         </View>
 
-        <SectionTitle text="Produtos" />
+        <SectionTitle text="Seus produtos" />
         {productsQuery.isLoading ? <StateText text="Carregando produtos..." /> : null}
         {productsQuery.error ? <StateText tone="error" text={friendlyErrorMessage(productsQuery.error)} /> : null}
         {activeProducts.map(productRow)}
+        {productsQuery.isSuccess && activeProducts.length === 0 ? (
+          <EmptyState
+            emoji="🥖"
+            title="Nenhum produto cadastrado"
+            hint="Comece pelo que você mais vende. Nome e preço já bastam."
+            actionLabel="Cadastrar produto"
+            onAction={() => setSheet("product")}
+          />
+        ) : null}
 
-        <SectionTitle text="Locais" />
+        <SectionTitle text="Locais de venda" />
         {locationsQuery.error ? <StateText tone="error" text={friendlyErrorMessage(locationsQuery.error)} /> : null}
         {activeLocations.map(locationRow)}
+        {locationsQuery.isSuccess && activeLocations.length === 0 ? (
+          <EmptyState
+            emoji="📍"
+            title="Nenhum local cadastrado"
+            hint="Opcional: registre a feira, o ponto ou o evento onde você vende."
+            actionLabel="Cadastrar local"
+            onAction={() => setSheet("location")}
+            actionTone="soft"
+          />
+        ) : null}
 
         {inactiveProducts.length > 0 ? (
           <>
             <SectionTitle text="Produtos inativos" />
-            <StateText text="Excluídos do catálogo. Toque para reativar." />
+            <StateText text="Fora da venda e da lista. Toque para reativar." />
             {inactiveProducts.map(productRow)}
           </>
         ) : null}
@@ -237,11 +265,11 @@ function ProductSheet({ visible, onClose }: { visible: boolean; onClose: () => v
   });
 
   return (
-    <Sheet visible={visible} title="Novo produto" subtitle="Depois adicione a foto na edição." onClose={onClose}>
+    <Sheet visible={visible} title="Cadastrar produto" subtitle="Depois adicione a foto na edição." onClose={onClose}>
       <ProductFields draft={draft} setDraft={setDraft} />
       {createProduct.error instanceof Error ? <StateText tone="error" text={createProduct.error.message} /> : null}
       <Button
-        title={createProduct.isPending ? "Criando..." : "Criar produto"}
+        title={createProduct.isPending ? "Cadastrando..." : "Cadastrar produto"}
         disabled={!draft.nome || createProduct.isPending}
         onPress={() => createProduct.mutate()}
       />
@@ -458,7 +486,7 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
           onPress={() =>
             confirmDestructive(
               "Excluir produto",
-              `"${product.nome}" sai do catálogo e das vendas, mas o histórico é mantido. Dá para reativar depois na seção "Produtos inativos".`,
+              `"${product.nome}" sai da venda e da lista de produtos, mas o histórico é mantido. Dá para reativar depois na seção "Produtos inativos".`,
               "Excluir",
               () => removeProduct.mutate()
             )
@@ -563,7 +591,7 @@ function LocationSheet({ visible, onClose }: { visible: boolean; onClose: () => 
   });
 
   return (
-    <Sheet visible={visible} title="Novo local" subtitle="Feira, evento, ponto fixo..." onClose={onClose}>
+    <Sheet visible={visible} title="Cadastrar local" subtitle="Feira, evento, ponto fixo..." onClose={onClose}>
       <View style={styles.editHeader}>
         <LocationPhoto url={photo?.uri} size={96} />
         <View style={styles.editHeaderInfo}>
@@ -585,7 +613,7 @@ function LocationSheet({ visible, onClose }: { visible: boolean; onClose: () => 
       </Field>
       {createLocation.error instanceof Error ? <StateText tone="error" text={createLocation.error.message} /> : null}
       <Button
-        title={createLocation.isPending ? "Criando..." : "Criar local"}
+        title={createLocation.isPending ? "Cadastrando..." : "Cadastrar local"}
         disabled={!name || createLocation.isPending}
         onPress={() => createLocation.mutate()}
       />
