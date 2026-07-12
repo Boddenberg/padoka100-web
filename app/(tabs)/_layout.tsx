@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { BarChart3, Package, ShoppingBag, UserRound } from "lucide-react-native";
+import { BarChart3, Store, Sunrise, UserRound } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/auth";
 import { hasAccess } from "@/lib/access";
@@ -37,8 +37,8 @@ export default function TabsLayout() {
         }
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "Venda", tabBarIcon: ({ color }) => <ShoppingBag color={color} /> }} />
-      <Tabs.Screen name="catalogo" options={{ title: "Catálogo", tabBarIcon: ({ color }) => <Package color={color} /> }} />
+      <Tabs.Screen name="index" options={{ title: "Hoje", tabBarIcon: ({ color }) => <Sunrise color={color} /> }} />
+      <Tabs.Screen name="catalogo" options={{ title: "Minha padoca", tabBarIcon: ({ color }) => <Store color={color} /> }} />
       <Tabs.Screen
         name="resumo"
         options={{
