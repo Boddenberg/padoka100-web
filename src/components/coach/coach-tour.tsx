@@ -67,6 +67,9 @@ function measureNode(node: View): Promise<Rectangle | null> {
 
 export function CoachProvider({ children }: { children: ReactNode }) {
   const targets = useRef(new Map<string, View>());
+  // Âncora invisível de tela cheia: serve só para medir a origem real do
+  // overlay (ver measureOverlayOrigin).
+  const rootRef = useRef<View>(null);
   const finishRef = useRef<(() => void) | undefined>(undefined);
   const skipRef = useRef<(() => void) | undefined>(undefined);
 
@@ -90,6 +93,20 @@ export function CoachProvider({ children }: { children: ReactNode }) {
     return { x: 6, y: height - barHeight - 4, width: width - 12, height: barHeight };
   }, [width, height, insets.bottom]);
 
+  // Origem real do overlay em coordenadas de janela. measureInWindow do alvo e
+  // o desenho do overlay podem não compartilhar a mesma origem — no Android a
+  // barra de status/edge-to-edge desloca um em relação ao outro, e por isso o
+  // furo saía torto em telas maiores. Medindo a âncora de tela cheia e
+  // subtraindo essa origem, o furo cai exatamente sobre o componente em
+  // qualquer densidade, área segura ou tamanho de tela. No iOS a origem é ~0,
+  // então nada muda.
+  const measureOverlayOrigin = useCallback(async (): Promise<{ x: number; y: number }> => {
+    const node = rootRef.current;
+    if (!node) return { x: 0, y: 0 };
+    const measured = await measureNode(node);
+    return measured ? { x: measured.x, y: measured.y } : { x: 0, y: 0 };
+  }, []);
+
   const resolveRect = useCallback(
     async (step: CoachStep | undefined): Promise<Rectangle | null> => {
       if (!step) return null;
@@ -100,12 +117,15 @@ export function CoachProvider({ children }: { children: ReactNode }) {
       // measureInWindow pode devolver 0 logo após montar/rolar: tenta algumas vezes.
       for (let attempt = 0; attempt < 6; attempt++) {
         const measured = await measureNode(node);
-        if (measured && measured.width > 0 && measured.height > 0) return measured;
+        if (measured && measured.width > 0 && measured.height > 0) {
+          const origin = await measureOverlayOrigin();
+          return { ...measured, x: measured.x - origin.x, y: measured.y - origin.y };
+        }
         await delay(60);
       }
       return null;
     },
-    [tabsRect]
+    [tabsRect, measureOverlayOrigin]
   );
 
   const finish = useCallback(() => {
@@ -184,21 +204,26 @@ export function CoachProvider({ children }: { children: ReactNode }) {
 
   return (
     <CoachContext.Provider value={value}>
-      {children}
-      {currentStep ? (
-        <CoachOverlay
-          step={currentStep}
-          rect={rect}
-          index={index}
-          total={steps.length}
-          width={width}
-          height={height}
-          insetTop={insets.top}
-          onNext={goNext}
-          onBack={goBack}
-          onSkip={skip}
-        />
-      ) : null}
+      {/* Envolve app + overlay numa mesma âncora de tela cheia (rootRef). O furo
+          é medido subtraindo a origem desta âncora, então destaque e componente
+          real caem no mesmo lugar em qualquer Android/iOS (ver measureOverlayOrigin). */}
+      <View ref={rootRef} collapsable={false} style={styles.root}>
+        {children}
+        {currentStep ? (
+          <CoachOverlay
+            step={currentStep}
+            rect={rect}
+            index={index}
+            total={steps.length}
+            width={width}
+            height={height}
+            insetTop={insets.top}
+            onNext={goNext}
+            onBack={goBack}
+            onSkip={skip}
+          />
+        ) : null}
+      </View>
     </CoachContext.Provider>
   );
 }
@@ -399,6 +424,9 @@ export function useCoach() {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 9999,

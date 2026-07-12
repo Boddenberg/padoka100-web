@@ -94,7 +94,7 @@ export function LoginScreen() {
               <View style={styles.brand}>
                 <Image source={require("../../Logo.png")} style={styles.logo} contentFit="contain" />
                 <Text style={styles.greeting}>{getGreeting()}</Text>
-                <Text style={styles.title}>Padoka 100</Text>
+                <Text style={styles.title}>Padoka 100%</Text>
                 <Text style={styles.subtitle}>{subtitleByMode[mode]}</Text>
               </View>
 

@@ -233,7 +233,7 @@ export function SalesScreen() {
     const steps: CoachStep[] = [
       {
         emoji: "👋",
-        title: "Bem-vindo(a) ao Padoka 100!",
+        title: "Bem-vindo(a) ao Padoka 100%!",
         body: "Vou te mostrar rapidinho onde fica cada coisa. É um passo de cada vez — toque em “Próximo”."
       },
       {
