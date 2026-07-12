@@ -10,6 +10,7 @@ import { AGENT_NAME, AgentAvatar } from "@/components/agent";
 import { Button, Field, Input, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { loginErrorMessage, useAuth } from "@/contexts/auth";
+import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { formatBrazilianPhone, isValidBrazilianPhone, PHONE_ERROR } from "@/lib/phone";
 import { supabaseAuthConfigured } from "@/lib/supabase";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
@@ -35,18 +36,25 @@ export function LoginScreen() {
   // sozinha se a pessoa mudar a primeira senha depois de confirmar.
   const passwordsMismatch = mode === "register" && confirmSenha.length > 0 && senha !== confirmSenha;
 
+  // E-mail precisa ter uma estrutura mínima (nome@dominio.com). O erro só
+  // aparece depois que a pessoa começa a digitar, para não "brigar" com o campo vazio.
+  const emailValid = isValidEmail(email);
+  const emailInvalid = email.trim().length > 0 && !emailValid;
+
   const submit = useMutation({
     mutationFn: async () => {
       setSuccessMessage(null);
+      // Normaliza (sem espaços, minúsculas) antes de qualquer envio.
+      const emailNormalizado = normalizeEmail(email);
       if (mode === "recover") {
-        await requestPasswordReset(email);
+        await requestPasswordReset(emailNormalizado);
         return "recover" as const;
       }
       if (mode === "register") {
-        const result = await register({ nome, email, telefone, senha });
+        const result = await register({ nome, email: emailNormalizado, telefone, senha });
         return result.requiresEmailConfirmation ? ("confirmation" as const) : ("signed-in" as const);
       }
-      await signIn(email, senha);
+      await signIn(emailNormalizado, senha);
       return "signed-in" as const;
     },
     onSuccess: (result) => {
@@ -77,7 +85,7 @@ export function LoginScreen() {
 
   const canSubmit =
     supabaseAuthConfigured &&
-    email.trim().length > 0 &&
+    emailValid &&
     (mode === "recover" || senha.length >= 1) &&
     (mode !== "register" || (nome.trim().length > 0 && confirmSenha.length > 0 && senha === confirmSenha)) &&
     !submit.isPending;
@@ -85,6 +93,7 @@ export function LoginScreen() {
   // Telefone é opcional no cadastro, mas se veio preenchido precisa ser um
   // telefone brasileiro de verdade.
   function handleSubmit() {
+    if (!emailValid) return;
     if (mode === "register" && senha !== confirmSenha) return;
     if (mode === "register" && telefone.trim() && !isValidBrazilianPhone(telefone)) {
       setPhoneError(PHONE_ERROR);
@@ -152,8 +161,12 @@ export function LoginScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
+                    inputMode="email"
+                    textContentType="emailAddress"
+                    autoComplete="email"
                     placeholder="seu@email.com"
                   />
+                  {emailInvalid ? <StateText tone="error" text="Digite um e-mail válido." /> : null}
                 </Field>
 
                 {mode !== "recover" ? (
