@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  Info,
   ListChecks,
   Share2,
   ShoppingCart,
@@ -385,6 +386,11 @@ function ShoppingItemCard({ item }: { item: ListaCompraItem }) {
   const confirmado = (item.status || "").toUpperCase() === "CONFIRMADO";
   const contribuicoes = item.contribuicoes || [];
 
+  // Preço por unidade usado no cálculo — é "o valor" por trás do custo estimado
+  // (inclusive quando o backend reaproveita o preço de uma compra anterior).
+  const precoUnitario = toNumber(item.custo_unitario_base);
+  const unidadePreco = item.unidade_base || item.unidade_sugerida || "un";
+
   return (
     <View style={[styles.itemCard, shadows.soft]}>
       <View style={styles.itemTop}>
@@ -398,6 +404,12 @@ function ShoppingItemCard({ item }: { item: ListaCompraItem }) {
           <Text style={styles.itemQty}>
             {formatQty(item.quantidade_sugerida)} {item.unidade_sugerida || ""}
           </Text>
+          {precoUnitario > 0 ? (
+            <Text style={styles.itemUnitPrice}>
+              Preço usado: <Text style={styles.itemUnitPriceValue}>{formatCurrency(precoUnitario)}</Text>
+              <Text style={styles.itemUnitPriceUnit}> / {unidadePreco}</Text>
+            </Text>
+          ) : null}
         </View>
         <View style={styles.itemRight}>
           <Text style={styles.itemCost}>{formatCurrency(item.custo_estimado)}</Text>
@@ -409,7 +421,12 @@ function ShoppingItemCard({ item }: { item: ListaCompraItem }) {
         </View>
       </View>
 
-      {item.observacoes ? <Text style={styles.itemObs}>{item.observacoes}</Text> : null}
+      {item.observacoes ? (
+        <View style={styles.itemNote}>
+          <Info size={13} color={colors.muted} />
+          <Text style={styles.itemNoteText}>{item.observacoes}</Text>
+        </View>
+      ) : null}
 
       {contribuicoes.length > 0 ? (
         <Pressable onPress={() => setShowFrom((value) => !value)} style={({ pressed }) => [styles.fromToggle, pressed && styles.pressed]}>
@@ -712,9 +729,33 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fonts.bodyBold
   },
-  itemObs: {
-    color: colors.warning,
+  itemUnitPrice: {
+    color: colors.muted,
     fontSize: 12.5,
+    fontFamily: fonts.body
+  },
+  itemUnitPriceValue: {
+    color: colors.ink,
+    fontFamily: fonts.bodyBold
+  },
+  itemUnitPriceUnit: {
+    color: colors.muted,
+    fontFamily: fonts.bodyBold
+  },
+  itemNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceGlow,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  itemNoteText: {
+    flex: 1,
+    color: colors.muted,
+    fontSize: 12.5,
+    lineHeight: 17,
     fontFamily: fonts.bodyBold
   },
   fromToggle: {
