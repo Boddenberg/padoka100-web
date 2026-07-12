@@ -105,7 +105,7 @@ export function SummaryScreen() {
 
   return (
     <>
-      <Page title="Resumo" subtitle="Faturamento, período, gráfico e histórico." onRefresh={onRefresh} refreshing={refreshing}>
+      <Page title="Resumo" subtitle="Quanto você vendeu, por dia e por período." onRefresh={onRefresh} refreshing={refreshing}>
         {/* 1. Faturamento do período: o destaque principal da tela. */}
         <Card>
           <View style={styles.revenueHeader}>

@@ -26,7 +26,7 @@ export const PLANOS: PlanoCatalogo[] = [
     heranca: null,
     beneficios: [
       "Venda registrada no toque, rapidinho",
-      "Catálogo com fotos dos seus produtos",
+      "Fotos nos seus produtos",
       "Resumo do dia de venda",
       "Histórico de tudo o que aconteceu"
     ]

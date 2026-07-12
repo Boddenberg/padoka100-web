@@ -182,6 +182,8 @@ export function LoginScreen() {
                       />
                       <Pressable
                         onPress={() => setShowPassword((current) => !current)}
+                        accessibilityRole="button"
+                        accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
                         style={({ pressed }) => [styles.eyeButton, pressed && styles.pressed]}
                       >
                         {showPassword ? <EyeOff size={20} color={colors.muted} /> : <Eye size={20} color={colors.muted} />}
@@ -203,6 +205,8 @@ export function LoginScreen() {
                       />
                       <Pressable
                         onPress={() => setShowConfirm((current) => !current)}
+                        accessibilityRole="button"
+                        accessibilityLabel={showConfirm ? "Ocultar senha" : "Mostrar senha"}
                         style={({ pressed }) => [styles.eyeButton, pressed && styles.pressed]}
                       >
                         {showConfirm ? <EyeOff size={20} color={colors.muted} /> : <Eye size={20} color={colors.muted} />}

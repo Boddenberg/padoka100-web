@@ -88,7 +88,12 @@ export function NotificationsButton() {
 
   return (
     <>
-      <Pressable onPress={() => setOpen(true)} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={unreadCount > 0 ? `Avisos: ${unreadCount} sem ler` : "Avisos"}
+        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+      >
         <Text style={styles.iconEmoji}>✉️</Text>
         {unreadCount > 0 ? (
           <View style={styles.badge}>
