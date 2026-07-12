@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff, LogIn, Mail, UserPlus } from "lucide-react-native";
 import { useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar } from "@/components/agent";
@@ -88,9 +88,19 @@ export function LoginScreen() {
   return (
     <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.background}>
       <SafeAreaView style={styles.safe}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
-          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Pressable style={styles.content} onPress={Keyboard.dismiss} accessible={false}>
+        {/* Teclado nao cobre os campos: no iOS o ScrollView insere o espaco do
+            teclado e rola ate o campo focado (automaticallyAdjustKeyboardInsets);
+            no Android a janela e redimensionada (softwareKeyboardLayoutMode:
+            "resize"). keyboardShouldPersistTaps deixa tocar em Entrar/Criar conta
+            com o teclado aberto, e "interactive" permite rolar sem fecha-lo. */}
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+        >
+          <Pressable style={styles.content} onPress={Keyboard.dismiss} accessible={false}>
               <View style={styles.brand}>
                 <Image source={require("../../Logo.png")} style={styles.logo} contentFit="contain" />
                 <Text style={styles.greeting}>{getGreeting()}</Text>
@@ -200,9 +210,8 @@ export function LoginScreen() {
                   </Pressable>
                 ) : null}
               </View>
-            </Pressable>
-          </ScrollView>
-        </KeyboardAvoidingView>
+          </Pressable>
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -277,9 +286,6 @@ const styles = StyleSheet.create({
     flex: 1
   },
   safe: {
-    flex: 1
-  },
-  flex: {
     flex: 1
   },
   scroll: {
