@@ -41,6 +41,18 @@ function showUpgrade(capability: string) {
   Alert.alert(plan ? `Funcionalidade do plano ${plan}` : "Funcionalidade de outro plano", upgradeMessage(capability));
 }
 
+// Preço/custo digitados aceitam vírgula ou ponto; no envio viram número.
+function inputToDecimal(value: string) {
+  return toNumber(value.replace(/\s/g, "").replace(",", "."));
+}
+
+// Valor atual do produto → texto do campo, no formato pt-BR ("3,50"). Zero/vazio
+// vira "" para o campo mostrar só o placeholder.
+function decimalToInput(value: string | number | null | undefined) {
+  const amount = toNumber(value);
+  return amount > 0 ? amount.toFixed(2).replace(".", ",") : "";
+}
+
 type ProductDraft = {
   nome: string;
   descricao: string;
@@ -253,39 +265,35 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
   const [nome, setNome] = useState(product.nome);
   const [descricao, setDescricao] = useState(product.descricao || "");
   const [situacao, setSituacao] = useState(product.situacao || "ativo");
-  const [price, setPrice] = useState("");
-  const [cost, setCost] = useState(product.preco_atual?.preco_custo || "0");
+  // Preço e custo começam com os valores atuais: mexer e salvar cria uma nova
+  // versão de preço (histórico) sozinho, sem uma ação "Criar novo preço" à parte.
+  const [price, setPrice] = useState(decimalToInput(product.preco_atual?.preco_venda));
+  const [cost, setCost] = useState(decimalToInput(product.preco_atual?.preco_custo));
   // Foto recém-enviada: mostra na hora, sem esperar a lista recarregar.
   const [photoUrl, setPhotoUrl] = useState(product.url_imagem_principal);
 
-  // Dados cadastrais salvos pelo endpoint de atualização (PATCH), sem exigir preço.
-  const updateProduct = useMutation({
-    mutationFn: () =>
-      api.produtos.update(
-        product.id,
-        cleanPayload({
-          nome,
-          descricao,
-          situacao
-        })
-      ),
+  const priceChanged = inputToDecimal(price) !== toNumber(product.preco_atual?.preco_venda);
+  const costChanged = inputToDecimal(cost) !== toNumber(product.preco_atual?.preco_custo);
+  const priceOrCostChanged = priceChanged || costChanged;
+  const priceValid = inputToDecimal(price) > 0;
+
+  // Um único "Salvar alterações": grava os dados cadastrais e, se o preço ou o
+  // custo mudou, registra a nova versão de preço no histórico — sem passo extra.
+  const save = useMutation({
+    mutationFn: async () => {
+      await api.produtos.update(product.id, cleanPayload({ nome, descricao, situacao }));
+      if (priceOrCostChanged) {
+        await api.produtos.createPrice(product.id, {
+          preco_venda: inputToDecimal(price),
+          preco_custo: inputToDecimal(cost),
+          vigente_desde: todayInputValue(),
+          motivo: "Atualização pelo app"
+        });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
       onClose();
-    }
-  });
-
-  const createPrice = useMutation({
-    mutationFn: () =>
-      api.produtos.createPrice(product.id, {
-        preco_venda: Number(price),
-        preco_custo: Number(cost || 0),
-        vigente_desde: todayInputValue(),
-        motivo: "Atualização pelo app"
-      }),
-    onSuccess: () => {
-      setPrice("");
-      queryClient.invalidateQueries({ queryKey: ["produtos"] });
     }
   });
 
@@ -326,8 +334,11 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
     }
   });
 
+  const canSave = nome.trim().length > 0 && (!priceOrCostChanged || priceValid) && !save.isPending;
+
   return (
     <>
+      {/* Identidade do produto: foto e situação atual. */}
       <View style={styles.editHeader}>
         <ProductPhoto url={photoUrl} name={product.nome} size={96} rounded={radius.xl} />
         <View style={styles.editHeaderInfo}>
@@ -335,41 +346,6 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
           <Badge text={situacao} tone={situacao === "ativo" ? "good" : "warn"} />
         </View>
       </View>
-
-      {/* Porta de entrada do custeio assistido: fecha o sheet e abre a sessão guiada. */}
-      <Pressable
-        onPress={() => {
-          if (!canUseCostAssistant) {
-            showUpgrade("custos.assistente");
-            return;
-          }
-          onClose();
-          router.push(`/produto/${product.id}/custos`);
-        }}
-        style={({ pressed }) => pressed && styles.pressed}
-      >
-        <LinearGradient colors={gradients.agent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.costCard, shadows.agent]}>
-          <View style={styles.costCardIcon}>
-            <Calculator size={22} color="#fff" />
-          </View>
-          <View style={styles.costCardInfo}>
-            <Text style={styles.costCardTitle}>Quanto custa fazer?</Text>
-            <Text style={styles.costCardSubtitle}>
-              {toNumber(product.preco_atual?.preco_custo) > 0
-                ? `Custo atual: ${formatCurrency(product.preco_atual?.preco_custo)} — recalcule com o assistente`
-                : "Descubra o custo e o lucro de cada unidade com o assistente"}
-            </Text>
-            {isCostFromAI(product.preco_atual) ? (
-              <View style={styles.aiPill}>
-                <Sparkles size={11} color="#fff" />
-                <Text style={styles.aiPillText}>Calculado com IA</Text>
-              </View>
-            ) : null}
-          </View>
-          <ChevronRight size={20} color="#fff" />
-        </LinearGradient>
-      </Pressable>
-      {!canUseCostAssistant ? <StateText text={upgradeMessage("custos.assistente")} /> : null}
 
       <PhotoPickerButtons onPick={(source) => uploadMedia.mutate(source)} disabled={uploadMedia.isPending} />
       {photoUrl ? (
@@ -387,6 +363,7 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
       {uploadMedia.error instanceof Error ? <StateText tone="error" text={uploadMedia.error.message} /> : null}
       {removePhoto.error instanceof Error ? <StateText tone="error" text={removePhoto.error.message} /> : null}
 
+      {/* 1) Dados principais: nome, descrição e situação (juntos, sem competir com Salvar). */}
       <Field label="Nome">
         <Input value={nome} onChangeText={setNome} maxLength={60} />
       </Field>
@@ -409,32 +386,70 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
           </Pressable>
         </View>
       </Field>
-      {updateProduct.error instanceof Error ? <StateText tone="error" text={updateProduct.error.message} /> : null}
-      <Button
-        title={updateProduct.isPending ? "Salvando..." : "Salvar alterações"}
-        disabled={!nome.trim() || updateProduct.isPending}
-        onPress={() => updateProduct.mutate()}
-      />
 
+      {/* 2) Preço e custo — custo acima do preço; salvar cria o novo preço no histórico. */}
       <View style={styles.priceSection}>
-        <Text style={styles.priceSectionTitle}>Novo preço (opcional)</Text>
-        <Field label="Preço de venda">
-          <Input value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="Deixe vazio para manter o atual" />
-        </Field>
+        <Text style={styles.priceSectionTitle}>Preço e custo</Text>
         <Field label="Custo">
-          <Input value={cost} onChangeText={setCost} keyboardType="decimal-pad" />
+          <Input value={cost} onChangeText={setCost} keyboardType="decimal-pad" placeholder="0,00" />
         </Field>
-        {createPrice.error instanceof Error ? <StateText tone="error" text={createPrice.error.message} /> : null}
-        {createPrice.isSuccess ? <StateText tone="success" text="Preço atualizado!" /> : null}
-        <Button
-          title={createPrice.isPending ? "Salvando..." : "Criar novo preço"}
-          tone="soft"
-          disabled={!price.trim() || createPrice.isPending}
-          onPress={() => createPrice.mutate()}
-        />
+        <Field label="Preço de venda">
+          <Input value={price} onChangeText={setPrice} keyboardType="decimal-pad" placeholder="0,00" />
+        </Field>
+        {priceOrCostChanged && !priceValid ? (
+          <StateText tone="error" text="Informe um preço de venda maior que zero." />
+        ) : (
+          <Text style={styles.priceHint}>
+            {priceOrCostChanged
+              ? "Ao salvar, o novo preço entra no histórico do produto."
+              : "Mudou o preço ou o custo? É só salvar — o histórico é atualizado sozinho."}
+          </Text>
+        )}
+
+        {/* Ajuda opcional para descobrir o custo com o assistente. */}
+        <Pressable
+          onPress={() => {
+            if (!canUseCostAssistant) {
+              showUpgrade("custos.assistente");
+              return;
+            }
+            onClose();
+            router.push(`/produto/${product.id}/custos`);
+          }}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <LinearGradient colors={gradients.agent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.costCard, shadows.agent]}>
+            <View style={styles.costCardIcon}>
+              <Calculator size={22} color="#fff" />
+            </View>
+            <View style={styles.costCardInfo}>
+              <Text style={styles.costCardTitle}>Quanto custa fazer?</Text>
+              <Text style={styles.costCardSubtitle}>
+                {toNumber(product.preco_atual?.preco_custo) > 0
+                  ? `Custo atual: ${formatCurrency(product.preco_atual?.preco_custo)} — recalcule com o assistente`
+                  : "Descubra o custo e o lucro de cada unidade com o assistente"}
+              </Text>
+              {isCostFromAI(product.preco_atual) ? (
+                <View style={styles.aiPill}>
+                  <Sparkles size={11} color="#fff" />
+                  <Text style={styles.aiPillText}>Calculado com IA</Text>
+                </View>
+              ) : null}
+            </View>
+            <ChevronRight size={20} color="#fff" />
+          </LinearGradient>
+        </Pressable>
+        {!canUseCostAssistant ? <StateText text={upgradeMessage("custos.assistente")} /> : null}
       </View>
 
-      <View style={styles.dangerSection}>
+      {/* 3) Ações no final: salvar (principal) e excluir (destrutiva). */}
+      <View style={styles.footerActions}>
+        {save.error instanceof Error ? <StateText tone="error" text={save.error.message} /> : null}
+        <Button
+          title={save.isPending ? "Salvando..." : "Salvar alterações"}
+          disabled={!canSave}
+          onPress={() => save.mutate()}
+        />
         {removeProduct.error instanceof Error ? <StateText tone="error" text={removeProduct.error.message} /> : null}
         <Button
           title={removeProduct.isPending ? "Excluindo..." : "Excluir produto"}
@@ -934,6 +949,19 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 17,
     fontFamily: fonts.display
+  },
+  priceHint: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.body
+  },
+  footerActions: {
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 16,
+    marginTop: 4
   },
   dangerSection: {
     gap: 12,
