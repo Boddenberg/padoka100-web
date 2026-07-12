@@ -1,5 +1,5 @@
 import * as WebBrowser from "expo-web-browser";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { isAdmin } from "@/lib/access";
 import { api, ApiError, setApiToken, setUnauthorizedHandler } from "@/lib/api";
 import { setApiLogAdminEnabled } from "@/lib/api-log";
@@ -41,6 +41,16 @@ function ensureSupabaseAuthConfigured() {
   }
 }
 
+// O fetch do app não tem timeout: uma resposta que nunca chega deixaria a
+// Promise pendente para sempre. Na ABERTURA isso prenderia o app no
+// carregamento, então corremos a validação da sessão contra um relógio.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+  ]);
+}
+
 function readUrlParam(url: string, key: string) {
   const source = url.includes("#") ? url.replace("#", "?") : url;
   try {
@@ -54,6 +64,9 @@ function readUrlParam(url: string, key: string) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<UsuarioPerfil | null>(null);
+  // Status atual acessível dentro do watchdog sem recriá-lo a cada mudança.
+  const statusRef = useRef<AuthStatus>("loading");
+  statusRef.current = status;
 
   // Fora do dev, o Diagnóstico (fim do Perfil) só registra chamadas para
   // contas admin; logout ou troca de conta desliga e limpa o histórico.
@@ -100,10 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setApiToken(session.token);
           // Confere o token salvo ANTES de declarar "logado": assim um token
           // expirado leva direto ao login, em vez de abrir a tela Hoje e só
-          // então tomar 401 (o "sessão expirada" que piscava). Falha de rede
-          // (offline) mantém a sessão salva, para o app abrir mesmo sem sinal.
+          // então tomar 401 (o "sessão expirada" que piscava). A conferência
+          // tem prazo: se a rede travar (fetch sem timeout) ou o servidor
+          // demorar, o app abre com a sessão salva em vez de ficar preso.
           try {
-            const profile = await api.auth.me();
+            const profile = await withTimeout(api.auth.me(), 4000);
             if (!active) return;
             setUser(profile);
             setStatus("signed-in");
@@ -113,6 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (error instanceof ApiError && [401, 403].includes(error.status)) {
               await clearLocalAuth();
             } else {
+              // Timeout ou falha de rede: abre com o que está salvo (se o token
+              // estiver mesmo vencido, o 401 seguinte desloga sozinho).
               setUser(session.usuario);
               setStatus("signed-in");
             }
@@ -121,12 +137,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setStatus("signed-out");
         }
       } catch {
-        if (active) setStatus("signed-out");
+        // Só decide "deslogado" se o watchdog ainda não resolveu por conta dele.
+        if (active && statusRef.current === "loading") setStatus("signed-out");
       }
     }
     void restoreSession();
+
+    // Blindagem final: sob QUALQUER travamento (inclusive a sessão do Supabase),
+    // o app nunca fica preso no carregamento. Passado o limite, resolve com a
+    // sessão salva (o 401 seguinte, se vier, desloga) ou vai para o login.
+    const watchdog = setTimeout(async () => {
+      if (!active || statusRef.current !== "loading") return;
+      const saved = await readSession().catch(() => null);
+      if (!active || statusRef.current !== "loading") return;
+      if (saved) {
+        setApiToken(saved.token);
+        setUser(saved.usuario);
+        setStatus("signed-in");
+      } else {
+        setStatus("signed-out");
+      }
+    }, 7000);
+
     return () => {
       active = false;
+      clearTimeout(watchdog);
     };
   }, [establishSession, clearLocalAuth]);
 
