@@ -157,6 +157,21 @@ export interface ListaCompra {
   [key: string]: unknown;
 }
 
+// Produtos que já têm receita cadastrada (GET /custos/produtos-com-receita).
+// A lista de compras só consegue calcular insumos para estes.
+export interface ProdutoComReceita {
+  produto_id: string;
+  nome: string;
+  slug?: string | null;
+  situacao?: string;
+  receita_id?: string;
+  receita_nome?: string | null;
+  rendimento?: number | string;
+  unidade_rendimento?: string;
+  status?: string;
+  total_ingredientes?: number;
+}
+
 export interface GerarListaCompraRequest {
   nome?: string;
   data_referencia?: string;

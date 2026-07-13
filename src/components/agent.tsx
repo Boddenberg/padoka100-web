@@ -5,16 +5,21 @@ import { StyleSheet, Text, View } from "react-native";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 
 export const AGENT_NAME = "Seu Pãozinho";
+// Nome "de crachá" do agente, com o selo IA. Usado onde ele se apresenta como
+// personagem (cabeçalho do card na aba Hoje, título do sheet).
+export const AGENT_DISPLAY_NAME = "Seu Pãozinho IA";
 
 // O Pãozinho falando: rostinho + balão de fala + as ações que ele oferece.
 // É assim que o app conversa com a pessoa — o agente é o anfitrião do app,
-// não um botão de microfone escondido.
-export function AgentSays({ text, children, size = 46 }: { text: string; children?: ReactNode; size?: number }) {
+// não um botão de microfone escondido. Quando `name` é passado, mostra o nome
+// dele acima do balão (para a pessoa saber com quem está falando).
+export function AgentSays({ text, name, children, size = 46 }: { text: string; name?: string; children?: ReactNode; size?: number }) {
   return (
     <View style={[styles.says, shadows.soft]}>
       <View style={styles.saysRow}>
         <AgentAvatar size={size} />
         <View style={styles.bubble}>
+          {name ? <Text style={styles.bubbleName}>{name}</Text> : null}
           <Text style={styles.bubbleText}>{text}</Text>
         </View>
       </View>
@@ -73,6 +78,14 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.sm,
     backgroundColor: colors.agentSoft,
     padding: 12
+  },
+  bubbleName: {
+    marginBottom: 3,
+    color: colors.agentDeep,
+    fontSize: 12.5,
+    fontFamily: fonts.bodyBold,
+    textTransform: "uppercase",
+    letterSpacing: 0.5
   },
   bubbleText: {
     color: colors.agentDeep,

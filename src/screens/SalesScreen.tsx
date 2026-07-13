@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AGENT_NAME, AgentAvatar, AgentSays, AgentTag } from "@/components/agent";
+import { AGENT_DISPLAY_NAME, AGENT_NAME, AgentAvatar, AgentSays, AgentTag } from "@/components/agent";
 import { AgentSheet, invalidateDay } from "@/components/agent-sheet";
 import { CoachAnchor, useCoach, type CoachStep } from "@/components/coach/coach-tour";
 import { NotificationsButton } from "@/components/notifications";
@@ -414,6 +414,7 @@ export function SalesScreen() {
         {isFirstRun ? (
           <>
             <AgentSays
+              name={AGENT_DISPLAY_NAME}
               text={`Oi! Eu sou o ${AGENT_NAME}, seu ajudante aqui na padoca. Primeiro, cadastre o que você vende — nome e preço já bastam.`}
             >
               <Button title="Cadastrar produto" onPress={() => router.push("/produtos?novo=1")} />
@@ -443,7 +444,7 @@ export function SalesScreen() {
             ele se oferece para abrir o dia. Ontem e atalhos vêm depois. */}
         {isReadyToStart ? (
           <>
-            <AgentSays text="Fornada pronta? Me fala o que você preparou que eu abro o dia pra você.">
+            <AgentSays name={AGENT_DISPLAY_NAME} text="Fornada pronta? Me fala o que você preparou que eu abro o dia pra você.">
               <Button
                 title={`Falar com o ${AGENT_NAME}`}
                 tone="agent"
@@ -724,7 +725,7 @@ function AgentBanner({
         <AgentAvatar size={52} />
         <View style={styles.agentBannerText}>
           <AgentTag />
-          <Text style={styles.agentName}>{AGENT_NAME}</Text>
+          <Text style={styles.agentName}>{AGENT_DISPLAY_NAME}</Text>
           <Text style={styles.agentHint}>{hint}</Text>
         </View>
       </View>

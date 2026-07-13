@@ -259,6 +259,18 @@ export function formatUnitIssue(issue: UnitIssue): string {
   return `${issue.nome}: a medida ${medida ? `"${medida}" ` : ""}precisa ser g, kg, ml, L ou unidade.`;
 }
 
+// Unidade de rendimento no singular, para o rótulo do custo ("custo por
+// fatia", "custo por unidade"). O rendimento é digitado no plural ("fatias",
+// "unidades", "pães") — reduzimos os plurais mais comuns do pt-BR.
+export function unidadeRendimentoSingular(unidade?: string | null): string {
+  const raw = (unidade || "").trim().toLowerCase();
+  if (!raw) return "unidade";
+  if (raw.endsWith("ões")) return `${raw.slice(0, -3)}ão`; // porções → porção
+  if (raw.endsWith("ães")) return `${raw.slice(0, -3)}ão`; // pães → pão
+  if (raw.endsWith("s") && raw.length > 3) return raw.slice(0, -1); // fatias → fatia
+  return raw;
+}
+
 // Entradas numéricas em pt-BR aceitam vírgula ("1,5" → 1.5).
 export function parseDecimalInput(text: string): number | null {
   const normalized = text.trim().replace(/\./g, ".").replace(",", ".");

@@ -8,6 +8,7 @@ import type {
   FinalidadeCusteio,
   GerarListaCompraRequest,
   ListaCompra,
+  ProdutoComReceita,
   SessaoCusteio
 } from "@/types/custeio";
 import type {
@@ -515,6 +516,10 @@ export const api = {
       obter: (listaId: UUID) =>
         apiRequest<ListaCompra | null>(`/api/v1/custos/listas-compras/${listaId}`, { allowNotFound: true })
     },
+    // Produtos que já têm receita — para a lista de compras separar disponíveis
+    // (com receita) de quem ainda precisa passar pela jornada de custo.
+    produtosComReceita: () =>
+      apiRequest<ProdutoComReceita[] | null>("/api/v1/custos/produtos-com-receita", { allowNotFound: true }),
     listInsumos: () => apiRequest<Record<string, unknown>[]>("/api/v1/custos/insumos"),
     createInsumo: (body: Record<string, unknown>) => apiRequest("/api/v1/custos/insumos", { method: "POST", body }),
     updateInsumo: (insumoId: UUID, body: Record<string, unknown>) =>

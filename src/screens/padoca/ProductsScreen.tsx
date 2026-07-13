@@ -393,7 +393,7 @@ function EditProductForm({ onClose, product }: { onClose: () => void; product: P
           <StateText tone="error" text="Informe um preço de venda maior que zero." />
         ) : priceOrCostChanged ? (
           <Text style={styles.priceHint}>Ao salvar, o novo preço entra no histórico do produto.</Text>
-        ) : isCostFromAI(product.preco_atual) ? (
+        ) : isCostFromAI(product.preco_atual) && toNumber(product.preco_atual?.preco_custo) > 0 ? (
           <View style={styles.costFromAi}>
             <Sparkles size={13} color={colors.agentDeep} />
             <Text style={styles.costFromAiText}>Este custo foi calculado com IA.</Text>

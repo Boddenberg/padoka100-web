@@ -753,6 +753,9 @@ function ResultPhase({
   onRedo: () => void;
   onBackToCatalog: () => void;
 }) {
+  // A unidade escolhida no rendimento faz o rótulo do custo casar com o que a
+  // pessoa selecionou (custo por fatia, por unidade...).
+  const unidadeRendimento = session?.rascunho?.receita?.unidade_rendimento;
   if (confirmed) {
     return (
       <>
@@ -765,7 +768,9 @@ function ResultPhase({
             Guardei o custo em {productName} com a marca “calculado com IA”. Agora cada venda já sabe quanto custou.
           </Text>
         </View>
-        {session?.custo_simulado ? <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} confirmed /> : null}
+        {session?.custo_simulado ? (
+          <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} unidadeRendimento={unidadeRendimento} confirmed />
+        ) : null}
         {redoError ? <StateText tone="error" text={redoError} /> : null}
         <Button title={redoPending ? "Preparando..." : "Refazer o cálculo"} tone="outline" disabled={redoPending} onPress={onRedo} />
         <Button title="Voltar ao catálogo" tone="soft" onPress={onBackToCatalog} />
@@ -779,7 +784,7 @@ function ResultPhase({
     <>
       <SectionTitle text="Resultado" />
       {session?.custo_simulado ? (
-        <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} incompleteHint={incompleteHint} />
+        <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} unidadeRendimento={unidadeRendimento} incompleteHint={incompleteHint} />
       ) : null}
 
       {acceptError ? <StateText tone="error" text={acceptError} /> : null}

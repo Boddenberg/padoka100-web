@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar } from "@/components/agent";
 import { Badge, Button, Card, Input, Sheet, StateText } from "@/components/ui";
 import { api, createAudioForm, createIaPhotoForm, type NativeFile } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
@@ -213,12 +214,24 @@ function AgentConversation({
   }
 
   const busy = interpret.isPending || upload.isPending || photoUpload.isPending;
-  const reviewing = Boolean(result);
+  // Só é "revisão" quando há mesmo algo para confirmar. Respostas de conversa
+  // (o especialista) e recados sem ação vêm com precisa_confirmacao=false: aí
+  // o Pãozinho só fala no balão e as entradas continuam à mão para seguir.
+  const needsConfirm = Boolean(result) && result?.precisa_confirmacao !== false;
+  const reviewing = needsConfirm;
 
   // Itens estruturados só aparecem em algumas ações (venda/produção). No
-  // cadastro por cardápio, o resumo vem em mensagem_confirmacao.
+  // cadastro por cardápio, os produtos lidos vêm em dados_confirmacao.produtos.
   const items = result?.itens ?? [];
   const acao = result?.acao ?? "";
+  const produtosCadastro =
+    acao === "criar_produtos" && result?.dados_confirmacao
+      ? ((result.dados_confirmacao as { produtos?: { nome?: string; preco_venda?: number | string }[] }).produtos ?? [])
+      : [];
+  // O balão de cima já fala a mensagem do agente; só repetimos a mensagem de
+  // confirmação no card quando ela for diferente (senão fica escrito 2x).
+  const bubbleText = (result?.mensagem_assistente || "").trim();
+  const showReviewMessage = Boolean(result?.mensagem_confirmacao) && (result?.mensagem_confirmacao || "").trim() !== bubbleText;
   const reviewTitle =
     acao === "criar_produtos"
       ? "Vou cadastrar estes produtos:"
@@ -283,10 +296,18 @@ function AgentConversation({
               ) : null}
             </View>
           ))}
+          {produtosCadastro.map((produto, index) => (
+            <View key={`${produto.nome || "produto"}-${index}`} style={styles.resultRow}>
+              <Text style={styles.resultItem}>{fixProductName(produto.nome || "Produto")}</Text>
+              {produto.preco_venda != null && produto.preco_venda !== "" ? (
+                <Text style={styles.resultPrice}>{formatCurrency(produto.preco_venda)}</Text>
+              ) : null}
+            </View>
+          ))}
           {result?.itens_nao_identificados?.length ? (
             <StateText tone="error" text={`Não consegui identificar: ${result.itens_nao_identificados.join(", ")}`} />
           ) : null}
-          {result?.mensagem_confirmacao ? <Text style={styles.reviewMessage}>{result.mensagem_confirmacao}</Text> : null}
+          {showReviewMessage ? <Text style={styles.reviewMessage}>{result?.mensagem_confirmacao}</Text> : null}
           <Button
             title={confirmLabel}
             tone="success"
@@ -551,5 +572,11 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
     fontFamily: fonts.bodyBold
+  },
+  resultPrice: {
+    color: colors.agentDeep,
+    fontSize: 15,
+    fontFamily: fonts.display,
+    letterSpacing: -0.2
   }
 });

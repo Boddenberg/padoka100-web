@@ -16,6 +16,7 @@ import {
   purchaseText,
   receitaPendingHint,
   recipeUsageText,
+  unidadeRendimentoSingular,
   type CusteioPhase
 } from "@/lib/custeio";
 import { formatCurrency, toNumber } from "@/lib/format";
@@ -316,16 +317,21 @@ export function CostSummaryCard({
   custo,
   precoVenda,
   confirmed,
-  incompleteHint
+  incompleteHint,
+  unidadeRendimento
 }: {
   custo: CustoSimulado;
   precoVenda: number | null;
   confirmed?: boolean;
   incompleteHint?: string;
+  // Unidade escolhida no rendimento ("fatias", "unidades"...) para o rótulo do
+  // custo espelhar o que a pessoa selecionou (custo por fatia, por unidade...).
+  unidadeRendimento?: string | null;
 }) {
   const unidade = custoPorUnidade(custo);
   const total = custoTotal(custo);
   const detalhes = custoDetalhes(custo);
+  const unidadeLabel = unidadeRendimentoSingular(unidadeRendimento);
   const scale = useRef(new Animated.Value(0.96)).current;
 
   // Sem custo real ainda (faltam preços/medidas): mostramos um estado calmo
@@ -342,7 +348,7 @@ export function CostSummaryCard({
     return (
       <Animated.View style={{ transform: [{ scale }] }}>
         <View style={[styles.costCard, styles.costCardDraft, shadows.soft]}>
-          <Text style={[styles.costLabel, { color: colors.muted }]}>Custo por unidade</Text>
+          <Text style={[styles.costLabel, { color: colors.muted }]}>Custo por {unidadeLabel}</Text>
           <View style={styles.incompleteRow}>
             <Text style={styles.incompleteEmoji}>🧮</Text>
             <Text style={styles.incompleteText}>
@@ -362,11 +368,11 @@ export function CostSummaryCard({
     <Animated.View style={{ transform: [{ scale }] }}>
       {confirmed ? (
         <LinearGradient colors={gradients.hero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.costCard, shadows.floating]}>
-          <CostSummaryContent light unidade={unidade} total={total} detalhes={detalhes} lucro={lucro} margem={margem} costShare={costShare} precoVenda={precoVenda} />
+          <CostSummaryContent light unidade={unidade} unidadeLabel={unidadeLabel} total={total} detalhes={detalhes} lucro={lucro} margem={margem} costShare={costShare} precoVenda={precoVenda} />
         </LinearGradient>
       ) : (
         <View style={[styles.costCard, styles.costCardDraft, shadows.soft]}>
-          <CostSummaryContent unidade={unidade} total={total} detalhes={detalhes} lucro={lucro} margem={margem} costShare={costShare} precoVenda={precoVenda} />
+          <CostSummaryContent unidade={unidade} unidadeLabel={unidadeLabel} total={total} detalhes={detalhes} lucro={lucro} margem={margem} costShare={costShare} precoVenda={precoVenda} />
         </View>
       )}
     </Animated.View>
@@ -376,6 +382,7 @@ export function CostSummaryCard({
 function CostSummaryContent({
   light,
   unidade,
+  unidadeLabel,
   total,
   detalhes,
   lucro,
@@ -385,6 +392,7 @@ function CostSummaryContent({
 }: {
   light?: boolean;
   unidade: number | null;
+  unidadeLabel: string;
   total: number | null;
   detalhes: { nome: string; valor: number }[];
   lucro: number | null;
@@ -397,7 +405,7 @@ function CostSummaryContent({
 
   return (
     <>
-      <Text style={[styles.costLabel, { color: soft }]}>{light ? "Custo confirmado por unidade" : "Custo simulado por unidade"}</Text>
+      <Text style={[styles.costLabel, { color: soft }]}>{light ? `Custo confirmado por ${unidadeLabel}` : `Custo simulado por ${unidadeLabel}`}</Text>
       <Money value={unidade ?? 0} size={44} color={ink} prefixColor={soft} />
       {total !== null && total > 0 ? (
         <Text style={[styles.costTotalText, { color: soft }]}>Receita completa: {formatCurrency(total)}</Text>
@@ -421,7 +429,7 @@ function CostSummaryContent({
             <View style={{ flex: 1 - costShare }} />
           </View>
           <Text style={[styles.marginText, { color: ink }]}>
-            Vendendo a {formatCurrency(precoVenda || 0)}, sobra {formatCurrency(lucro)} por unidade
+            Vendendo a {formatCurrency(precoVenda || 0)}, sobra {formatCurrency(lucro)} por {unidadeLabel}
             {margem !== null ? ` (${margem}% de lucro) 🎉` : ""}
           </Text>
         </View>
