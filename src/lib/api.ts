@@ -31,6 +31,7 @@ import type {
   LocalVenda,
   LoginRequest,
   Midia,
+  MidiaRecebidaIA,
   Produto,
   RegistrarVendaRequest,
   RespostaLogin,
@@ -499,6 +500,12 @@ export const api = {
     structuredData: (dataInicio: string, dataFim: string) =>
       apiRequest<Record<string, unknown>>("/api/v1/ia/dados-estruturados/periodo", {
         query: { data_inicio: dataInicio, data_fim: dataFim }
+      }),
+    // Rastreio admin (admin.gerenciar): áudios/fotos enviados pelos clientes à IA.
+    midiasRecebidas: (params?: { item?: "audio" | "foto"; usuarioId?: UUID; limite?: number }) =>
+      apiRequest<MidiaRecebidaIA[] | null>("/api/v1/ia/midias-recebidas", {
+        query: { item: params?.item, usuario_id: params?.usuarioId, limite: params?.limite ?? 100 },
+        allowNotFound: true
       })
   },
   // Custos, insumos e receitas (exigem Bearer token e papel "dono").

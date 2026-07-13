@@ -279,6 +279,21 @@ export interface RespostaInterpretarVenda {
   modelo_usado: string;
 }
 
+// Rastreio admin: áudios/fotos que os clientes enviaram para a IA
+// (GET /ia/midias-recebidas, protegido por admin.gerenciar).
+export interface MidiaRecebidaIA {
+  id: UUID;
+  usuario_id?: UUID | null;
+  usuario_nome_cadastrado?: string | null;
+  data?: string | null;
+  item: "audio" | "foto" | string;
+  interacao_ia_id?: UUID | null;
+  midia_id?: UUID | null;
+  nome_arquivo?: string | null;
+  url_publica?: string | null;
+  tipo_conteudo?: string | null;
+}
+
 export interface RespostaConfirmarComando {
   interacao_ia_id: UUID;
   acao: string;

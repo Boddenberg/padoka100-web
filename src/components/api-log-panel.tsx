@@ -103,7 +103,7 @@ export function ApiLogPanel() {
                     {entry.path}
                   </Text>
                   <Text style={styles.entryMeta}>
-                    {entry.durationMs}ms · {formatTime(entry.at)}
+                    {entry.durationMs}ms · {entry.responseChars.toLocaleString("pt-BR")} caracteres · {formatTime(entry.at)}
                   </Text>
                 </View>
                 <ChevronDown size={16} color={colors.muted} style={open ? styles.chevronUp : undefined} />
@@ -117,7 +117,7 @@ export function ApiLogPanel() {
                       <Text style={styles.code}>{entry.request}</Text>
                     </>
                   ) : null}
-                  <Text style={styles.detailLabel}>Resposta</Text>
+                  <Text style={styles.detailLabel}>Resposta · {entry.responseChars.toLocaleString("pt-BR")} caracteres</Text>
                   <Text style={styles.code}>{entry.response || "(vazio)"}</Text>
                   <Pressable onPress={() => shareEntry(entry)} style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}>
                     <Share2 size={15} color={colors.brandDeep} />

@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation } from "@tanstack/react-query";
 import { ApiLogPanel } from "@/components/api-log-panel";
+import { IaMediaPanel } from "@/components/ia-media-panel";
 import { PlansShowcase } from "@/components/plans-showcase";
 import { Badge, Button, Card, Field, Input, Page, Sheet, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
@@ -203,6 +204,9 @@ export function ProfileScreen() {
 
         {/* Diagnóstico: histórico de chamadas ao servidor (ajuda a investigar erros). */}
         <ApiLogPanel />
+
+        {/* Rastreio admin: áudios/fotos que os clientes enviaram para a IA. */}
+        <IaMediaPanel />
       </Page>
 
       <EditPersonalSheet
