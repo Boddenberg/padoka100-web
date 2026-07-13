@@ -1,17 +1,31 @@
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets, AudioModule, setAudioModeAsync } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
-import { Camera, Images, Mic, Send, Sparkles } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { Camera, ChevronRight, Images, Mic, Send, Sparkles } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AGENT_NAME, AgentAvatar } from "@/components/agent";
 import { Badge, Button, Card, Input, Sheet, StateText } from "@/components/ui";
+import { useAuth } from "@/contexts/auth";
+import { hasAccess } from "@/lib/access";
 import { api, createAudioForm, createIaPhotoForm, type NativeFile } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { pickImage } from "@/utils/media";
 import { fixProductName } from "@/utils/text";
 import type { DiaDeVenda, RespostaInterpretarVenda } from "@/types/api";
+
+// Jornadas que o agente pode oferecer como botão quando o pedido é de outra
+// parte do app. Cada uma vira uma navegação; `capability` (quando existe) faz o
+// botão só aparecer para quem tem o plano — o resto some sozinho.
+const JOURNEYS: Record<string, { label: string; route: string; capability?: string }> = {
+  cadastrar_produtos: { label: "🥖 Cadastrar produtos", route: "/produtos?novo=1" },
+  calcular_custo: { label: "🧮 Calcular custo", route: "/custos", capability: "custos.assistente" },
+  lista_compras: { label: "🛒 Lista de compras", route: "/lista-compras", capability: "compras.usar" },
+  relatorios: { label: "📊 Ver relatórios", route: "/resumo", capability: "relatorios.avancados" },
+  cadastrar_locais: { label: "📍 Locais de venda", route: "/locais" }
+};
 
 // Conversa com o Seu Pãozinho, disponível para qualquer tela do app.
 // O backend interpreta comandos genéricos (venda, abrir dia, cadastro...);
@@ -109,6 +123,8 @@ function AgentConversation({
   photo?: AgentPhoto;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const { user } = useAuth();
   const [text, setText] = useState(initialText);
   const [result, setResult] = useState<RespostaInterpretarVenda | null>(null);
   // Recado quando a confirmação não pôde ser aplicada (sucesso: false).
@@ -232,6 +248,20 @@ function AgentConversation({
   // confirmação no card quando ela for diferente (senão fica escrito 2x).
   const bubbleText = (result?.mensagem_assistente || "").trim();
   const showReviewMessage = Boolean(result?.mensagem_confirmacao) && (result?.mensagem_confirmacao || "").trim() !== bubbleText;
+  // Conversa do especialista: quando o pedido é de outra jornada do app, ele
+  // sugere as chaves; viram botões só se a pessoa tiver o plano.
+  const jornadas =
+    !needsConfirm
+      ? ((((result?.dados_confirmacao as { jornadas?: string[] })?.jornadas) ?? []).filter((key) => {
+          const journey = JOURNEYS[key];
+          return journey && (!journey.capability || hasAccess(user, journey.capability));
+        }))
+      : [];
+
+  function goToJourney(route: string) {
+    onClose();
+    router.push(route);
+  }
   const reviewTitle =
     acao === "criar_produtos"
       ? "Vou cadastrar estes produtos:"
@@ -275,6 +305,23 @@ function AgentConversation({
         <View style={styles.loadingCard}>
           <ActivityIndicator color={colors.agentDeep} />
           <Text style={styles.loadingText}>{loadingText}</Text>
+        </View>
+      ) : null}
+
+      {/* Conversa: quando o pedido é de outra jornada do app, o Pãozinho oferece
+          o atalho direto (só aparece o que o plano da pessoa libera). */}
+      {jornadas.length > 0 && !busy ? (
+        <View style={styles.journeys}>
+          {jornadas.map((key) => (
+            <Pressable
+              key={key}
+              onPress={() => goToJourney(JOURNEYS[key].route)}
+              style={({ pressed }) => [styles.journeyButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.journeyLabel}>{JOURNEYS[key].label}</Text>
+              <ChevronRight size={18} color={colors.agentDeep} />
+            </Pressable>
+          ))}
         </View>
       ) : null}
 
@@ -578,5 +625,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: fonts.display,
     letterSpacing: -0.2
+  },
+  journeys: {
+    gap: 8
+  },
+  journeyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    minHeight: 52,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.agentSoft,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16
+  },
+  journeyLabel: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 15,
+    fontFamily: fonts.bodyBold
   }
 });
