@@ -27,6 +27,26 @@ const JOURNEYS: Record<string, { label: string; route: string; capability?: stri
   cadastrar_locais: { label: "📍 Locais de venda", route: "/locais" }
 };
 
+// Como cada jornada é falada DENTRO do texto (nunca a chave interna). Rede de
+// segurança: se o texto do agente vier com a chave crua ("cadastrar_produtos"),
+// trocamos pela frase amigável antes de mostrar — o cliente nunca vê o nome
+// técnico, mesmo que o backend ainda não tenha subido a correção.
+const JOURNEY_INLINE: Record<string, string> = {
+  cadastrar_produtos: "cadastrar seus produtos",
+  calcular_custo: "calcular o custo",
+  lista_compras: "montar a lista de compras",
+  relatorios: "ver seus relatórios",
+  cadastrar_locais: "cadastrar seus locais de venda"
+};
+
+function humanizeJourneys(text: string | null | undefined): string {
+  let output = text || "";
+  for (const [key, phrase] of Object.entries(JOURNEY_INLINE)) {
+    output = output.replace(new RegExp(`["']?\\b${key}\\b["']?`, "gi"), phrase);
+  }
+  return output;
+}
+
 // Conversa com o Seu Pãozinho, disponível para qualquer tela do app.
 // O backend interpreta comandos genéricos (venda, abrir dia, cadastro...);
 // aqui só muda o convite e os exemplos conforme o contexto.
@@ -293,7 +313,7 @@ function AgentConversation({
             : busy
               ? loadingText
               : result?.mensagem_assistente
-                ? result.mensagem_assistente
+                ? humanizeJourneys(result.mensagem_assistente)
                 : reviewing
                   ? "Confere pra mim e toque em confirmar."
                   : idleHint}
@@ -354,7 +374,7 @@ function AgentConversation({
           {result?.itens_nao_identificados?.length ? (
             <StateText tone="error" text={`Não consegui identificar: ${result.itens_nao_identificados.join(", ")}`} />
           ) : null}
-          {showReviewMessage ? <Text style={styles.reviewMessage}>{result?.mensagem_confirmacao}</Text> : null}
+          {showReviewMessage ? <Text style={styles.reviewMessage}>{humanizeJourneys(result?.mensagem_confirmacao)}</Text> : null}
           <Button
             title={confirmLabel}
             tone="success"
