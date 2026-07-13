@@ -55,11 +55,13 @@ export function ProductsScreen() {
   const [agentAutoRecord, setAgentAutoRecord] = useState(false);
   const [agentMessage, setAgentMessage] = useState<string | null>(null);
 
-  // "Por voz" já abre gravando; "por foto" abre nos botões de foto.
+  // "Por voz" já abre gravando; "por foto" abre nos botões de foto. O sheet de
+  // cadastro fecha antes de o do agente abrir: no Android, abrir um Modal no
+  // mesmo instante que outro fecha às vezes não mostra o segundo.
   const openAgent = (mode: "voice" | "photo") => {
     setSheet(null);
     setAgentAutoRecord(mode === "voice");
-    setAgentOpen(true);
+    setTimeout(() => setAgentOpen(true), 250);
   };
 
   // O recado de sucesso do Pãozinho se despede sozinho.
