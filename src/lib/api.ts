@@ -57,6 +57,8 @@ interface RequestOptions {
   signal?: AbortSignal;
   allowNotFound?: boolean;
   settings?: ApiSettings;
+  // Interno: marca a rechamada após renovar o token (evita loop de 401).
+  isRetry?: boolean;
 }
 
 export interface NativeFile {
@@ -68,6 +70,9 @@ export interface NativeFile {
 // Token de sessão em cache: enviado como Bearer em toda chamada autenticada.
 let sessionToken: string | null = null;
 let unauthorizedHandler: (() => void) | null = null;
+// Quem detém a sessão (auth context) registra como renovar o token de acesso.
+let tokenRefresher: (() => Promise<string | null>) | null = null;
+let refreshInFlight: Promise<string | null> | null = null;
 
 export function setApiToken(token: string | null) {
   sessionToken = token;
@@ -76,6 +81,24 @@ export function setApiToken(token: string | null) {
 // Sessão expirada (401): quem cuida do estado de auth se registra aqui.
 export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler;
+}
+
+// Renovação do token de acesso (Supabase). O auth context registra a função;
+// a API a usa quando um request toma 401, para tentar recuperar antes de deslogar.
+export function setTokenRefresher(refresher: (() => Promise<string | null>) | null) {
+  tokenRefresher = refresher;
+}
+
+// Renova no máximo uma vez por vez, mesmo com várias chamadas tomando 401
+// juntas (singleflight). Devolve o novo token, ou null se não deu para renovar.
+function refreshSessionToken(): Promise<string | null> {
+  if (!tokenRefresher) return Promise.resolve(null);
+  if (!refreshInFlight) {
+    refreshInFlight = tokenRefresher().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
 }
 
 // Mensagens amigáveis por categoria. Nunca expomos código HTTP, nome de exceção
@@ -273,6 +296,14 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) {
     if (response.status === 404 && options.allowNotFound) return null as T;
+    // Sessão possivelmente vencida no meio do uso: tenta renovar o token UMA vez
+    // e refazer a chamada, antes de deslogar. É o que evita ficar "preso" numa
+    // tela com "sessão expirou" quando o Supabase ainda consegue renovar — a
+    // pessoa nem percebe. Só desloga (unauthorizedHandler) se a renovação falhar.
+    if (response.status === 401 && sessionToken && !options.isRetry) {
+      const renewed = await refreshSessionToken();
+      if (renewed) return apiRequest<T>(path, { ...options, isRetry: true });
+    }
     if (response.status === 401 && sessionToken) unauthorizedHandler?.();
     throw new ApiError(messageForError(response.status, payload), response.status, payload);
   }

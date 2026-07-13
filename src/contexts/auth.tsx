@@ -1,7 +1,7 @@
 import * as WebBrowser from "expo-web-browser";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { isAdmin } from "@/lib/access";
-import { api, ApiError, setApiToken, setUnauthorizedHandler } from "@/lib/api";
+import { api, ApiError, setApiToken, setTokenRefresher, setUnauthorizedHandler } from "@/lib/api";
 import { setApiLogAdminEnabled } from "@/lib/api-log";
 import { clearSession, readSession, saveSession } from "@/lib/session";
 import {
@@ -94,6 +94,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await clearSession();
   }, []);
 
+  // Renova o token de acesso pelo Supabase e devolve o novo. A camada de API
+  // chama isto quando um request toma 401: renovar + refazer a chamada evita o
+  // "sessão expirou" preso na tela quando o token só venceu (e ainda dá para
+  // renovar). Devolve null quando a sessão morreu de vez → aí sim desloga.
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!supabaseAuthConfigured) return null;
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      const token = data.session?.access_token ?? null;
+      if (error || !token) return null;
+      // O onAuthStateChange("TOKEN_REFRESHED") cuida de perfil/sessão salva; aqui
+      // só precisamos do token novo em cache para a rechamada seguir na hora.
+      setApiToken(token);
+      return token;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    setTokenRefresher(refreshAccessToken);
+    return () => setTokenRefresher(null);
+  }, [refreshAccessToken]);
+
   useEffect(() => {
     let active = true;
     async function restoreSession() {
@@ -178,10 +202,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearLocalAuth, establishSession]);
 
   const signOut = useCallback(async () => {
+    // Encerra a sessão LOCAL na hora: clearLocalAuth já joga o status para
+    // signed-out (o RootNavigator leva ao login com a splash por cima), sem
+    // esperar a rede. O logout no servidor/Supabase segue em segundo plano —
+    // assim uma sessão expirada nunca fica "presa" na tela atual.
     api.auth.logout().catch(() => undefined);
-    if (supabaseAuthConfigured) {
-      await supabase.auth.signOut();
-    }
+    if (supabaseAuthConfigured) supabase.auth.signOut().catch(() => undefined);
     await clearLocalAuth();
   }, [clearLocalAuth]);
 
