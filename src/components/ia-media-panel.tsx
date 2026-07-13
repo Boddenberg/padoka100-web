@@ -1,8 +1,8 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
-import { ImageOff, Pause, Play, X } from "lucide-react-native";
+import { ImageOff, Pause, Play, RefreshCw, X } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Input, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
@@ -91,9 +91,28 @@ export function IaMediaPanel() {
     setVisible(10);
   }
 
+  function refresh() {
+    stopPlayback();
+    query.refetch();
+  }
+
   return (
     <Card>
-      <Text style={styles.title}>Mídias recebidas</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Mídias recebidas</Text>
+        <Pressable
+          accessibilityLabel="Atualizar mídias recebidas"
+          disabled={query.isFetching}
+          onPress={refresh}
+          style={({ pressed }) => [styles.refreshButton, pressed && styles.pressed, query.isFetching && styles.pressed]}
+        >
+          {query.isFetching ? (
+            <ActivityIndicator size="small" color={colors.brandDeep} />
+          ) : (
+            <RefreshCw size={18} color={colors.brandDeep} />
+          )}
+        </Pressable>
+      </View>
       <Text style={styles.subtitle}>Áudios e fotos que os clientes enviaram para a IA. Toque para ouvir ou ampliar.</Text>
 
       <View style={styles.filterRow}>
@@ -209,6 +228,22 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  refreshButton: {
+    height: 40,
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.brandSoft,
+    backgroundColor: colors.surfaceGlow
   },
   title: {
     color: colors.ink,
