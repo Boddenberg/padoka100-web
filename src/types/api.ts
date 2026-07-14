@@ -285,6 +285,7 @@ export interface MidiaRecebidaIA {
   id: UUID;
   usuario_id?: UUID | null;
   usuario_nome_cadastrado?: string | null;
+  usuario_foto_url?: string | null;
   data?: string | null;
   item: "audio" | "foto" | string;
   interacao_ia_id?: UUID | null;

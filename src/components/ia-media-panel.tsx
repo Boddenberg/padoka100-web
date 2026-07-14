@@ -1,6 +1,6 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
-import { ImageOff, Pause, Play, RefreshCw, X } from "lucide-react-native";
+import { ImageOff, Pause, Play, RefreshCw, UserRound, X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { Collapsible, Input, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
 import { isAdmin } from "@/lib/access";
 import { api } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/settings";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
 import type { MidiaRecebidaIA } from "@/types/api";
 
@@ -202,9 +203,12 @@ function MediaRow({
         </Pressable>
       )}
       <View style={styles.rowInfo}>
-        <Text style={styles.rowName} numberOfLines={1}>
-          {media.usuario_nome_cadastrado || "Sem nome"}
-        </Text>
+        <View style={styles.nameRow}>
+          <SenderAvatar nome={media.usuario_nome_cadastrado} foto={media.usuario_foto_url} />
+          <Text style={styles.rowName} numberOfLines={1}>
+            {media.usuario_nome_cadastrado || "Sem nome"}
+          </Text>
+        </View>
         <Text style={styles.rowMeta}>
           {isAudio ? "🎙️ Áudio" : "📷 Foto"}
           {media.data ? ` · ${formatWhen(media.data)}` : ""}
@@ -215,6 +219,21 @@ function MediaRow({
           </Text>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+// Foto de quem enviou (item 8): ajuda o admin a reconhecer o remetente. Sem
+// foto, cai numa inicial (ou ícone) para o layout nunca ficar estranho.
+function SenderAvatar({ nome, foto }: { nome?: string | null; foto?: string | null }) {
+  const uri = resolveMediaUrl(foto);
+  if (uri) {
+    return <Image source={{ uri }} style={styles.senderAvatar} contentFit="cover" transition={150} />;
+  }
+  const inicial = (nome || "").trim().charAt(0).toUpperCase();
+  return (
+    <View style={styles.senderAvatarFallback}>
+      {inicial ? <Text style={styles.senderInitial}>{inicial}</Text> : <UserRound size={14} color={colors.brandDeep} />}
     </View>
   );
 }
@@ -319,7 +338,32 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2
   },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7
+  },
+  senderAvatar: {
+    height: 22,
+    width: 22,
+    borderRadius: 11,
+    backgroundColor: colors.surfaceWarm
+  },
+  senderAvatarFallback: {
+    height: 22,
+    width: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: colors.brandSoft
+  },
+  senderInitial: {
+    color: colors.brandDeep,
+    fontSize: 11,
+    fontFamily: fonts.display
+  },
   rowName: {
+    flex: 1,
     color: colors.ink,
     fontSize: 15,
     fontFamily: fonts.bodyBold
