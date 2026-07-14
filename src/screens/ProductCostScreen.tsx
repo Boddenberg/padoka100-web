@@ -1,7 +1,7 @@
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Keyboard as KeyboardIcon, Mic, PartyPopper, X } from "lucide-react-native";
+import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Keyboard as KeyboardIcon, Mic, PartyPopper, Pencil, X } from "lucide-react-native";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -247,6 +247,26 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     }
   });
 
+  // Editar depois de confirmar: uma sessão confirmada é imutável, então abrimos
+  // uma NOVA já semeada com a receita e os preços que a pessoa tinha (o backend
+  // só normaliza o rascunho, sem IA). Nada se perde — o pai cai na etapa da
+  // receita para adicionar o ingrediente esquecido e o custo recalcula sozinho.
+  const editSession = useMutation({
+    mutationFn: async () => {
+      const seed = session?.rascunho || {};
+      await Promise.all([clearStoredSessionId(produtoId), clearStoredPhase(produtoId)]);
+      return api.custos.assistente.criarSessao({
+        produto_id: produtoId,
+        contexto: `Usuário quer editar a receita e recalcular o custo de ${productName}`,
+        rascunho_inicial: seed
+      });
+    },
+    onSuccess: (response) => {
+      applySession(response);
+      goToPhase("receita");
+    }
+  });
+
   // --- Gravação de áudio (mesmo padrão da tela de vendas). -----------------
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -467,7 +487,10 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
                 acceptError={confirmSession.error instanceof Error ? confirmSession.error.message : null}
                 redoPending={restartSession.isPending}
                 redoError={restartSession.error instanceof Error ? restartSession.error.message : null}
+                editPending={editSession.isPending}
+                editError={editSession.error instanceof Error ? editSession.error.message : null}
                 onAccept={() => confirmSession.mutate(true)}
+                onEdit={() => editSession.mutate()}
                 onRedo={() =>
                   confirmDestructive(
                     "Refazer o cálculo",
@@ -734,7 +757,10 @@ function ResultPhase({
   acceptError,
   redoPending,
   redoError,
+  editPending,
+  editError,
   onAccept,
+  onEdit,
   onRedo,
   onBackToCatalog
 }: {
@@ -749,7 +775,10 @@ function ResultPhase({
   acceptError: string | null;
   redoPending: boolean;
   redoError: string | null;
+  editPending: boolean;
+  editError: string | null;
   onAccept: () => void;
+  onEdit: () => void;
   onRedo: () => void;
   onBackToCatalog: () => void;
 }) {
@@ -771,8 +800,18 @@ function ResultPhase({
         {session?.custo_simulado ? (
           <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} unidadeRendimento={unidadeRendimento} confirmed />
         ) : null}
+        {/* Esqueceu um ingrediente? Reabre a receita já preenchida (sem perder
+            nada) para adicionar o que faltou e recalcular. */}
+        {editError ? <StateText tone="error" text={editError} /> : null}
+        <Button
+          title={editPending ? "Abrindo..." : "Editar receita e recalcular"}
+          icon={<Pencil size={18} color="#fff" />}
+          disabled={editPending || redoPending}
+          onPress={onEdit}
+        />
+        <Text style={styles.editKeepsHint}>Sua receita e os preços continuam salvos — só adicione ou ajuste o que faltou.</Text>
         {redoError ? <StateText tone="error" text={redoError} /> : null}
-        <Button title={redoPending ? "Preparando..." : "Refazer o cálculo"} tone="outline" disabled={redoPending} onPress={onRedo} />
+        <Button title={redoPending ? "Preparando..." : "Refazer do zero"} tone="outline" disabled={redoPending || editPending} onPress={onRedo} />
         <Button title="Voltar ao catálogo" tone="soft" onPress={onBackToCatalog} />
       </>
     );
@@ -1225,6 +1264,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body
   },
   gateHint: {
+    color: colors.muted,
+    fontSize: 13,
+    fontFamily: fonts.body,
+    textAlign: "center"
+  },
+  editKeepsHint: {
+    marginTop: -4,
     color: colors.muted,
     fontSize: 13,
     fontFamily: fonts.body,

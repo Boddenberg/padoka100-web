@@ -94,6 +94,9 @@ export interface SessaoCusteio {
 export interface CriarSessaoCusteioRequest {
   produto_id?: UUID | null;
   contexto?: string | null;
+  // Semeia a sessão nova já preenchida (usado ao editar um custo confirmado
+  // sem perder receita nem preços). O backend só normaliza — não roda IA.
+  rascunho_inicial?: RascunhoCusteio | null;
 }
 
 export interface EntradaTextoCusteioRequest {
