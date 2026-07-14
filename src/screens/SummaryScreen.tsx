@@ -8,6 +8,7 @@ import { AiAnalysisCard } from "@/components/resumo/ai-analysis";
 import { DaySummarySheet } from "@/components/resumo/day-summary-sheet";
 import { PeriodChart } from "@/components/resumo/period-chart";
 import { Badge, Button, Card, Money, Page, SectionTitle, Skeleton, StateText } from "@/components/ui";
+import { useProgressivePeriod } from "@/hooks/use-progressive-period";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, formatWholeCurrency, toNumber, todayInputValue } from "@/lib/format";
 import { colors, fonts, radius, shadows } from "@/lib/theme";
@@ -22,38 +23,21 @@ export function SummaryScreen() {
   const [end, setEnd] = useState(today);
   const [openDayId, setOpenDayId] = useState<string | null>(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [visibleDayLimit, setVisibleDayLimit] = useState(31);
   const HISTORY_PREVIEW = 6;
 
-  // 1º card (faturamento + comparação): rota agregada leve e rápida. Enquanto o
-  // backend não publica /periodo/resumo, ela devolve null (404 tolerado) e o card
-  // cai nos totais da rota pesada abaixo — mesma experiência de hoje, sem quebrar.
-  const cardQuery = useQuery({
-    queryKey: ["relatorios", "periodo-resumo", start, end],
-    queryFn: () => api.relatorios.periodResumo(start, end),
-    enabled: Boolean(start && end),
-    refetchInterval: (query) => (query.state.status === "error" ? 6000 : false)
-  });
+  // O mês mais recente aparece primeiro. Os demais entram um a um, sempre pela
+  // rota compacta; nenhuma resposta contém as vendas ou os itens brutos.
+  const progressivePeriod = useProgressivePeriod(start, end);
 
-  // Rota pesada: ainda necessária para o gráfico e a lista de dias (usa `dias`).
-  const periodQuery = useQuery({
-    queryKey: ["relatorios", "periodo", start, end],
-    queryFn: () => api.relatorios.period(start, end),
-    enabled: Boolean(start && end),
-    // Se o servidor ainda não respondeu (ex.: endpoint indisponível/404),
-    // segue tentando sozinho a cada 6s em vez de travar num erro seco.
-    refetchInterval: (query) => (query.state.status === "error" ? 6000 : false)
-  });
-
-  // Período anterior do mesmo tamanho, para a frase de comparação. Só busca no
-  // pesado se a rota leve NÃO trouxe `periodo_anterior` (fica inerte quando ela
-  // estiver no ar); espera a leve responder antes, pra não disparar à toa.
+  // A comparação só começa depois que o período atual terminou, evitando duas
+  // leituras grandes concorrentes.
   const span = diffDays(start, end) + 1;
   const previousStart = addDays(start, -span);
   const previousEnd = addDays(start, -1);
-  const previousQuery = useQuery({
-    queryKey: ["relatorios", "periodo", previousStart, previousEnd],
-    queryFn: () => api.relatorios.period(previousStart, previousEnd),
-    enabled: Boolean(start && end) && cardQuery.isFetched && !cardQuery.data?.periodo_anterior
+  const previousPeriod = useProgressivePeriod(previousStart, previousEnd, {
+    enabled: progressivePeriod.isComplete,
+    includeDays: false
   });
 
   const historyQuery = useQuery({
@@ -76,30 +60,29 @@ export function SummaryScreen() {
   // Dia único selecionado que teve venda: habilita o botão de resumo do dia.
   const selectedDayId = start === end ? dayIdByDate.get(start) : undefined;
 
-  const totals = periodQuery.data; // pesado: alimenta gráfico e lista de dias
-  // 1º card: prioriza a rota leve; sem ela (404), usa os totais do pesado.
-  const cardTotals = cardQuery.data ?? totals;
-  const cardLoading = !cardTotals && (cardQuery.isLoading || periodQuery.isLoading);
-  const cardError = !cardTotals && Boolean(cardQuery.error || periodQuery.error);
-  // Comparação: faturamento anterior vem da rota leve ou, no fallback, do pesado.
-  const previousFaturamento = cardQuery.data?.periodo_anterior
-    ? toNumber(cardQuery.data.periodo_anterior.faturamento_bruto)
-    : toNumber(previousQuery.data?.faturamento_bruto);
-  const hasPrevious = Boolean(cardQuery.data?.periodo_anterior) || (!previousQuery.error && !previousQuery.isLoading);
+  const totals = progressivePeriod.data;
+  const cardTotals = totals;
+  const cardLoading = !cardTotals && progressivePeriod.isLoading;
+  const cardError = !cardTotals && Boolean(progressivePeriod.error);
+  const previousFaturamento = toNumber(previousPeriod.data?.faturamento_bruto);
+  const hasPrevious = previousPeriod.isComplete;
   const periodLabel = describePeriod(start, end, today);
+  const daysNewestFirst = useMemo(
+    () => [...(totals?.dias || [])].sort((first, second) => second.data_venda.localeCompare(first.data_venda)),
+    [totals?.dias]
+  );
+  const visibleDays = daysNewestFirst.slice(0, visibleDayLimit);
 
   // Puxar-para-recarregar: refaz todas as buscas do resumo (recupera de erro).
-  const refreshing =
-    cardQuery.isRefetching || periodQuery.isRefetching || historyQuery.isRefetching || salesDaysQuery.isRefetching;
+  const refreshing = historyQuery.isRefetching || salesDaysQuery.isRefetching;
   const onRefresh = () => {
-    cardQuery.refetch();
-    periodQuery.refetch();
-    previousQuery.refetch();
+    progressivePeriod.reload();
     historyQuery.refetch();
     salesDaysQuery.refetch();
   };
 
   function setPeriod(nextStart: string, nextEnd: string) {
+    setVisibleDayLimit(31);
     setStart(nextStart);
     setEnd(nextEnd);
   }
@@ -134,7 +117,14 @@ export function SummaryScreen() {
           {cardTotals ? (
             <>
               <Money value={cardTotals.faturamento_bruto} size={40} />
-              <Badge text={periodLabel} tone="good" />
+              <Badge
+                text={
+                  progressivePeriod.isComplete
+                    ? periodLabel
+                    : `Parcial · ${progressivePeriod.loadedChunks} de ${progressivePeriod.totalChunks} meses`
+                }
+                tone={progressivePeriod.isComplete ? "good" : "neutral"}
+              />
               <ComparisonLine
                 total={toNumber(cardTotals.faturamento_bruto)}
                 previousTotal={previousFaturamento}
@@ -180,17 +170,34 @@ export function SummaryScreen() {
           ) : null}
         </Card>
 
+        {progressivePeriod.totalChunks > 1 ? (
+          <ProgressiveLoadState
+            loaded={progressivePeriod.loadedChunks}
+            total={progressivePeriod.totalChunks}
+            current={progressivePeriod.currentChunk}
+            complete={progressivePeriod.isComplete}
+            error={progressivePeriod.error}
+            onRetry={progressivePeriod.reload}
+          />
+        ) : null}
+
         <AnalyticsReportHub start={start} end={end} />
 
         {/* 3. Gráfico de vendas do período selecionado. */}
-        <PeriodChart dias={totals?.dias} start={start} end={end} today={today} loading={periodQuery.isLoading} />
+        <PeriodChart
+          dias={totals?.dias}
+          start={start}
+          end={end}
+          today={today}
+          loading={progressivePeriod.isLoading && !totals}
+        />
 
         {/* 4. Análise com IA do período selecionado. */}
         <AiAnalysisCard start={start} end={end} />
 
         {/* Dias do período, cada um abre o próprio resumo. */}
-        {totals?.dias?.length ? <SectionTitle text="Dias do período" /> : null}
-        {(totals?.dias || []).map((day) => (
+        {daysNewestFirst.length ? <SectionTitle text="Dias do período" /> : null}
+        {visibleDays.map((day) => (
           <Pressable
             key={day.dia_de_venda_id}
             onPress={() => setOpenDayId(day.dia_de_venda_id)}
@@ -217,6 +224,13 @@ export function SummaryScreen() {
             </Card>
           </Pressable>
         ))}
+        {daysNewestFirst.length > visibleDayLimit ? (
+          <Button
+            title={`Mostrar mais ${Math.min(31, daysNewestFirst.length - visibleDayLimit)} dias`}
+            tone="soft"
+            onPress={() => setVisibleDayLimit((current) => current + 31)}
+          />
+        ) : null}
 
         {/* 5. Histórico em linguagem humana: começa curto, expande sob demanda. */}
         <SectionTitle text="Histórico" />
@@ -247,6 +261,50 @@ export function SummaryScreen() {
 
       <DaySummarySheet visible={Boolean(openDayId)} dayId={openDayId} onClose={() => setOpenDayId(null)} />
     </>
+  );
+}
+
+function ProgressiveLoadState({
+  loaded,
+  total,
+  current,
+  complete,
+  error,
+  onRetry
+}: {
+  loaded: number;
+  total: number;
+  current?: { start: string; end: string };
+  complete: boolean;
+  error: Error | null;
+  onRetry: () => void;
+}) {
+  const percentage = Math.round((loaded / Math.max(total, 1)) * 100);
+  return (
+    <Card>
+      <View style={styles.progressHeader}>
+        <View style={styles.progressCopy}>
+          <Text style={styles.progressTitle}>
+            {complete ? "Período completo" : error ? "Carregamento pausado" : "Carregando sem pesar"}
+          </Text>
+          <Text style={styles.muted}>
+            {complete
+              ? `${total} etapas mensais carregadas com segurança.`
+              : `${loaded} de ${total} etapas prontas${current ? ` · agora ${formatDate(current.start)} a ${formatDate(current.end)}` : ""}`}
+          </Text>
+        </View>
+        <Badge text={`${percentage}%`} tone={complete ? "good" : "neutral"} />
+      </View>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${Math.max(percentage, 3)}%` as `${number}%` }]} />
+      </View>
+      {error ? (
+        <>
+          <StateText tone="error" text="Uma etapa não respondeu. O que já carregou continua visível." />
+          <Button title="Continuar carregamento" tone="soft" onPress={onRetry} />
+        </>
+      ) : null}
+    </Card>
   );
 }
 
@@ -327,6 +385,31 @@ const styles = StyleSheet.create({
   comparisonText: {
     fontSize: 15,
     fontFamily: fonts.bodyBold
+  },
+  progressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  progressCopy: {
+    flex: 1,
+    gap: 2
+  },
+  progressTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontFamily: fonts.display
+  },
+  progressTrack: {
+    height: 8,
+    overflow: "hidden",
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceWarm
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand
   },
   metricsGrid: {
     flexDirection: "row",

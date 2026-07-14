@@ -440,12 +440,11 @@ export const api = {
       apiRequest<ResumoDoPeriodo>("/api/v1/relatorios/periodo", {
         query: { data_inicio: dataInicio, data_fim: dataFim, produto_id: produtoId }
       }),
-    // Rota agregada leve só para o 1º card da tela Resumo (faturamento + comparação).
-    // Tolera 404: enquanto o backend não publica /periodo/resumo, a tela cai no
-    // `period` pesado sem quebrar (ver SummaryScreen).
-    periodResumo: (dataInicio: string, dataFim: string, comparar = true) =>
+    // Rota compacta usada em etapas mensais; `incluirDias` devolve somente um
+    // ponto resumido por dia, nunca as vendas e os itens brutos.
+    periodResumo: (dataInicio: string, dataFim: string, comparar = false, incluirDias = false) =>
       apiRequest<ResumoPeriodoLeve | null>("/api/v1/relatorios/periodo/resumo", {
-        query: { data_inicio: dataInicio, data_fim: dataFim, comparar },
+        query: { data_inicio: dataInicio, data_fim: dataFim, comparar, incluir_dias: incluirDias },
         allowNotFound: true
       })
   },

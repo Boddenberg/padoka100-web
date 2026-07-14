@@ -175,6 +175,7 @@ export interface ResumoPeriodoLeve {
   total_vendido?: number;
   total_sobra?: number;
   periodo_anterior?: { faturamento_bruto?: DecimalString | number } | null;
+  dias?: ResumoDoDia[];
 }
 
 export interface EventoLinhaDoTempo {
