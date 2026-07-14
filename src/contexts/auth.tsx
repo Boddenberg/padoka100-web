@@ -1,9 +1,10 @@
 import * as WebBrowser from "expo-web-browser";
+import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { isAdmin } from "@/lib/access";
 import { api, ApiError, setApiToken, setTokenRefresher, setUnauthorizedHandler } from "@/lib/api";
 import { setApiLogAdminEnabled } from "@/lib/api-log";
-import { clearSession, readSession, saveSession } from "@/lib/session";
+import { clearSession, readSession, saveLastEmail, saveSession } from "@/lib/session";
 import {
   buildAuthRedirectUrl,
   supabase,
@@ -62,11 +63,15 @@ function readUrlParam(url: string, key: string) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<UsuarioPerfil | null>(null);
   // Status atual acessível dentro do watchdog sem recriá-lo a cada mudança.
   const statusRef = useRef<AuthStatus>("loading");
   statusRef.current = status;
+  // Conta atualmente logada. Serve para detectar troca de conta no mesmo
+  // aparelho e limpar caches (avisos, resumos...) sem misturar dados.
+  const currentUserIdRef = useRef<string | null>(null);
 
   // Fora do dev, o Diagnóstico (fim do Perfil) só registra chamadas para
   // contas admin; logout ou troca de conta desliga e limpa o histórico.
@@ -82,17 +87,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       if (!profile) throw new Error("Nao foi possivel carregar o perfil da conta.");
     }
+    // Troca de conta no mesmo aparelho: zera os caches em memória (avisos,
+    // resumos, produtos...) para os dados de uma conta nunca aparecerem na outra.
+    const previousId = currentUserIdRef.current;
+    if (profile?.id && previousId && profile.id !== previousId) {
+      queryClient.clear();
+    }
+    currentUserIdRef.current = profile?.id ?? null;
     setUser(profile);
     setStatus("signed-in");
+    // Lembra o e-mail para adiantar a próxima entrada (fica mesmo após sair).
+    if (profile?.email) void saveLastEmail(profile.email);
     await saveSession({ token: accessToken, usuario: profile });
-  }, []);
+  }, [queryClient]);
 
   const clearLocalAuth = useCallback(async () => {
     setApiToken(null);
     setUser(null);
     setStatus("signed-out");
+    // Sai zerando os caches: o próximo login (mesma conta ou outra) começa limpo,
+    // sem avisos/dados antigos do aparelho reaparecendo para quem entrar depois.
+    currentUserIdRef.current = null;
+    queryClient.clear();
     await clearSession();
-  }, []);
+  }, [queryClient]);
 
   // Renova o token de acesso pelo Supabase e devolve o novo. A camada de API
   // chama isto quando um request toma 401: renovar + refazer a chamada evita o

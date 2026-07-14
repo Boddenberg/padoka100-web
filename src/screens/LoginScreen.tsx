@@ -11,6 +11,7 @@ import { AUTH_REQUIRED } from "@/constants/auth";
 import { loginErrorMessage, useAuth } from "@/contexts/auth";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { formatBrazilianPhone, isValidBrazilianPhone, PHONE_ERROR } from "@/lib/phone";
+import { readLastEmail } from "@/lib/session";
 import { supabaseAuthConfigured } from "@/lib/supabase";
 import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { getGreeting } from "@/utils/greeting";
@@ -30,6 +31,18 @@ export function LoginScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  // Adianta a entrada de quem já usou o app: pré-preenche o e-mail do último
+  // login (só o e-mail, nunca a senha), sem atrapalhar quem começou a digitar.
+  useEffect(() => {
+    let active = true;
+    readLastEmail().then((saved) => {
+      if (active && saved) setEmail((current) => (current.trim() ? current : saved));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Com o teclado aberto: a marca (logo/título) some para dar espaço, e a
   // rolagem passa a alinhar ao topo — assim os campos de baixo (senha,

@@ -8,6 +8,7 @@ import {
   LogIn,
   LogOut,
   Mail,
+  MessageSquare,
   Pencil,
   Phone,
   UserRound
@@ -18,6 +19,8 @@ import { useMutation } from "@tanstack/react-query";
 import { ApiLogPanel } from "@/components/api-log-panel";
 import { IaMediaPanel } from "@/components/ia-media-panel";
 import { PlansShowcase } from "@/components/plans-showcase";
+import { ReportSheet } from "@/components/report-sheet";
+import { ReportsPanel } from "@/components/reports-panel";
 import { Badge, Button, Card, Field, Input, Page, Sheet, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { useAuth } from "@/contexts/auth";
@@ -45,6 +48,7 @@ export function ProfileScreen() {
   const router = useRouter();
   const { status, user, signOut, setUser } = useAuth();
   const [sheet, setSheet] = useState<ActiveSheet>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const [profile, setProfile] = useState<LocalProfile>(emptyProfile);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -202,6 +206,23 @@ export function ProfileScreen() {
           )}
         </Card>
 
+        {/* Ajuda e feedback: qualquer pessoa logada pode relatar um problema. */}
+        {status === "signed-in" ? (
+          <Card>
+            <Text style={styles.sectionTitle}>Ajuda e feedback</Text>
+            <Text style={styles.muted}>Encontrou um erro, teve dificuldade ou tem uma sugestão? Fale com a gente.</Text>
+            <Button
+              title="Relatar um problema"
+              tone="soft"
+              icon={<MessageSquare size={18} color={colors.ink} />}
+              onPress={() => setReportOpen(true)}
+            />
+          </Card>
+        ) : null}
+
+        {/* Reports recebidos: área admin para ler e acompanhar os relatos. */}
+        <ReportsPanel />
+
         {/* Diagnóstico: histórico de chamadas ao servidor (ajuda a investigar erros). */}
         <ApiLogPanel />
 
@@ -221,6 +242,7 @@ export function ProfileScreen() {
         }}
       />
       <ChangePasswordSheet visible={sheet === "password"} onClose={() => setSheet(null)} />
+      <ReportSheet visible={reportOpen} onClose={() => setReportOpen(false)} contexto="Perfil" />
     </>
   );
 }

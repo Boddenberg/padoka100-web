@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
-import { Minus, Plus, X } from "lucide-react-native";
-import { useEffect, useRef, type ReactNode } from "react";
+import { ChevronDown, Minus, Plus, X } from "lucide-react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   Keyboard,
@@ -89,6 +89,52 @@ export function Page({
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.card, style]}>{children}</View>;
+}
+
+// Cartão que começa recolhido: mostra só o título (e uma pílula de contagem, se
+// houver) e abre/fecha ao tocar. Usado em seções longas do Perfil — Diagnóstico
+// e Mídias recebidas — para elas não ocuparem a tela toda antes de serem pedidas.
+export function Collapsible({
+  title,
+  subtitle,
+  badge,
+  defaultOpen = false,
+  children
+}: {
+  title: string;
+  subtitle?: string;
+  // Pílula de contexto ao lado do título quando fechado (ex.: quantos itens).
+  badge?: string | number | null;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const scale = useFontMultiplier();
+  const showBadge = badge !== null && badge !== undefined && badge !== "" && badge !== 0;
+
+  return (
+    <Card>
+      <Pressable
+        onPress={() => setOpen((current) => !current)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${title}. Toque para ${open ? "recolher" : "expandir"}.`}
+        style={({ pressed }) => [styles.collapsibleHeader, pressed && styles.collapsiblePressed]}
+      >
+        <View style={styles.collapsibleHeaderText}>
+          <Text style={[styles.collapsibleTitle, { fontSize: 18 * scale }]}>{title}</Text>
+          {subtitle ? <Text style={[styles.collapsibleSubtitle, { fontSize: 13 * scale }]}>{subtitle}</Text> : null}
+        </View>
+        {showBadge ? (
+          <View style={styles.collapsibleBadge}>
+            <Text style={styles.collapsibleBadgeText}>{badge}</Text>
+          </View>
+        ) : null}
+        <ChevronDown size={20} color={colors.muted} style={open ? styles.collapsibleChevronOpen : undefined} />
+      </Pressable>
+      {open ? <View style={styles.collapsibleBody}>{children}</View> : null}
+    </Card>
+  );
 }
 
 type ButtonTone = "brand" | "agent" | "soft" | "danger" | "success" | "outline";
@@ -403,7 +449,11 @@ export function Stepper({
   );
 }
 
-// Foto do produto com fallback simpático quando não há imagem.
+// Foto do produto com fallback proporcional quando não há imagem (ou quando ela
+// falha ao carregar). O pãozinho acompanha o tamanho do espaço: preenche o card
+// grande da Venda e fica discreto no ícone de lista — nunca um símbolo perdido
+// num quadrado vazio. O fundo é um degradê quente, para o estado "sem foto"
+// parecer intencional em vez de improvisado.
 export function ProductPhoto({
   url,
   name,
@@ -416,16 +466,40 @@ export function ProductPhoto({
   rounded?: number;
 }) {
   const resolved = resolveMediaUrl(url);
+  const [failed, setFailed] = useState(false);
+  // Menor lado medido do quadro no modo "fill", para dimensionar o pãozinho.
+  const [box, setBox] = useState(0);
+
+  // Troca de produto reaproveitando o mesmo nó: zera o erro da imagem anterior.
+  useEffect(() => setFailed(false), [resolved]);
+
   const dimensions =
     size === "fill"
       ? ({ width: "100%", height: "100%" } as const)
       : ({ width: size, height: size } as const);
 
-  if (!resolved) {
+  if (!resolved || failed) {
+    const measured = size === "fill" ? box : size;
+    // ~42% do lado menor: proporção que "enche o olho" sem encostar nas bordas.
+    const emojiSize = measured > 0 ? Math.min(60, Math.max(18, Math.round(measured * 0.42))) : 30;
     return (
-      <View style={[styles.photoFallback, dimensions, { borderRadius: rounded }]}>
-        <Text style={size === "fill" || size >= 56 ? styles.photoEmoji : styles.photoEmojiSmall}>🥖</Text>
-      </View>
+      <LinearGradient
+        colors={gradients.glow}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.photoFallback, dimensions, { borderRadius: rounded }]}
+        onLayout={
+          size === "fill"
+            ? (event) => {
+                const { width, height } = event.nativeEvent.layout;
+                const menor = Math.min(width, height);
+                if (menor && Math.abs(menor - box) > 1) setBox(menor);
+              }
+            : undefined
+        }
+      >
+        <Text style={{ fontSize: emojiSize }}>🥖</Text>
+      </LinearGradient>
     );
   }
 
@@ -435,6 +509,7 @@ export function ProductPhoto({
       style={[dimensions, { borderRadius: rounded, backgroundColor: colors.surfaceWarm }]}
       contentFit="cover"
       transition={180}
+      onError={() => setFailed(true)}
     />
   );
 }
@@ -551,6 +626,48 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: 16,
     ...shadows.soft
+  },
+  collapsibleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  collapsiblePressed: {
+    opacity: 0.7
+  },
+  collapsibleHeaderText: {
+    flex: 1
+  },
+  collapsibleTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontFamily: fonts.display
+  },
+  collapsibleSubtitle: {
+    marginTop: 2,
+    color: colors.muted,
+    fontSize: 13,
+    fontFamily: fonts.body
+  },
+  collapsibleBadge: {
+    minWidth: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceWarm,
+    paddingHorizontal: 8
+  },
+  collapsibleBadgeText: {
+    color: colors.muted,
+    fontSize: 12.5,
+    fontFamily: fonts.bodyBold
+  },
+  collapsibleChevronOpen: {
+    transform: [{ rotate: "180deg" }]
+  },
+  collapsibleBody: {
+    gap: 12
   },
   button: {
     minHeight: 52,
@@ -720,12 +837,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceWarm
-  },
-  photoEmoji: {
-    fontSize: 30
-  },
-  photoEmojiSmall: {
-    fontSize: 20
   },
   scrim: {
     flex: 1,

@@ -1,7 +1,7 @@
 import { ChevronDown, Share2, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
-import { Card } from "@/components/ui";
+import { Collapsible } from "@/components/ui";
 import { isAdmin } from "@/lib/access";
 import { clearApiLog, useApiLog, type ApiLogEntry } from "@/lib/api-log";
 import { colors, fonts, radius } from "@/lib/theme";
@@ -53,13 +53,9 @@ export function ApiLogPanel() {
   }
 
   return (
-    <Card>
-      <View style={styles.headerRow}>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Diagnóstico</Text>
-          <Text style={styles.subtitle}>Últimas chamadas ao servidor e o que voltou.</Text>
-        </View>
-        {entries.length > 0 ? (
+    <Collapsible title="Diagnóstico" subtitle="Últimas chamadas ao servidor e o que voltou." badge={entries.length}>
+      {entries.length > 0 ? (
+        <View style={styles.actionsRow}>
           <Pressable
             onPress={() => {
               setExpanded(null);
@@ -70,8 +66,8 @@ export function ApiLogPanel() {
             <Trash2 size={15} color={colors.muted} />
             <Text style={styles.clearText}>Limpar</Text>
           </Pressable>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       {entries.length > 0 ? (
         <View style={styles.filterRow}>
@@ -129,7 +125,7 @@ export function ApiLogPanel() {
           );
         })
       )}
-    </Card>
+    </Collapsible>
   );
 }
 
@@ -145,24 +141,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7
   },
-  headerRow: {
+  actionsRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12
-  },
-  headerText: {
-    flex: 1
-  },
-  title: {
-    color: colors.ink,
-    fontSize: 18,
-    fontFamily: fonts.display
-  },
-  subtitle: {
-    marginTop: 2,
-    color: colors.muted,
-    fontSize: 13,
-    fontFamily: fonts.body
+    justifyContent: "flex-end"
   },
   clearButton: {
     flexDirection: "row",

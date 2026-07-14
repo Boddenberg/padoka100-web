@@ -1,7 +1,8 @@
-import { Compass, Settings } from "lucide-react-native";
+import { Compass, MessageSquare, Settings } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useCoach } from "@/components/coach/coach-tour";
+import { ReportSheet } from "@/components/report-sheet";
 import { Sheet } from "@/components/ui";
 import { useFontScale, type FontLevel } from "@/lib/font-scale";
 import { colors, fonts, radius } from "@/lib/theme";
@@ -15,6 +16,7 @@ const FONT_OPTIONS: { level: FontLevel; label: string; sample: number }[] = [
 // Engrenagem no topo: abre as preferências do app (por ora, tamanho do texto).
 export function SettingsButton() {
   const [open, setOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const { level, setLevel } = useFontScale();
   const coach = useCoach();
 
@@ -56,7 +58,23 @@ export function SettingsButton() {
           <Compass size={20} color={colors.brandDeep} />
           <Text style={styles.tourButtonText}>Ver tutorial de novo</Text>
         </Pressable>
+
+        <Text style={styles.groupTitle}>Fale com a gente</Text>
+        <Text style={styles.groupHint}>Encontrou um erro, teve dificuldade ou tem uma ideia? Conte pra gente.</Text>
+        <Pressable
+          onPress={() => {
+            // Fecha as Preferências e abre o formulário de report.
+            setOpen(false);
+            setReportOpen(true);
+          }}
+          style={({ pressed }) => [styles.tourButton, pressed && styles.pressed]}
+        >
+          <MessageSquare size={20} color={colors.brandDeep} />
+          <Text style={styles.tourButtonText}>Relatar um problema</Text>
+        </Pressable>
       </Sheet>
+
+      <ReportSheet visible={reportOpen} onClose={() => setReportOpen(false)} contexto="Venda" />
     </>
   );
 }

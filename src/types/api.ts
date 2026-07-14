@@ -489,3 +489,35 @@ export interface RegistrarVendaRequest {
   observacoes?: string | null;
   ocorrido_em?: string | null;
 }
+
+// Canal de reports (feedback do usuário): erro, dificuldade, sugestão ou recado,
+// com anexos opcionais (print/foto/áudio). A visão do admin traz o remetente.
+export type ReportTipo = "erro" | "dificuldade" | "sugestao" | "recado";
+export type ReportStatus = "novo" | "lido" | "resolvido";
+
+export interface ReportAnexo {
+  id?: UUID | null;
+  url: string;
+  tipo: "imagem" | "audio" | "video" | "arquivo" | string;
+  tipo_conteudo?: string | null;
+}
+
+export interface Report {
+  id: UUID;
+  tipo: ReportTipo | string;
+  mensagem?: string | null;
+  contexto?: string | null;
+  plataforma?: string | null;
+  app_versao?: string | null;
+  status: ReportStatus | string;
+  criado_em: string;
+  anexos: ReportAnexo[];
+}
+
+export interface ReportAdmin extends Report {
+  usuario_id?: UUID | null;
+  usuario_nome?: string | null;
+  usuario_email?: string | null;
+  usuario_foto_url?: string | null;
+  atualizado_em?: string | null;
+}

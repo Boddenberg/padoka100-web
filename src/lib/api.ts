@@ -34,6 +34,9 @@ import type {
   MidiaRecebidaIA,
   Produto,
   RegistrarVendaRequest,
+  Report,
+  ReportAdmin,
+  ReportStatus,
   RespostaLogin,
   RespostaAnaliseIA,
   RespostaConfirmarComando,
@@ -476,6 +479,18 @@ export const api = {
         body: {},
         allowNotFound: true
       })
+  },
+  // Canal de reports: o usuário manda erro/dificuldade/sugestão/recado (com
+  // print/áudio opcionais); o admin lê tudo pela área do Perfil.
+  reports: {
+    criar: (formData: FormData) => apiRequest<Report>("/api/v1/reports", { method: "POST", formData }),
+    listarAdmin: (params?: { status?: ReportStatus; limite?: number }) =>
+      apiRequest<ReportAdmin[] | null>("/api/v1/admin/reports", {
+        query: { status: params?.status, limite: params?.limite ?? 100 },
+        allowNotFound: true
+      }),
+    atualizar: (id: UUID, status: ReportStatus) =>
+      apiRequest<ReportAdmin>(`/api/v1/admin/reports/${id}`, { method: "PATCH", body: { status } })
   },
   ia: {
     // Endpoints genéricos: interpretam qualquer comando (venda, abrir dia com

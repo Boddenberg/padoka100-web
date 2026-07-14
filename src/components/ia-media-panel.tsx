@@ -4,7 +4,7 @@ import { ImageOff, Pause, Play, RefreshCw, X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Input, StateText } from "@/components/ui";
+import { Collapsible, Input, StateText } from "@/components/ui";
 import { useAuth } from "@/contexts/auth";
 import { isAdmin } from "@/lib/access";
 import { api } from "@/lib/api";
@@ -97,9 +97,12 @@ export function IaMediaPanel() {
   }
 
   return (
-    <Card>
-      <View style={styles.header}>
-        <Text style={styles.title}>Mídias recebidas</Text>
+    <Collapsible
+      title="Mídias recebidas"
+      subtitle="Áudios e fotos que os clientes enviaram para a IA. Toque para ouvir ou ampliar."
+      badge={all.length}
+    >
+      <View style={styles.actionsRow}>
         <Pressable
           accessibilityLabel="Atualizar mídias recebidas"
           disabled={query.isFetching}
@@ -113,7 +116,6 @@ export function IaMediaPanel() {
           )}
         </Pressable>
       </View>
-      <Text style={styles.subtitle}>Áudios e fotos que os clientes enviaram para a IA. Toque para ouvir ou ampliar.</Text>
 
       <View style={styles.filterRow}>
         <Chip label="Todas" active={itemFilter === "todas"} onPress={() => changeItemFilter("todas")} />
@@ -166,7 +168,7 @@ export function IaMediaPanel() {
           </View>
         </Pressable>
       </Modal>
-    </Card>
+    </Collapsible>
   );
 }
 
@@ -229,11 +231,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7
   },
-  header: {
+  actionsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12
+    justifyContent: "flex-end"
   },
   refreshButton: {
     height: 40,
@@ -244,18 +244,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.brandSoft,
     backgroundColor: colors.surfaceGlow
-  },
-  title: {
-    color: colors.ink,
-    fontSize: 18,
-    fontFamily: fonts.display
-  },
-  subtitle: {
-    marginTop: 2,
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: fonts.body
   },
   filterRow: {
     flexDirection: "row",

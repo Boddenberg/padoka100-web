@@ -5,6 +5,9 @@ import type { UsuarioPerfil } from "@/types/api";
 
 const TOKEN_KEY = "padoka100.auth_token";
 const USER_KEY = "padoka100:auth-user";
+// E-mail do último login: fica no aparelho mesmo depois de sair, só para
+// pré-preencher o campo na próxima entrada (nunca guarda senha).
+const LAST_EMAIL_KEY = "padoka100:last-email";
 
 // SecureStore não existe no navegador; lá o token vai para o AsyncStorage.
 const secureStorage = {
@@ -38,4 +41,28 @@ export async function saveSession(session: StoredSession) {
 
 export async function clearSession() {
   await Promise.all([secureStorage.remove(TOKEN_KEY), AsyncStorage.removeItem(USER_KEY)]);
+}
+
+// Guarda o e-mail do último login para adiantar a próxima entrada. Sobrevive ao
+// logout de propósito: quem sai só precisa digitar a senha para voltar.
+export async function saveLastEmail(email: string) {
+  const value = email.trim().toLowerCase();
+  if (!value) return;
+  try {
+    await AsyncStorage.setItem(LAST_EMAIL_KEY, value);
+  } catch {
+    // Guardar o e-mail é conveniência; se falhar, o login segue normal.
+  }
+}
+
+export async function readLastEmail(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(LAST_EMAIL_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function clearLastEmail() {
+  await AsyncStorage.removeItem(LAST_EMAIL_KEY).catch(() => undefined);
 }
