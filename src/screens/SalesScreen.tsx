@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Ban, CalendarDays, CheckCircle2, ChevronRight, Mic, ReceiptText, Search, Sparkles } from "lucide-react-native";
+import { Ban, CalendarDays, CheckCircle2, ChevronRight, Mic, QrCode, ReceiptText, Search, Sparkles } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,6 +9,7 @@ import { AGENT_DISPLAY_NAME, AGENT_NAME, AgentAvatar, AgentSays, AgentTag } from
 import { AgentSheet, invalidateDay } from "@/components/agent-sheet";
 import { CoachAnchor, useCoach, type CoachStep } from "@/components/coach/coach-tour";
 import { NotificationsButton } from "@/components/notifications";
+import { PixSheet } from "@/components/pix-sheet";
 import { SettingsButton } from "@/components/settings-menu";
 import {
   Badge,
@@ -55,6 +56,7 @@ export function SalesScreen() {
   const [accessNotice, setAccessNotice] = useState<string | null>(null);
   const [aiInitialText, setAiInitialText] = useState("");
   const [aiAutoRecord, setAiAutoRecord] = useState(false);
+  const [showPix, setShowPix] = useState(false);
 
   const currentDayQuery = useQuery({ queryKey: ["dias", "atual"], queryFn: api.dias.current });
   const productsQuery = useQuery({ queryKey: ["produtos", "ativos"], queryFn: () => api.produtos.list(true) });
@@ -529,6 +531,9 @@ export function SalesScreen() {
             )}
           </CoachAnchor>
         ) : null}
+        {/* Folga extra para os últimos produtos não ficarem atrás da ilha da
+            sacola (que agora tem duas linhas: valor + botões Pix/Registrar). */}
+        {itemCount ? <View style={styles.cartBarSpacer} /> : null}
       </Page>
 
       {itemCount ? (
@@ -542,14 +547,38 @@ export function SalesScreen() {
             </View>
             <Text style={styles.cartTotal}>{formatCurrency(total)}</Text>
           </View>
-          <Button
-            title={registerSale.isPending ? "Registrando..." : "Registrar venda"}
-            disabled={saleDisabled || registerSale.isPending}
-            onPress={() => registerSale.mutate()}
-          />
+          <View style={styles.cartActions}>
+            <Button
+              title="Pix"
+              tone="soft"
+              icon={<QrCode size={18} color={colors.brandDeep} strokeWidth={2.4} />}
+              disabled={total <= 0 || registerSale.isPending}
+              onPress={() => {
+                haptics.tap();
+                setShowPix(true);
+              }}
+              style={styles.cartPixButton}
+            />
+            <Button
+              title={registerSale.isPending ? "Registrando..." : "Registrar venda"}
+              disabled={saleDisabled || registerSale.isPending}
+              onPress={() => registerSale.mutate()}
+              style={styles.cartRegisterButton}
+            />
+          </View>
         </View>
       ) : null}
 
+      <PixSheet
+        visible={showPix}
+        onClose={() => setShowPix(false)}
+        amount={total}
+        itemCount={itemCount}
+        registering={registerSale.isPending}
+        canRegister={!saleDisabled}
+        // Mesma venda do botão comum: registra, e só então fecha o Pix.
+        onRegister={(onDone) => registerSale.mutate(undefined, { onSuccess: () => onDone() })}
+      />
       <OpenDaySheet visible={sheet === "open-day"} onClose={() => setSheet(null)} products={products} />
       <ProductionSheet visible={sheet === "production"} onClose={() => setSheet(null)} day={currentDay} products={products} />
       <CloseDaySheet visible={sheet === "close-day"} onClose={() => setSheet(null)} day={currentDay} />
@@ -1623,17 +1652,27 @@ const styles = StyleSheet.create({
     // Acima da tab bar flutuante.
     bottom: 94,
     left: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     gap: 12,
-    borderRadius: radius.pill,
+    borderRadius: radius.xl,
     // "Ilha" clara como a tab bar, no lugar do marrom escuro que destoava.
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 10,
-    paddingLeft: 18
+    padding: 16
+  },
+  cartBarSpacer: {
+    height: 64
+  },
+  cartActions: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 10
+  },
+  cartPixButton: {
+    flex: 1
+  },
+  cartRegisterButton: {
+    flex: 1.7
   },
   cartBarGuarded: {
     opacity: 0.7
