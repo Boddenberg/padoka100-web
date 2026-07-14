@@ -6,7 +6,7 @@ import { LockedFeatureScreen } from "@/screens/LockedFeatureScreen";
 export default function ResumoRoute() {
   const { user } = useAuth();
   if (!hasAccess(user, "relatorios.avancados")) {
-    return <LockedFeatureScreen capability="relatorios.avancados" title="Resumo" />;
+    return <LockedFeatureScreen capability="relatorios.avancados" title="Analytics" />;
   }
   return <SummaryScreen />;
 }

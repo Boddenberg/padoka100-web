@@ -42,7 +42,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="resumo"
         options={{
-          title: "Resumo",
+          title: "Analytics",
           href: canSeeAdvancedReports ? undefined : null,
           tabBarIcon: ({ color }) => <BarChart3 color={color} />
         }}

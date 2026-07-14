@@ -13,6 +13,8 @@ import type {
 } from "@/types/custeio";
 import type {
   AcaoNotificacaoResposta,
+  AnalyticsReport,
+  AnalyticsReportAvailability,
   AnaliseEspecificaRequest,
   AnalisePadraoRequest,
   AtualizarPerfilRequest,
@@ -170,6 +172,9 @@ function backendBusinessMessage(payload: unknown): string | null {
   }
   if ("mensagem" in payload) candidates.push((payload as { mensagem?: unknown }).mensagem);
   if ("message" in payload) candidates.push((payload as { message?: unknown }).message);
+  if ("error" in payload && payload.error && typeof payload.error === "object") {
+    candidates.push((payload.error as { message?: unknown }).message);
+  }
 
   for (const candidate of candidates) {
     if (typeof candidate === "string" && looksHuman(candidate)) return candidate.trim();
@@ -443,6 +448,15 @@ export const api = {
         query: { data_inicio: dataInicio, data_fim: dataFim, comparar },
         allowNotFound: true
       })
+  },
+  analyticsReports: {
+    availability: () =>
+      apiRequest<AnalyticsReportAvailability>("/api/v1/analytics/relatorios/disponibilidade"),
+    list: (limite = 30) =>
+      apiRequest<AnalyticsReport[]>("/api/v1/analytics/relatorios", { query: { limite } }),
+    get: (id: UUID) => apiRequest<AnalyticsReport>(`/api/v1/analytics/relatorios/${id}`),
+    create: (body: { data_inicio: string; data_fim: string }) =>
+      apiRequest<AnalyticsReport>("/api/v1/analytics/relatorios", { method: "POST", body })
   },
   historico: {
     timeline: (query?: { dia_de_venda_id?: string; tipo_entidade?: string; entidade_id?: string; limite?: number }) =>

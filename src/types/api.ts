@@ -215,6 +215,7 @@ export interface Notificacao {
   expira_em?: string | null;
   criado_em?: string | null;
   publicado_em?: string | null;
+  metadados?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
 
@@ -245,6 +246,151 @@ export interface AcaoNotificacaoResposta {
   oculta?: boolean;
   oculta_em?: string | null;
   persistida?: boolean;
+}
+
+export type AnalyticsReportStatus = "na_fila" | "processando" | "pronto" | "falhou";
+export type AnalyticsReportType = "analytics" | "ia";
+
+export interface AnalyticsComparison {
+  atual: number;
+  anterior: number;
+  diferenca: number;
+  variacao_percentual?: number | null;
+  tendencia: "alta" | "queda" | "estavel" | "novo";
+}
+
+export interface AnalyticsProduct {
+  produto_id?: UUID | null;
+  nome: string;
+  faturamento: number;
+  participacao_percentual: number;
+  custo_estimado: number;
+  lucro_estimado: number;
+  margem_percentual: number;
+  produzido: number;
+  vendido: number;
+  sobra: number;
+  reaproveitado: number;
+  descartado: number;
+  eficiencia_percentual: number;
+  dias_esgotado: number;
+}
+
+export interface AnalyticsDailyPoint {
+  data: string;
+  faturamento: number;
+  lucro: number;
+  custo: number;
+  produzido: number;
+  vendido: number;
+  sobra: number;
+  vendas: number;
+  local?: string | null;
+}
+
+export interface AnalyticsReportContent {
+  versao: number;
+  tipo: AnalyticsReportType;
+  gerado_em: string;
+  periodo: {
+    inicio: string;
+    fim: string;
+    rotulo: string;
+    dias_calendario: number;
+    dias_com_operacao: number;
+  };
+  indicadores: {
+    faturamento: number;
+    custo_estimado: number;
+    lucro_estimado: number;
+    margem_percentual: number;
+    quantidade_vendas: number;
+    ticket_medio: number;
+    unidades_produzidas: number;
+    unidades_vendidas: number;
+    unidades_sobrando: number;
+    sobras_reaproveitadas: number;
+    sobras_descartadas: number;
+    eficiencia_venda_percentual: number;
+    indice_sobra_percentual: number;
+  };
+  comparacao: {
+    faturamento: AnalyticsComparison;
+    lucro: AnalyticsComparison;
+    unidades_vendidas: AnalyticsComparison;
+    ticket_medio: AnalyticsComparison;
+  };
+  serie_diaria: AnalyticsDailyPoint[];
+  produtos: AnalyticsProduct[];
+  rankings: {
+    mais_vendidos: AnalyticsProduct[];
+    menos_vendidos: AnalyticsProduct[];
+    maiores_sobras: AnalyticsProduct[];
+    maiores_margens: AnalyticsProduct[];
+  };
+  desempenho_semana: {
+    dia: string;
+    faturamento: number;
+    media_faturamento: number;
+    vendido: number;
+    sobra: number;
+    dias: number;
+  }[];
+  horarios: { hora: number; vendas: number; faturamento: number }[];
+  destaques: { tipo: string; titulo: string; descricao: string; valor?: number | null }[];
+  oportunidades: { titulo: string; descricao: string; impacto: string }[];
+  alertas: { nivel: string; titulo: string; descricao: string }[];
+  qualidade_dados: {
+    score: number;
+    nivel: string;
+    dias_analisados: number;
+    produtos_analisados: number;
+    cobertura_custos_percentual: number;
+    mensagem: string;
+  };
+  metodologia: string[];
+  ia?: {
+    disponivel: boolean;
+    modelo: string;
+    resumo: string;
+    principais_achados: string[];
+    acoes_recomendadas: string[];
+    pontos_atencao: string[];
+    perguntas_estrategicas: string[];
+    limitacao?: string | null;
+  } | null;
+}
+
+export interface AnalyticsReport {
+  id: UUID;
+  status: AnalyticsReportStatus;
+  tipo: AnalyticsReportType;
+  plano_origem: string;
+  data_inicio: string;
+  data_fim: string;
+  progresso: number;
+  etapa: string;
+  titulo?: string | null;
+  conteudo?: AnalyticsReportContent | null;
+  modelo_ia?: string | null;
+  erro?: string | null;
+  solicitado_em: string;
+  iniciado_em?: string | null;
+  concluido_em?: string | null;
+  atualizado_em: string;
+  url_exportacao?: string | null;
+  reaproveitado?: boolean;
+}
+
+export interface AnalyticsReportAvailability {
+  pode_solicitar: boolean;
+  motivo?: string | null;
+  proxima_solicitacao_em?: string | null;
+  intervalo_dias?: number | null;
+  ilimitado: boolean;
+  relatorio_em_andamento_id?: UUID | null;
+  plano: string;
+  tipo: AnalyticsReportType;
 }
 
 export interface Midia {

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { RangeCalendar } from "@/components/calendar";
+import { AnalyticsReportHub } from "@/components/analytics/report-hub";
 import { AiAnalysisCard } from "@/components/resumo/ai-analysis";
 import { DaySummarySheet } from "@/components/resumo/day-summary-sheet";
 import { PeriodChart } from "@/components/resumo/period-chart";
@@ -105,7 +106,7 @@ export function SummaryScreen() {
 
   return (
     <>
-      <Page title="Resumo" subtitle="Faturamento, período, gráfico e histórico." onRefresh={onRefresh} refreshing={refreshing}>
+      <Page title="Analytics" subtitle="Entenda o que aconteceu e decida o próximo passo." onRefresh={onRefresh} refreshing={refreshing}>
         {/* 1. Faturamento do período: o destaque principal da tela. */}
         <Card>
           <View style={styles.revenueHeader}>
@@ -178,6 +179,8 @@ export function SummaryScreen() {
             />
           ) : null}
         </Card>
+
+        <AnalyticsReportHub start={start} end={end} />
 
         {/* 3. Gráfico de vendas do período selecionado. */}
         <PeriodChart dias={totals?.dias} start={start} end={end} today={today} loading={periodQuery.isLoading} />

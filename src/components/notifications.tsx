@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import { Check, ChevronDown, RotateCcw, Trash2 } from "lucide-react-native";
 import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
@@ -48,6 +49,7 @@ async function loadFeed(limite: number): Promise<FeedNotificacoes> {
 
 // Botão de "cartinha" no topo: badge com quantos avisos não lidos; abre a caixa.
 export function NotificationsButton() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [limite, setLimite] = useState(20);
@@ -84,6 +86,14 @@ export function NotificationsButton() {
       { text: "Voltar", style: "cancel" },
       { text: "Excluir", style: "destructive", onPress: () => hide.mutate(item.id) }
     ]);
+  };
+
+  const openNotification = (item: Notificacao) => {
+    const route = item.metadados?.rota;
+    if (typeof route !== "string" || !route.startsWith("/")) return;
+    if (isUnread(item)) markRead.mutate(item.id);
+    setOpen(false);
+    router.push(route);
   };
 
   return (
@@ -131,6 +141,7 @@ export function NotificationsButton() {
                     disabled={busy}
                     onToggleRead={() => markRead.mutate(item.id)}
                     onDelete={() => confirmDelete(item)}
+                    onOpen={typeof item.metadados?.rota === "string" ? () => openNotification(item) : undefined}
                   />
                 ))}
               </View>
@@ -151,6 +162,7 @@ export function NotificationsButton() {
                     disabled={busy}
                     onToggleRead={() => markUnread.mutate(item.id)}
                     onDelete={() => confirmDelete(item)}
+                    onOpen={typeof item.metadados?.rota === "string" ? () => openNotification(item) : undefined}
                   />
                 ))}
               </View>
@@ -177,13 +189,15 @@ function NotificationCard({
   unread,
   disabled,
   onToggleRead,
-  onDelete
+  onDelete,
+  onOpen
 }: {
   item: Notificacao;
   unread: boolean;
   disabled?: boolean;
   onToggleRead: () => void;
   onDelete: () => void;
+  onOpen?: () => void;
 }) {
   const date = item.publicado_em || item.criado_em;
   const midias = (item.midias || []).filter((midia) => midia && midia.url);
@@ -216,6 +230,13 @@ function NotificationCard({
         );
       })}
       {date ? <Text style={styles.cardDate}>{formatDate(date)}</Text> : null}
+
+      {onOpen ? (
+        <Pressable onPress={onOpen} style={({ pressed }) => [styles.openButton, pressed && styles.pressed]}>
+          <Text style={styles.openButtonText}>Abrir relatório</Text>
+          <ChevronDown size={18} color="#fff" style={styles.openButtonArrow} />
+        </Pressable>
+      ) : null}
 
       <View style={styles.cardActions}>
         <Pressable
@@ -378,6 +399,23 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12.5,
     fontFamily: fonts.bodyBold
+  },
+  openButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand
+  },
+  openButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: fonts.bodyBold
+  },
+  openButtonArrow: {
+    transform: [{ rotate: "-90deg" }]
   },
   cardActions: {
     flexDirection: "row",
