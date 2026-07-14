@@ -10,8 +10,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "doctor": "expo-doctor",
-    "update:preview": "npx eas-cli update --branch preview --message \"Padoka 100 mobile update\"",
-    "update:production": "npx eas-cli update --branch production --message \"Padoka 100 mobile update\"",
+    "update:preview": "npx eas-cli update --branch preview --environment preview --message \"Padoka 100 mobile update\"",
+    "update:production": "npx eas-cli update --branch production --environment production --message \"Padoka 100 mobile update\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
