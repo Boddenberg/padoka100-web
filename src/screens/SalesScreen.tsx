@@ -1518,11 +1518,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold
   },
   productRow: {
-    gap: 12,
+    // Largura fixa (não flex) para o item sozinho/ímpar não esticar e virar um
+    // card gigante: fica sempre com meia largura, alinhado à esquerda.
+    justifyContent: "space-between",
     marginBottom: 12
   },
   product: {
-    flex: 1,
+    width: "48%",
     overflow: "hidden",
     borderWidth: 1.5,
     borderColor: colors.border,
@@ -1536,7 +1538,8 @@ const styles = StyleSheet.create({
     opacity: 0.55
   },
   productPhoto: {
-    aspectRatio: 4 / 3,
+    // Um pouco mais baixa (era 4/3) para o card inteiro caber melhor na tela.
+    aspectRatio: 3 / 2,
     backgroundColor: colors.surfaceWarm
   },
   productBadge: {
