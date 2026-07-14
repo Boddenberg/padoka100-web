@@ -517,6 +517,10 @@ export const api = {
         apiRequest<SessaoCusteio>("/api/v1/custos/assistente/sessoes", { method: "POST", body }),
       obterSessao: (sessaoId: UUID) =>
         apiRequest<SessaoCusteio | null>(`/api/v1/custos/assistente/sessoes/${sessaoId}`, { allowNotFound: true }),
+      // Custeio salvo de um produto (o confirmado, se houver): deixa o app abrir
+      // direto o resultado em qualquer aparelho, sem depender da sessão local.
+      sessaoDoProduto: (produtoId: UUID) =>
+        apiRequest<SessaoCusteio | null>(`/api/v1/custos/assistente/produtos/${produtoId}/sessao`, { allowNotFound: true }),
       enviarTexto: (sessaoId: UUID, body: EntradaTextoCusteioRequest) =>
         apiRequest<SessaoCusteio>(`/api/v1/custos/assistente/sessoes/${sessaoId}/entradas/texto`, {
           method: "POST",

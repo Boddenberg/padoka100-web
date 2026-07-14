@@ -110,20 +110,24 @@ export function ProductCostScreen({ produtoId }: { produtoId: string }) {
     [produtoId]
   );
 
-  // Retoma a sessão guardada do produto; sem sessão válida, começa do zero.
+  // Retoma o custeio do produto: primeiro a sessão que ESTE aparelho guardou;
+  // se não houver (celular novo/limpo) ou tiver sumido, busca no backend o
+  // custeio salvo do produto — assim "Calcular com IA" abre direto o resultado
+  // em qualquer aparelho. Sem nada disso, começa do zero.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const stored = await readStoredSessionId(produtoId);
-        if (!stored) {
-          if (!cancelled) setBoot("none");
-          return;
+        let remote = stored ? await api.custos.assistente.obterSessao(stored) : null;
+        let storedPhase = stored ? await readStoredPhase(produtoId) : null;
+
+        if (!remote || isDiscardedSession(remote)) {
+          remote = await api.custos.assistente.sessaoDoProduto(produtoId).catch(() => null);
+          storedPhase = null; // fase é local; vinda do backend, deixamos a sessão decidir
+          const id = sessionId(remote);
+          if (id) void storeSessionId(produtoId, id);
         }
-        const [remote, storedPhase] = await Promise.all([
-          api.custos.assistente.obterSessao(stored),
-          readStoredPhase(produtoId)
-        ]);
         if (cancelled) return;
         if (!remote || isDiscardedSession(remote)) {
           await Promise.all([clearStoredSessionId(produtoId), clearStoredPhase(produtoId)]);
@@ -785,6 +789,11 @@ function ResultPhase({
   // A unidade escolhida no rendimento faz o rótulo do custo casar com o que a
   // pessoa selecionou (custo por fatia, por unidade...).
   const unidadeRendimento = session?.rascunho?.receita?.unidade_rendimento;
+  // Ingredientes e preços salvos, para a tela de custo confirmado ser uma
+  // revisão de verdade (e não só o número). Tocar num item reabre para editar.
+  const ingredientesSalvos = session?.rascunho?.ingredientes || [];
+  const custosSalvos = session?.rascunho?.custos_adicionais || [];
+  const simSalvos = simulatedIngredients(session?.custo_simulado);
   if (confirmed) {
     return (
       <>
@@ -792,14 +801,35 @@ function ResultPhase({
           <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.celebrationBadge}>
             <PartyPopper size={26} color="#fff" />
           </LinearGradient>
-          <Text style={styles.celebrationTitle}>Custo aceito!</Text>
+          <Text style={styles.celebrationTitle}>Custo salvo em {productName}</Text>
           <Text style={styles.celebrationHint}>
-            Guardei o custo em {productName} com a marca “calculado com IA”. Agora cada venda já sabe quanto custou.
+            Marcado como “calculado com IA” — cada venda já sabe quanto custou. Precisa mexer? É só editar aqui embaixo.
           </Text>
         </View>
         {session?.custo_simulado ? (
           <CostSummaryCard custo={session.custo_simulado} precoVenda={precoVenda} unidadeRendimento={unidadeRendimento} confirmed />
         ) : null}
+
+        {/* A lista salva de ingredientes e preços: a "última etapa" mostra tudo
+            que foi preenchido. Tocar num item (ou no botão) reabre para editar. */}
+        {ingredientesSalvos.length ? (
+          <View style={styles.savedList}>
+            <SectionTitle text="Ingredientes e preços" />
+            {ingredientesSalvos.map((item, index) => (
+              <IngredientRow
+                key={`saved-ing-${index}`}
+                ingrediente={item}
+                phase="precos"
+                costOk={simSalvos[index] ? ingredientCostOk(simSalvos[index]) : undefined}
+                onEdit={onEdit}
+              />
+            ))}
+            {custosSalvos.map((custo, index) => (
+              <ExtraCostRow key={`saved-extra-${index}`} custo={custo} onEdit={onEdit} />
+            ))}
+          </View>
+        ) : null}
+
         {/* Esqueceu um ingrediente? Reabre a receita já preenchida (sem perder
             nada) para adicionar o que faltou e recalcular. */}
         {editError ? <StateText tone="error" text={editError} /> : null}
@@ -1275,6 +1305,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.body,
     textAlign: "center"
+  },
+  savedList: {
+    gap: 10
   },
   readyCallout: {
     flexDirection: "row",
