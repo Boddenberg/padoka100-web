@@ -3,21 +3,18 @@
 // pode ser copiada pelo cliente. Tudo é calculado no app — não depende do
 // backend nem de internet — então funciona offline e via atualização OTA.
 
-// Dados do recebedor. Ficam aqui no front por enquanto (o backend ainda não tem
-// cadastro de conta Pix); se um dia virar configurável por padoca, é só trocar
-// esta constante por um valor vindo da API.
-export const PIX_RECEBEDOR = {
-  // Chave Pix é um telefone: no BR Code precisa vir em formato E.164
-  // (+55 + DDD + número). O telefone informado foi 11981090986.
-  chave: "+5511981090986",
-  chaveExibicao: "(11) 98109-0986",
-  nome: "Filipe Boddenberg Ribeiro",
-  cidade: "São Paulo",
-  // Identificador da venda (txid): só aceita letras e números, até 25.
-  txid: "Padoka100",
-  // Texto livre mostrado em alguns apps de banco (informação adicional).
-  descricao: "Paes e Doces Padoka100"
-} as const;
+// Dados do recebedor vêm de fora (cada pessoa cadastra os seus — ver
+// pix-config.ts). Nada aqui é chumbado: sem chave + nome, não gera o Pix.
+export interface PixRecebedor {
+  // Chave já normalizada para o BR Code (telefone em E.164, CPF/CNPJ só dígitos…).
+  chave: string;
+  // Nome do recebedor (aparece no app do cliente).
+  nome: string;
+  cidade?: string | null;
+}
+
+// Identificador da venda (txid): só letras e números, até 25. Neutro (marca).
+const TXID_PADRAO = "Padoka100";
 
 // Remove acentos e limita ao conjunto de caracteres seguro do padrão EMV.
 // Nome e cidade viram ASCII para o comprimento do campo bater em bytes.
@@ -59,26 +56,32 @@ function formatAmount(amount: number): string {
 
 export interface PixInput {
   amount: number;
+  recebedor: PixRecebedor;
   txid?: string;
   descricao?: string | null;
 }
 
-// Gera a string "copia e cola". Lança erro se o valor não for positivo — não
-// faz sentido cobrar zero.
-export function buildPixPayload({ amount, txid, descricao }: PixInput): string {
+// Gera a string "copia e cola". Lança erro se o valor não for positivo ou se o
+// recebedor não estiver configurado (chave + nome) — sem isso, não há Pix.
+export function buildPixPayload({ amount, recebedor, txid, descricao }: PixInput): string {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error("Valor inválido para o Pix.");
   }
+  const chave = (recebedor?.chave || "").trim();
+  const nomeRecebedor = (recebedor?.nome || "").trim();
+  if (!chave || !nomeRecebedor) {
+    throw new Error("Configure sua chave Pix e o nome do recebedor.");
+  }
 
-  const nome = toAscii(PIX_RECEBEDOR.nome).slice(0, 25);
-  const cidade = toAscii(PIX_RECEBEDOR.cidade).slice(0, 15) || "BRASIL";
-  const info = descricao === undefined ? PIX_RECEBEDOR.descricao : descricao;
+  const nome = toAscii(nomeRecebedor).slice(0, 25) || "RECEBEDOR";
+  const cidade = toAscii(recebedor.cidade || "").slice(0, 15) || "BRASIL";
+  const info = descricao ? toAscii(descricao).slice(0, 72) : null;
 
   // Merchant Account Information (26): GUI + chave + info adicional opcional.
   const merchantAccount =
-    tlv("00", "br.gov.bcb.pix") + tlv("01", PIX_RECEBEDOR.chave) + (info ? tlv("02", toAscii(info).slice(0, 72)) : "");
+    tlv("00", "br.gov.bcb.pix") + tlv("01", chave) + (info ? tlv("02", info) : "");
 
-  const additionalData = tlv("05", sanitizeTxid(txid ?? PIX_RECEBEDOR.txid));
+  const additionalData = tlv("05", sanitizeTxid(txid ?? TXID_PADRAO));
 
   const payload =
     tlv("00", "01") +

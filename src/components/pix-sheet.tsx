@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
-import { Check, Copy, QrCode } from "lucide-react-native";
+import { Check, Copy, QrCode, Settings2 } from "lucide-react-native";
 import { Button, Sheet } from "@/components/ui";
-import { buildPixPayload, PIX_RECEBEDOR } from "@/lib/pix";
+import { buildPixPayload } from "@/lib/pix";
+import { isPixConfigComplete, PIX_KEY_LABEL, pixKeyDisplay, resolveRecebedor, type PixConfig } from "@/lib/pix-config";
 import { encodeQr, matrixToSvgPath } from "@/lib/qrcode";
 import { formatCurrency } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
@@ -34,6 +35,8 @@ export function PixSheet({
   onClose,
   amount,
   itemCount,
+  config,
+  onConfigure,
   onRegister,
   registering,
   canRegister
@@ -42,6 +45,9 @@ export function PixSheet({
   onClose: () => void;
   amount: number;
   itemCount: number;
+  // Chave Pix da própria pessoa (null/incompleta => mostra o convite a cadastrar).
+  config: PixConfig | null;
+  onConfigure: () => void;
   // Registra a venda (mesma chamada do botão comum). Recebe callback de sucesso
   // para o sheet se fechar sozinho quando a venda entra.
   onRegister: (onDone: () => void) => void;
@@ -49,16 +55,18 @@ export function PixSheet({
   canRegister: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const configured = isPixConfigComplete(config);
 
-  // Só monta o payload quando há valor: buildPixPayload recusa zero.
+  // Só monta o payload quando há valor E chave cadastrada: buildPixPayload
+  // recusa zero e recusa recebedor vazio.
   const payload = useMemo(() => {
-    if (!visible || amount <= 0) return null;
+    if (!visible || amount <= 0 || !configured || !config) return null;
     try {
-      return buildPixPayload({ amount });
+      return buildPixPayload({ amount, recebedor: resolveRecebedor(config) });
     } catch {
       return null;
     }
-  }, [visible, amount]);
+  }, [visible, amount, configured, config]);
 
   useEffect(() => {
     if (!copied) return;
@@ -107,7 +115,18 @@ export function PixSheet({
         </View>
       }
     >
-      {payload ? (
+      {!configured ? (
+        <View style={styles.setupBox}>
+          <View style={styles.setupIcon}>
+            <Settings2 size={26} color={colors.brandDeep} strokeWidth={2.2} />
+          </View>
+          <Text style={styles.setupTitle}>Cadastre seu Pix primeiro</Text>
+          <Text style={styles.setupHint}>
+            Para gerar o QR Code, informe sua chave Pix e o nome que recebe. Você faz isso uma vez só.
+          </Text>
+          <Button title="Configurar meu Pix" onPress={onConfigure} />
+        </View>
+      ) : payload && config ? (
         <>
           <Text style={styles.instruction}>Mostre o código para o cliente escanear no app do banco.</Text>
 
@@ -120,9 +139,16 @@ export function PixSheet({
           </View>
 
           <View style={styles.recebedor}>
-            <Text style={styles.recebedorLabel}>Recebedor</Text>
-            <Text style={styles.recebedorNome}>{PIX_RECEBEDOR.nome}</Text>
-            <Text style={styles.recebedorChave}>Chave (celular): {PIX_RECEBEDOR.chaveExibicao}</Text>
+            <View style={styles.recebedorHead}>
+              <Text style={styles.recebedorLabel}>Recebedor</Text>
+              <Pressable onPress={onConfigure} hitSlop={8}>
+                <Text style={styles.recebedorEdit}>Editar</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.recebedorNome}>{config.nome}</Text>
+            <Text style={styles.recebedorChave}>
+              {PIX_KEY_LABEL[config.tipoChave]}: {pixKeyDisplay(config.tipoChave, config.chave)}
+            </Text>
           </View>
 
           <View style={styles.copyBlock}>
@@ -208,11 +234,50 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     letterSpacing: -0.5
   },
+  setupBox: {
+    alignItems: "center",
+    gap: 10,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surfaceGlow,
+    padding: 22
+  },
+  setupIcon: {
+    height: 56,
+    width: 56,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 28,
+    backgroundColor: colors.brandSoft
+  },
+  setupTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontFamily: fonts.display,
+    textAlign: "center"
+  },
+  setupHint: {
+    color: colors.muted,
+    fontSize: 14.5,
+    lineHeight: 21,
+    fontFamily: fonts.body,
+    textAlign: "center",
+    marginBottom: 4
+  },
   recebedor: {
     gap: 2,
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceWarm,
     padding: 14
+  },
+  recebedorHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  recebedorEdit: {
+    color: colors.brandDeep,
+    fontSize: 13,
+    fontFamily: fonts.bodyBold
   },
   recebedorLabel: {
     color: colors.muted,

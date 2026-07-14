@@ -9,6 +9,7 @@ import { AGENT_DISPLAY_NAME, AGENT_NAME, AgentAvatar, AgentSays, AgentTag } from
 import { AgentSheet, invalidateDay } from "@/components/agent-sheet";
 import { CoachAnchor, useCoach, type CoachStep } from "@/components/coach/coach-tour";
 import { NotificationsButton } from "@/components/notifications";
+import { PixConfigSheet } from "@/components/pix-config-sheet";
 import { PixSheet } from "@/components/pix-sheet";
 import { SettingsButton } from "@/components/settings-menu";
 import {
@@ -32,6 +33,7 @@ import { colors, fonts, gradients, radius, shadows } from "@/lib/theme";
 import { addDays } from "@/utils/dates";
 import { useAuth } from "@/contexts/auth";
 import { hasSeenSalesTour, markSalesTourSeen } from "@/lib/onboarding";
+import { readPixConfig } from "@/lib/pix-config";
 import { haptics } from "@/lib/haptics";
 import { getGreeting } from "@/utils/greeting";
 import { fixProductName } from "@/utils/text";
@@ -57,8 +59,16 @@ export function SalesScreen() {
   const [aiInitialText, setAiInitialText] = useState("");
   const [aiAutoRecord, setAiAutoRecord] = useState(false);
   const [showPix, setShowPix] = useState(false);
+  const [showPixConfig, setShowPixConfig] = useState(false);
 
   const currentDayQuery = useQuery({ queryKey: ["dias", "atual"], queryFn: api.dias.current });
+  // Chave Pix da própria pessoa (por conta, no aparelho): decide se o Pix já
+  // gera QR ou se leva ao cadastro.
+  const pixConfigQuery = useQuery({
+    queryKey: ["pix-config", user?.id],
+    queryFn: () => readPixConfig(user?.id),
+    enabled: Boolean(user?.id)
+  });
   const productsQuery = useQuery({ queryKey: ["produtos", "ativos"], queryFn: () => api.produtos.list(true) });
   const resumoQuery = useQuery({
     queryKey: ["relatorios", "dia", currentDayQuery.data?.id],
@@ -574,10 +584,28 @@ export function SalesScreen() {
         onClose={() => setShowPix(false)}
         amount={total}
         itemCount={itemCount}
+        config={pixConfigQuery.data ?? null}
+        // Botão "Configurar/Editar" leva ao cadastro: fecha o Pix, abre o form,
+        // e ao salvar reabre o Pix já com o QR pronto.
+        onConfigure={() => {
+          setShowPix(false);
+          setShowPixConfig(true);
+        }}
         registering={registerSale.isPending}
         canRegister={!saleDisabled}
         // Mesma venda do botão comum: registra, e só então fecha o Pix.
         onRegister={(onDone) => registerSale.mutate(undefined, { onSuccess: () => onDone() })}
+      />
+
+      <PixConfigSheet
+        visible={showPixConfig}
+        onClose={() => setShowPixConfig(false)}
+        userId={user?.id ?? null}
+        initial={pixConfigQuery.data ?? null}
+        onSaved={() => {
+          setShowPixConfig(false);
+          setShowPix(true);
+        }}
       />
       <OpenDaySheet visible={sheet === "open-day"} onClose={() => setSheet(null)} products={products} />
       <ProductionSheet visible={sheet === "production"} onClose={() => setSheet(null)} day={currentDay} products={products} />

@@ -11,13 +11,15 @@ import {
   MessageSquare,
   Pencil,
   Phone,
+  QrCode,
   UserRound
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ApiLogPanel } from "@/components/api-log-panel";
 import { IaMediaPanel } from "@/components/ia-media-panel";
+import { PixConfigSheet } from "@/components/pix-config-sheet";
 import { PlansShowcase } from "@/components/plans-showcase";
 import { ReportSheet } from "@/components/report-sheet";
 import { ReportsPanel } from "@/components/reports-panel";
@@ -28,6 +30,7 @@ import { planLabel } from "@/lib/access";
 import { api, ApiError } from "@/lib/api";
 import { brDateToIso, maskBrDate, toBrDate } from "@/lib/format";
 import { formatBrazilianPhone, isValidBrazilianPhone, PHONE_ERROR } from "@/lib/phone";
+import { isPixConfigComplete, PIX_KEY_LABEL, pixKeyDisplay, readPixConfig } from "@/lib/pix-config";
 import { emptyProfile, readProfile, saveProfile, type LocalProfile } from "@/lib/profile";
 import { colors, fonts, radius } from "@/lib/theme";
 import type { UsuarioPerfil } from "@/types/api";
@@ -49,6 +52,15 @@ export function ProfileScreen() {
   const { status, user, signOut, setUser } = useAuth();
   const [sheet, setSheet] = useState<ActiveSheet>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [pixConfigOpen, setPixConfigOpen] = useState(false);
+
+  // Chave Pix da própria pessoa (usada para gerar o QR na Venda).
+  const pixConfigQuery = useQuery({
+    queryKey: ["pix-config", user?.id],
+    queryFn: () => readPixConfig(user?.id),
+    enabled: Boolean(user?.id)
+  });
+  const pixConfig = pixConfigQuery.data ?? null;
 
   const [profile, setProfile] = useState<LocalProfile>(emptyProfile);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -206,6 +218,38 @@ export function ProfileScreen() {
           )}
         </Card>
 
+        {/* Recebimento por Pix: a pessoa cadastra a própria chave (gera o QR na Venda). */}
+        {status === "signed-in" ? (
+          <Card>
+            <Text style={styles.sectionTitle}>Recebimento por Pix</Text>
+            {isPixConfigComplete(pixConfig) ? (
+              <>
+                <InfoRow icon={<UserRound size={18} color={colors.brandDeep} />} label="Nome que recebe" value={pixConfig.nome} />
+                <InfoRow
+                  icon={<QrCode size={18} color={colors.brandDeep} />}
+                  label={`Chave (${PIX_KEY_LABEL[pixConfig.tipoChave].toLowerCase()})`}
+                  value={pixKeyDisplay(pixConfig.tipoChave, pixConfig.chave)}
+                />
+                <Button
+                  title="Editar meu Pix"
+                  tone="soft"
+                  icon={<QrCode size={18} color={colors.ink} />}
+                  onPress={() => setPixConfigOpen(true)}
+                />
+              </>
+            ) : (
+              <>
+                <Text style={styles.muted}>Cadastre sua chave Pix para gerar QR Code de cobrança na tela de Venda.</Text>
+                <Button
+                  title="Configurar meu Pix"
+                  icon={<QrCode size={18} color="#fff" />}
+                  onPress={() => setPixConfigOpen(true)}
+                />
+              </>
+            )}
+          </Card>
+        ) : null}
+
         {/* Ajuda e feedback: qualquer pessoa logada pode relatar um problema. */}
         {status === "signed-in" ? (
           <Card>
@@ -243,6 +287,12 @@ export function ProfileScreen() {
       />
       <ChangePasswordSheet visible={sheet === "password"} onClose={() => setSheet(null)} />
       <ReportSheet visible={reportOpen} onClose={() => setReportOpen(false)} contexto="Perfil" />
+      <PixConfigSheet
+        visible={pixConfigOpen}
+        onClose={() => setPixConfigOpen(false)}
+        userId={user?.id ?? null}
+        initial={pixConfig}
+      />
     </>
   );
 }
