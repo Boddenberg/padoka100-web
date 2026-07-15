@@ -198,8 +198,10 @@ Em celular físico, `localhost` aponta para o próprio aparelho. Para usar backe
 | `npm run android` | Inicia no Android. |
 | `npm run ios` | Inicia no iOS. |
 | `npm run web` | Inicia no navegador. |
+| `npm run build` | Alias compatível com o build automático do Railway. |
 | `npm run build:web` | Gera a versão web de produção em `dist`. |
 | `npm run start:web` | Serve a versão web usando a porta do ambiente. |
+| `npm run start:mobile` | Inicia explicitamente o servidor do Expo mobile. |
 | `npm run typecheck` | Valida TypeScript sem emitir build. |
 | `npm run lint` | Executa ESLint. |
 | `npm run doctor` | Roda diagnóstico do Expo. |
@@ -250,7 +252,10 @@ npm run build:web
 npm run start:web
 ```
 
-O `railway.json` executa esses comandos no serviço `padoka100-web`. O servidor entrega
+O `railway.json` executa esses comandos no serviço `padoka100-web`. Os aliases
+`npm run build` e `npm start` também reconhecem o Railway, o que mantém compatibilidade
+com configurações antigas do serviço. Fora do Railway, `npm start` continua iniciando o
+Expo mobile normalmente. O servidor entrega
 as rotas do Expo Router como SPA, responde em `/health` e usa a porta fornecida pelo
 Railway. O arquivo `public/sw.js` remove o antigo PWA Vite e seus caches quando um
 navegador que ainda guarda a primeira versão voltar ao endereço.
