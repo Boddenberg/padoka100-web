@@ -252,7 +252,8 @@ npm run build:web
 npm run start:web
 ```
 
-O `railway.json` executa esses comandos no serviço `padoka100-web`. Os aliases
+O `railway.json` usa o `Dockerfile` para compilar e servir a web no serviço
+`padoka100-web`. Os aliases
 `npm run build` e `npm start` também reconhecem o Railway, o que mantém compatibilidade
 com configurações antigas do serviço. Fora do Railway, `npm start` continua iniciando o
 Expo mobile normalmente. O servidor entrega
