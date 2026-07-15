@@ -34,6 +34,9 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
+    "web": {
+      "output": "single"
+    },
     "plugins": [
       "expo-router",
       [
@@ -55,8 +58,8 @@
     "extra": {
       "apiProdUrl": "https://padoka100-production.up.railway.app",
       "apiLocalUrl": "http://localhost:8000",
-      "supabaseUrl": "",
-      "supabaseAnonKey": "",
+      "supabaseUrl": "https://iblcjqegepghipkrahcb.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlibGNqcWVnZXBnaGlwa3JhaGNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMwNzA5MzcsImV4cCI6MjA3ODY0NjkzN30.kn4JpUthRLcaBlUhGwA0uxi4iJhuC2ny3S38wf7J9xE",
       "router": {},
       "eas": {
         "projectId": "1e644724-8f8e-46db-9ddb-c6f1a6cfcfa4"
