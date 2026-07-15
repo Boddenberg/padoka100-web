@@ -2,7 +2,6 @@ import { ArrowLeft, Camera, Images, MapPin, Trash2 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import {
   Alert,
-  Keyboard,
   Platform,
   Pressable,
   RefreshControl,
@@ -12,7 +11,7 @@ import {
   View
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ProductPhoto, Screen } from "@/components/ui";
+import { KeyboardDismissArea, ProductPhoto, Screen } from "@/components/ui";
 import { featurePlanName, upgradeMessage } from "@/lib/access";
 import { api, createMediaForm, type NativeFile } from "@/lib/api";
 import { useFontMultiplier } from "@/lib/font-scale";
@@ -57,7 +56,7 @@ export function SubPage({
           ) : undefined
         }
       >
-        <Pressable style={styles.page} onPress={Keyboard.dismiss} accessible={false}>
+        <KeyboardDismissArea style={styles.page}>
           <Pressable onPress={goBack} style={({ pressed }) => [styles.backRow, pressed && styles.pressed]}>
             <ArrowLeft size={18} color={colors.brandDeep} />
             <Text style={[styles.backText, { fontSize: 14 * scale }]}>Minha padoca</Text>
@@ -65,7 +64,7 @@ export function SubPage({
           <Text style={[styles.title, { fontSize: 30 * scale }]}>{title}</Text>
           {subtitle ? <Text style={[styles.subtitle, { fontSize: 15 * scale }]}>{subtitle}</Text> : null}
           {children}
-        </Pressable>
+        </KeyboardDismissArea>
       </ScrollView>
     </Screen>
   );

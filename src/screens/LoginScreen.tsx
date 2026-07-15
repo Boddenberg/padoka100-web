@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
-import { Button, Field, Input, StateText } from "@/components/ui";
+import { Button, Field, Input, KeyboardDismissArea, StateText } from "@/components/ui";
 import { AUTH_REQUIRED } from "@/constants/auth";
 import { loginErrorMessage, useAuth } from "@/contexts/auth";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
@@ -144,7 +144,7 @@ export function LoginScreen() {
             showsVerticalScrollIndicator={false}
             automaticallyAdjustKeyboardInsets
           >
-            <Pressable style={styles.content} onPress={Keyboard.dismiss} accessible={false}>
+            <KeyboardDismissArea style={styles.content}>
               {!keyboardOpen ? (
                 <View style={styles.brand}>
                   <Image source={require("../../Logo.png")} style={styles.logo} contentFit="contain" />
@@ -282,7 +282,7 @@ export function LoginScreen() {
                   </Pressable>
                 ) : null}
               </View>
-            </Pressable>
+            </KeyboardDismissArea>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

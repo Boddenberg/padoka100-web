@@ -7,6 +7,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -32,6 +33,21 @@ export function Screen({ children }: { children: ReactNode }) {
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       {children}
     </SafeAreaView>
+  );
+}
+
+// No navegador, um Pressable envolvendo inputs recebe o clique que borbulha do
+// campo e chama Keyboard.dismiss(), removendo o foco antes da digitação. Mantém
+// o toque-para-fechar-teclado apenas nas plataformas móveis.
+export function KeyboardDismissArea({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  if (Platform.OS === "web") {
+    return <View style={style}>{children}</View>;
+  }
+
+  return (
+    <Pressable style={style} onPress={Keyboard.dismiss} accessible={false}>
+      {children}
+    </Pressable>
   );
 }
 
@@ -71,7 +87,7 @@ export function Page({
         }
       >
         {/* Tocar em qualquer área vazia fecha o teclado. */}
-        <Pressable style={styles.page} onPress={Keyboard.dismiss} accessible={false}>
+        <KeyboardDismissArea style={styles.page}>
           <View style={styles.pageHeaderRow}>
             <View style={styles.pageHeaderText}>
               {greeting ? <Text style={[styles.greeting, { fontSize: 17 * scale }]}>{greeting}</Text> : null}
@@ -81,7 +97,7 @@ export function Page({
             {headerRight ? <View style={styles.pageHeaderActions}>{headerRight}</View> : null}
           </View>
           {children}
-        </Pressable>
+        </KeyboardDismissArea>
       </ScrollView>
     </Screen>
   );
@@ -561,9 +577,9 @@ export function Sheet({
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
-            <Pressable style={styles.sheetBody} onPress={Keyboard.dismiss} accessible={false}>
+            <KeyboardDismissArea style={styles.sheetBody}>
               {children}
-            </Pressable>
+            </KeyboardDismissArea>
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
