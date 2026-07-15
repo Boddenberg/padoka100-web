@@ -70,7 +70,8 @@ Sessão          expo-secure-store + contexto React
 UI              Componentes próprios + lucide-react-native
 Mídia           expo-image-picker + expo-image
 Áudio           expo-audio
-Build           EAS Build + Expo Updates
+Build mobile    EAS Build + Expo Updates
+Build web       Expo export + Railway
 Backend         FastAPI no Railway
 ```
 
@@ -197,6 +198,8 @@ Em celular físico, `localhost` aponta para o próprio aparelho. Para usar backe
 | `npm run android` | Inicia no Android. |
 | `npm run ios` | Inicia no iOS. |
 | `npm run web` | Inicia no navegador. |
+| `npm run build:web` | Gera a versão web de produção em `dist`. |
+| `npm run start:web` | Serve a versão web usando a porta do ambiente. |
 | `npm run typecheck` | Valida TypeScript sem emitir build. |
 | `npm run lint` | Executa ESLint. |
 | `npm run doctor` | Roda diagnóstico do Expo. |
@@ -237,6 +240,26 @@ eas build -p ios --profile production
 ```
 
 Para testar no **Expo Go**, não precisa gerar build: rode `npm run start` e escaneie o QR Code.
+
+### Web no Railway
+
+O mesmo código também gera a aplicação web atual, sem alterar os builds móveis:
+
+```bash
+npm run build:web
+npm run start:web
+```
+
+O `railway.json` executa esses comandos no serviço `padoka100-web`. O servidor entrega
+as rotas do Expo Router como SPA, responde em `/health` e usa a porta fornecida pelo
+Railway. O arquivo `public/sw.js` remove o antigo PWA Vite e seus caches quando um
+navegador que ainda guarda a primeira versão voltar ao endereço.
+
+Produção web:
+
+```txt
+https://padoka100-web-production.up.railway.app
+```
 
 ---
 
