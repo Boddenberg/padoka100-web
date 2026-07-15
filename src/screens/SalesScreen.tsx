@@ -228,8 +228,8 @@ export function SalesScreen() {
   const error = currentDayQuery.error || productsQuery.error || resumoQuery.error;
   const saleDisabled = !currentDay || !itemCount || currentDay.situacao !== "aberto" || !stockReady || hasStockIssue;
 
-  // A tela Hoje conta em que passo do dia a pessoa está:
-  // 1 Preparar (nada cadastrado) → 2 Vender (sem dia aberto) → dia aberto.
+  // A tela Hoje conduz a primeira configuração na ordem em que ela realmente
+  // acontece: cadastrar um produto, informar a produção e só então vender.
   const isFirstRun = !loading && !currentDay && productsQuery.isSuccess && products.length === 0;
   const isReadyToStart = !loading && !currentDay && productsQuery.isSuccess && products.length > 0;
 
@@ -246,68 +246,112 @@ export function SalesScreen() {
   const yesterdaySold = yesterdayQuery.data?.total_vendido ?? 0;
   const hasYesterday = Boolean(yesterdayQuery.data) && (toNumber(yesterdayQuery.data?.faturamento_bruto) > 0 || yesterdaySold > 0);
 
-  // Passeio guiado de primeiro acesso (coach marks). Os passos se adaptam ao
-  // estado da tela: sem dia aberto não há produtos para destacar, então esse
-  // passo é omitido (e o próprio tour pula qualquer alvo que não encontrar).
-  const tourStateRef = useRef({ hasDay: false, hasProducts: false });
-  tourStateRef.current = { hasDay: Boolean(currentDay), hasProducts: filteredProducts.length > 0 };
+  // O passeio nunca manda vender antes da hora: ele aponta para o primeiro
+  // pré-requisito que ainda falta e só ensina venda quando há itens no dia.
+  const tourStateRef = useRef({ hasDay: false, hasCatalogProducts: false, hasDayProducts: false });
+  tourStateRef.current = {
+    hasDay: Boolean(currentDay),
+    hasCatalogProducts: products.length > 0,
+    hasDayProducts: dayProducts.length > 0
+  };
 
   const buildTourSteps = (): CoachStep[] => {
-    const { hasDay, hasProducts } = tourStateRef.current;
+    const { hasDay, hasCatalogProducts, hasDayProducts } = tourStateRef.current;
     const steps: CoachStep[] = [
       {
         emoji: "👋",
         title: "Bem-vindo(a) ao Padoka 100%!",
-        body: "Vou te mostrar rapidinho onde fica cada coisa. É um passo de cada vez — toque em “Próximo”."
-      },
-      {
-        target: "coach-hero",
-        emoji: "🌅",
-        title: hasDay ? "O seu dia de venda" : "Comece o seu dia aqui",
-        body: hasDay
-          ? "Aqui aparece o total vendido de hoje. Toque nos botões para ver a produção, as vendas e para fechar o dia."
-          : "Toque em “Começar o dia” e diga quanto você preparou. Depois é só vender."
-      },
-      {
-        target: "coach-agent",
-        emoji: "🥐",
-        title: `Fale com o ${AGENT_NAME}`,
-        body: `Toque no ${AGENT_NAME} e fale, por exemplo, “vende 2 pães de queijo”, que ele registra pra você. Aqui também dá para buscar um produto.`
+        body: "Vou mostrar apenas o próximo passo que faz sentido para a sua padoca."
       }
     ];
-    if (hasDay && hasProducts) {
+
+    if (!hasCatalogProducts) {
       steps.push({
-        target: "coach-products",
+        target: "coach-first-product",
         emoji: "🥖",
-        title: "Toque para vender",
-        body: "Toque no produto para colocar na sacola. Use os botões “+” e “−” para ajustar a quantidade.",
-        maxSpotlightHeight: 260
+        title: "Primeiro, cadastre um produto",
+        body: "Toque em “Cadastrar produto”. Nome e preço já bastam; depois você informa quanto produziu."
       });
+    } else if (!hasDay) {
+      steps.push({
+        target: "coach-hero",
+        emoji: "🧺",
+        title: "Agora, informe a produção",
+        body: "Toque em “Começar o dia” e diga quantos itens preparou. Só depois eles aparecem disponíveis para venda."
+      });
+    } else {
+      steps.push({
+        target: "coach-hero",
+        emoji: "🌅",
+        title: "O seu dia de trabalho",
+        body: "Aqui aparecem a produção e o total vendido de hoje. Você também pode revisar as vendas ou fechar o dia."
+      });
+
+      if (!hasDayProducts) {
+        steps.push({
+          target: "coach-products",
+          emoji: "🧺",
+          title: "Registre o que foi produzido",
+          body: "Ainda não há itens para vender. Toque em “Registrar produção” e informe as quantidades preparadas.",
+          maxSpotlightHeight: 260
+        });
+      } else {
+        steps.push(
+          {
+            target: "coach-agent",
+            emoji: "🥐",
+            title: `Fale com o ${AGENT_NAME}`,
+            body: `Agora sim: peça ao ${AGENT_NAME} para registrar uma venda ou use a busca para encontrar um produto.`
+          },
+          {
+            target: "coach-products",
+            emoji: "🥖",
+            title: "Venda com um toque",
+            body: "Toque no produto para colocá-lo na sacola. Use “+” e “−” para ajustar a quantidade.",
+            maxSpotlightHeight: 260
+          }
+        );
+      }
     }
+
     steps.push({
       region: "tabs",
       cornerRadius: 26,
       emoji: "🧭",
       title: "Tudo à mão aqui embaixo",
-      body: "Hoje, Minha padoca, Resumo e Perfil. Toque nos ícones para trocar de tela."
+      body: !hasCatalogProducts
+        ? "Em “Minha padoca” você também cadastra produtos, locais e custos. Depois, volte para Hoje."
+        : "Hoje, Minha padoca, Resumo e Perfil. Toque nos ícones para trocar de tela."
     });
     steps.push({
       emoji: "✅",
-      title: "Prontinho!",
-      body: "Você pode rever este passeio quando quiser, em Preferências (a engrenagem no topo). Boas vendas! 🥐"
+      title: hasDayProducts ? "Prontinho!" : "Seu próximo passo está claro",
+      body: !hasCatalogProducts
+        ? "Feche o passeio e toque em “Cadastrar produto”. A venda será apresentada somente depois do cadastro e da produção."
+        : !hasDay
+          ? "Feche o passeio e toque em “Começar o dia” para informar a produção."
+          : !hasDayProducts
+            ? "Feche o passeio e toque em “Registrar produção”. Quando houver itens, eu mostro como vender."
+            : "Você pode rever este passeio quando quiser, em Preferências. Boas vendas! 🥐"
     });
     return steps;
   };
 
   // Primeiro login: abre o passeio uma única vez, e SÓ quando a sessão está
-  // comprovadamente válida — produtos carregados com sucesso significa que o
-  // token funcionou. Sem essa trava, um 401 logo após restaurar a sessão salva
+  // comprovadamente válida — dia, produtos e estoque já precisam estar
+  // carregados. Sem essa trava, um 401 logo após restaurar a sessão salva
   // (que assume "logado" por um instante) fazia o tour disparar já na tela de
   // login, apontando para alvos que não existem mais.
   const coachRef = useRef(coach);
   coachRef.current = coach;
   const tourStartedRef = useRef(false);
-  const canStartTour = status === "signed-in" && Boolean(user?.id) && productsQuery.isSuccess && !loading;
+  const canStartTour =
+    status === "signed-in" &&
+    Boolean(user?.id) &&
+    currentDayQuery.isSuccess &&
+    productsQuery.isSuccess &&
+    stockReady &&
+    !loading;
 
   useEffect(() => {
     if (tourStartedRef.current || !canStartTour || !user?.id) return;
@@ -425,19 +469,21 @@ export function SalesScreen() {
             oferece o botão. Os próximos passos ficam à espera, logo abaixo. */}
         {isFirstRun ? (
           <>
-            <AgentSays
-              name={AGENT_DISPLAY_NAME}
-              text={`Oi! Eu sou o ${AGENT_NAME}, seu ajudante aqui na padoca. Primeiro, cadastre o que você vende — nome e preço já bastam.`}
-            >
-              <Button title="Cadastrar produto" onPress={() => router.push("/produtos?novo=1")} />
-            </AgentSays>
+            <CoachAnchor name="coach-first-product">
+              <AgentSays
+                name={AGENT_DISPLAY_NAME}
+                text={`Oi! Eu sou o ${AGENT_NAME}, seu ajudante aqui na padoca. Primeiro, cadastre o que você vende — nome e preço já bastam.`}
+              >
+                <Button title="Cadastrar produto" onPress={() => router.push("/produtos?novo=1")} />
+              </AgentSays>
+            </CoachAnchor>
             <View style={[styles.taskCard, styles.taskCardOff]}>
               <View style={[styles.taskNumber, styles.taskNumberOff]}>
                 <Text style={[styles.taskNumberText, styles.taskNumberTextOff]}>2</Text>
               </View>
               <View style={styles.taskBody}>
-                <Text style={styles.taskTitle}>Comece o dia</Text>
-                <Text style={styles.taskHint}>Diga quantos de cada um você preparou.</Text>
+                <Text style={styles.taskTitle}>Informe a produção</Text>
+                <Text style={styles.taskHint}>Depois do cadastro, diga quantos itens preparou.</Text>
               </View>
             </View>
             <View style={[styles.taskCard, styles.taskCardOff]}>
@@ -445,8 +491,8 @@ export function SalesScreen() {
                 <Text style={[styles.taskNumberText, styles.taskNumberTextOff]}>3</Text>
               </View>
               <View style={styles.taskBody}>
-                <Text style={styles.taskTitle}>Venda com um toque</Text>
-                <Text style={styles.taskHint}>Toque no produto e a venda está registrada.</Text>
+                <Text style={styles.taskTitle}>Venda quando estiver pronto</Text>
+                <Text style={styles.taskHint}>Os produtos serão liberados aqui após a produção.</Text>
               </View>
             </View>
           </>
@@ -685,10 +731,10 @@ function DayHero({
   );
 }
 
-// A linha do dia dentro do cartão: Preparar → Vender → Fechar. Mostra o que
-// já foi feito, o passo atual e o que vem depois — o fio da história de Hoje.
+// A linha da primeira configuração: Cadastrar → Produzir → Vender. Ela não pula
+// direto para venda quando a pessoa ainda nem tem produto ou estoque.
 function DayJourney({ current }: { current: 1 | 2 }) {
-  const steps = ["Preparar", "Vender", "Fechar"];
+  const steps = ["Cadastrar", "Produzir", "Vender"];
   return (
     <View style={styles.journey}>
       {steps.map((label, index) => {
